@@ -3,13 +3,14 @@ import DashboardPage from './pages/DashboardPage.jsx';
 import CustomersPage from './pages/CustomersPage.jsx';
 import EquipmentPage from './pages/EquipmentPage.jsx';
 import CalendarPage from './pages/CalendarPage.jsx';
+import WorkOrdersPage from './pages/WorkOrdersPage.jsx';
 
 const MENU = [
   { id: 'anasayfa', ad: 'Ana Sayfa', ikon: '🏠' },
   { id: 'musteriler', ad: 'Müşteriler', ikon: '👥' },
   { id: 'takvim', ad: 'Bakım Takvimi', ikon: '📅' },
+  { id: 'isemirleri', ad: 'İş Emirleri', ikon: '📋' },
   { id: 'ekipman', ad: 'Ekipmanlar', ikon: '🛠️' },
-  { id: 'isemirleri', ad: 'İş Emirleri', ikon: '📋', yakinda: true },
   { id: 'raporlar', ad: 'Raporlar', ikon: '📊', yakinda: true },
   { id: 'ayarlar', ad: 'Ayarlar', ikon: '⚙️', yakinda: true },
 ];
@@ -74,6 +75,7 @@ export default function App() {
         {sayfa === 'anasayfa' && <DashboardPage onNavigate={git} />}
         {sayfa === 'musteriler' && <CustomersPage />}
         {sayfa === 'takvim' && <CalendarPage />}
+        {sayfa === 'isemirleri' && <WorkOrdersPage />}
         {sayfa === 'ekipman' && <EquipmentPage />}
       </main>
     </div>
