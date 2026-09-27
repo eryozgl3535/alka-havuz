@@ -17,7 +17,7 @@ export default function App() {
         <img
           src="/logopng.jpg"
           alt="ALKA Havuz"
-          style={{ height: 90, width: 90, borderRadius: 14, objectFit: 'cover' }}
+          style={{ height: 180, width: 180, borderRadius: 20, objectFit: 'cover' }}
         />
         <div>
           <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: 1 }}>ALKA HAVUZ</div>
