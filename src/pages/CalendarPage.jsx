@@ -159,4 +159,77 @@ export default function CalendarPage() {
 
         {yukleniyor ? (
           <p style={s.bos}>Yükleniyor...</p>
-        ) :
+        ) : liste.length === 0 ? (
+          <p style={s.bos}>Bu aralıkta bakım yok.</p>
+        ) : (
+          liste.map((k) => {
+            const e = k.equipment || {};
+            const m = e.customers || {};
+            const d = durum(kalanGun(k.next_due_date));
+            const wa = whatsappLink(m.phone, m.name, k.rule_name, k.next_due_date);
+            return (
+              <div key={k.id} style={s.satir}>
+                <div style={s.ikon}>{IKON[e.category] || '🛠️'}</div>
+                <div style={{ flex: 1, minWidth: 180 }}>
+                  <div style={s.musteri}>{m.name || '-'}</div>
+                  <div style={s.kucuk}>
+                    {e.category} · {e.equipment_type}{m.address ? ` · 📍 ${m.address}` : ''}
+                  </div>
+                  <div style={s.bakim}>{k.rule_name} · {trTarih(k.next_due_date)}</div>
+                </div>
+                <div style={{ ...s.rozet, color: d.renk, background: d.zemin }}>{d.etiket}</div>
+                <div style={s.butonlar}>
+                  {wa && <a href={wa} target="_blank" rel="noreferrer" style={s.waBtn}>WhatsApp hatırlat</a>}
+                  <button style={s.yapildiBtn} onClick={() => yapildi(k)}>✓ Yapıldı</button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+const s = {
+  sayfa: { padding: 20, maxWidth: 1000, margin: '0 auto', fontFamily: 'system-ui, sans-serif' },
+  baslik: { margin: 0, fontSize: 26, color: '#0f2d4a' },
+  altBaslik: { margin: '4px 0 20px', color: '#64748b', fontSize: 14 },
+  hata: { background: '#fee2e2', color: '#991b1b', padding: 12, borderRadius: 10, marginBottom: 14 },
+  kart: { background: '#fff', borderRadius: 16, padding: 18, marginBottom: 16,
+    boxShadow: '0 2px 12px rgba(15,45,74,0.08)' },
+  takvimUst: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  ayBaslik: { margin: 0, fontSize: 20, color: '#0f2d4a' },
+  okBtn: { width: 38, height: 38, borderRadius: 10, border: '1px solid #cbd5e1', background: '#fff',
+    cursor: 'pointer', fontSize: 20 },
+  takvim: { display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 6 },
+  gunBaslik: { textAlign: 'center', fontWeight: 700, fontSize: 13, color: '#0f2d4a', padding: '6px 0' },
+  hucre: { minHeight: 58, border: '1px solid #eef2f6', borderRadius: 10, background: '#fff', cursor: 'pointer',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
+    fontSize: 15, color: '#334155' },
+  bugun: { borderColor: '#1d6fe0', borderWidth: 2, fontWeight: 700, color: '#1d6fe0' },
+  secili: { background: '#1d6fe0', color: '#fff', borderColor: '#1d6fe0' },
+  sayac: { minWidth: 20, height: 20, borderRadius: 10, color: '#fff', fontSize: 11, fontWeight: 700,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' },
+  filtreler: { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 },
+  filtreBtn: { padding: '10px 16px', borderRadius: 20, border: '1px solid #cbd5e1', background: '#fff',
+    cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#334155' },
+  filtreAktif: { background: '#0f2d4a', color: '#fff', borderColor: '#0f2d4a' },
+  listeUst: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  listeBaslik: { margin: 0, fontSize: 18, color: '#0f2d4a' },
+  linkBtn: { background: 'none', border: 'none', color: '#1d6fe0', fontWeight: 600, cursor: 'pointer' },
+  bos: { color: '#64748b', fontSize: 14, margin: 0 },
+  satir: { display: 'flex', alignItems: 'center', gap: 14, padding: '14px 0', borderTop: '1px solid #eef2f6',
+    flexWrap: 'wrap' },
+  ikon: { width: 50, height: 50, borderRadius: 10, background: '#eef2f6', display: 'flex', alignItems: 'center',
+    justifyContent: 'center', fontSize: 24 },
+  musteri: { fontWeight: 700, color: '#0f2d4a', fontSize: 16 },
+  kucuk: { fontSize: 13, color: '#64748b', marginTop: 2 },
+  bakim: { fontSize: 14, color: '#334155', marginTop: 4, fontWeight: 600 },
+  rozet: { padding: '6px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' },
+  butonlar: { display: 'flex', gap: 8, flexWrap: 'wrap' },
+  waBtn: { background: '#16a34a', color: '#fff', borderRadius: 8, padding: '9px 12px',
+    textDecoration: 'none', fontSize: 13, fontWeight: 600 },
+  yapildiBtn: { background: '#0f2d4a', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 12px',
+    fontWeight: 600, cursor: 'pointer', fontSize: 13 },
+};
