@@ -6,6 +6,8 @@ import CustomersPage from './pages/CustomersPage.jsx';
 import EquipmentPage from './pages/EquipmentPage.jsx';
 import CalendarPage from './pages/CalendarPage.jsx';
 import WorkOrdersPage from './pages/WorkOrdersPage.jsx';
+import ReportsPage from './pages/ReportsPage.jsx';
+import SettingsPage from './pages/SettingsPage.jsx';
 
 const MENU = [
   { id: 'anasayfa', ad: 'Ana Sayfa', ikon: '🏠' },
@@ -13,8 +15,8 @@ const MENU = [
   { id: 'takvim', ad: 'Bakım Takvimi', ikon: '📅' },
   { id: 'isemirleri', ad: 'İş Emirleri', ikon: '📋' },
   { id: 'ekipman', ad: 'Ekipmanlar', ikon: '🛠️' },
-  { id: 'raporlar', ad: 'Raporlar', ikon: '📊', yakinda: true },
-  { id: 'ayarlar', ad: 'Ayarlar', ikon: '⚙️', yakinda: true },
+  { id: 'raporlar', ad: 'Raporlar', ikon: '📊' },
+  { id: 'ayarlar', ad: 'Ayarlar', ikon: '⚙️' },
 ];
 
 function kullaniciBilgisi(session) {
@@ -93,13 +95,11 @@ export default function App() {
               return (
                 <button
                   key={m.id}
-                  disabled={m.yakinda}
                   onClick={() => git(m.id)}
-                  style={{ ...s.menuBtn, ...(aktif ? s.menuAktif : {}), ...(m.yakinda ? s.menuPasif : {}) }}
+                  style={{ ...s.menuBtn, ...(aktif ? s.menuAktif : {}) }}
                 >
                   <span style={{ fontSize: 20 }}>{m.ikon}</span>
                   <span>{m.ad}</span>
-                  {m.yakinda && <span style={s.yakinda}>yakında</span>}
                 </button>
               );
             })}
@@ -126,6 +126,8 @@ export default function App() {
         {sayfa === 'takvim' && <CalendarPage />}
         {sayfa === 'isemirleri' && <WorkOrdersPage />}
         {sayfa === 'ekipman' && <EquipmentPage />}
+        {sayfa === 'raporlar' && <ReportsPage />}
+        {sayfa === 'ayarlar' && <SettingsPage session={session} />}
       </main>
     </div>
   );
@@ -152,8 +154,6 @@ const s = {
     color: '#e2e8f0', fontSize: 16, fontWeight: 500, cursor: 'pointer', textAlign: 'left',
   },
   menuAktif: { background: '#1d6fe0', color: '#fff', fontWeight: 700 },
-  menuPasif: { opacity: 0.45, cursor: 'default' },
-  yakinda: { marginLeft: 'auto', fontSize: 10, background: 'rgba(255,255,255,0.15)', padding: '2px 6px', borderRadius: 6 },
   kullaniciKutu: {
     display: 'flex', alignItems: 'center', gap: 10, marginTop: 16, padding: 12,
     background: 'rgba(255,255,255,0.08)', borderRadius: 14,
