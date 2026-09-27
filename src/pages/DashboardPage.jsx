@@ -136,4 +136,107 @@ export default function DashboardPage({ onNavigate }) {
                     <div style={s.musteri}>{m.name || '-'}</div>
                     {m.address && <div style={s.kucuk}>📍 {m.address}</div>}
                   </div>
-                  <div style={{ flex:
+                  <div style={{ flex: 1, minWidth: 120 }}>
+                    <div style={s.orta}>{e.category}</div>
+                    <div style={s.kucuk}>{e.equipment_type}</div>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 120, ...s.orta }}>{k.rule_name}</div>
+                  <div style={{ ...s.rozet, color: d.renk, background: d.zemin }}>
+                    {g < 0 ? `${Math.abs(g)} gün geçti` : `${g} gün`}
+                  </div>
+                  <div style={{ ...s.rozet, color: d.renk, background: d.zemin }}>{d.etiket}</div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <div style={s.sagKolon}>
+          <div style={s.kart}>
+            <div style={s.kartBaslikSatir}>
+              <h2 style={s.kartBaslik}>{AYLAR[a]} {y}</h2>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button style={s.okBtn} onClick={() => setTakvimAy(new Date(y, a - 1, 1))}>‹</button>
+                <button style={s.okBtn} onClick={() => setTakvimAy(new Date(y, a + 1, 1))}>›</button>
+              </div>
+            </div>
+            <div style={s.takvim}>
+              {GUNLER.map((g, i) => <div key={i} style={s.takvimBaslik}>{g}</div>)}
+              {hucreler.map((d, i) => {
+                if (!d) return <div key={i} />;
+                const bugunMu = y === bugun.getFullYear() && a === bugun.getMonth() && d === bugun.getDate();
+                const nokta = gunNokta(d);
+                return (
+                  <div key={i} style={s.takvimHucre}>
+                    <div style={bugunMu ? s.bugun : s.gunNo}>{d}</div>
+                    <div style={{ ...s.nokta, background: nokta || 'transparent' }} />
+                  </div>
+                );
+              })}
+            </div>
+            <div style={s.lejant}>
+              <span><span style={{ ...s.lejNokta, background: '#dc2626' }} /> Geçmiş</span>
+              <span><span style={{ ...s.lejNokta, background: '#b45309' }} /> Yaklaşıyor</span>
+              <span><span style={{ ...s.lejNokta, background: '#1d4ed8' }} /> Planlandı</span>
+            </div>
+          </div>
+
+          <div style={s.kart}>
+            <h2 style={{ ...s.kartBaslik, marginBottom: 12 }}>Hızlı İşlemler</h2>
+            <button style={s.hizliBtn} onClick={() => onNavigate && onNavigate('ekipman')}>🛠️ Yeni Ekipman / Bakım</button>
+            <button style={s.hizliBtn} onClick={() => onNavigate && onNavigate('musteriler')}>👥 Yeni Müşteri</button>
+          </div>
+
+          <div style={s.kart}>
+            <h2 style={{ ...s.kartBaslik, marginBottom: 8 }}>Son Mesajlar</h2>
+            <p style={s.bos}>WhatsApp/SMS bildirimleri (Verimor) bağlandığında burada görünecek.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const stiller = {
+  sayfa: { padding: 24, fontFamily: 'system-ui, sans-serif' },
+  ust: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 20 },
+  baslik: { margin: 0, fontSize: 30, color: '#0f2d4a', fontWeight: 800 },
+  tarih: { color: '#64748b', fontSize: 15, marginTop: 4 },
+  anaBtn: { background: '#1d6fe0', color: '#fff', border: 'none', borderRadius: 12, padding: '14px 22px',
+    fontWeight: 700, fontSize: 16, cursor: 'pointer' },
+  istatistikler: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 16, marginBottom: 20 },
+  istKart: { display: 'flex', alignItems: 'center', gap: 16, padding: 20, borderRadius: 16, cursor: 'pointer' },
+  istIkon: { width: 56, height: 56, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 },
+  istSayi: { fontSize: 32, fontWeight: 800, lineHeight: 1 },
+  istEtiket: { fontSize: 15, color: '#334155', marginTop: 4 },
+  istAlt: { fontSize: 12, color: '#64748b' },
+  izgara: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))', gap: 20, alignItems: 'start' },
+  sagKolon: { display: 'flex', flexDirection: 'column', gap: 20 },
+  kart: { background: '#fff', borderRadius: 16, padding: 20, boxShadow: '0 2px 12px rgba(15,45,74,0.08)' },
+  kartBaslikSatir: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  kartBaslik: { margin: 0, fontSize: 19, color: '#0f2d4a' },
+  linkBtn: { background: 'none', border: 'none', color: '#1d6fe0', fontWeight: 600, cursor: 'pointer', fontSize: 14 },
+  bos: { color: '#64748b', fontSize: 14, margin: 0 },
+  satir: { display: 'flex', alignItems: 'center', gap: 14, padding: '12px 0', borderTop: '1px solid #eef2f6', flexWrap: 'wrap' },
+  tarihKutu: { minWidth: 64 },
+  tarihGun: { fontWeight: 700, color: '#0f2d4a' },
+  tarihYil: { fontSize: 13, color: '#64748b' },
+  ikonKutu: { width: 52, height: 52, borderRadius: 10, background: '#eef2f6', display: 'flex', alignItems: 'center',
+    justifyContent: 'center', fontSize: 26 },
+  musteri: { fontWeight: 700, color: '#0f2d4a' },
+  orta: { fontSize: 14, color: '#334155' },
+  kucuk: { fontSize: 13, color: '#64748b' },
+  rozet: { padding: '6px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' },
+  okBtn: { width: 30, height: 30, borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontSize: 16 },
+  takvim: { display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4, textAlign: 'center' },
+  takvimBaslik: { fontWeight: 700, fontSize: 13, color: '#0f2d4a', padding: '4px 0' },
+  takvimHucre: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4px 0' },
+  gunNo: { fontSize: 14, color: '#334155', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  bugun: { fontSize: 14, color: '#fff', background: '#1d6fe0', borderRadius: '50%', width: 30, height: 30,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 },
+  nokta: { width: 6, height: 6, borderRadius: '50%', marginTop: 2 },
+  lejant: { display: 'flex', gap: 12, fontSize: 12, color: '#475569', marginTop: 12, flexWrap: 'wrap' },
+  lejNokta: { display: 'inline-block', width: 8, height: 8, borderRadius: '50%', marginRight: 4 },
+  hizliBtn: { display: 'block', width: '100%', textAlign: 'left', background: '#eff6ff', border: 'none', borderRadius: 10,
+    padding: '14px 16px', marginBottom: 10, fontSize: 15, color: '#0f2d4a', cursor: 'pointer', fontWeight: 600 },
+};
