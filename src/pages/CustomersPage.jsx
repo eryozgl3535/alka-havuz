@@ -6,12 +6,17 @@ const AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz',
 const KATEGORI = {
   Havuz: {
     ikon: '🏊',
-    cihazlar: ['Kum filtresi', 'Havuz motoru (pompa)', 'Isı pompası', 'Klor / tuz jeneratörü',
-      'Dozaj pompası', 'Havuz aydınlatma', 'Havuz robotu', 'Genel havuz bakımı'],
+    cihazlar: ['Kum filtresi', 'Havuz motoru (pompa)', 'Isı pompası', 'Havuz ısıtıcı / eşanjör', 'Klor / tuz jeneratörü',
+      'Dozaj pompası', 'Otomatik dozaj sistemi', 'UV sterilizasyon', 'Skimmer', 'Dengeleme deposu',
+      'Havuz aydınlatma', 'Havuz robotu', 'Havuz panosu', 'Genel havuz bakımı'],
     bakimlar: [
       { ad: 'Havuz periyodik bakım', ay: 1 },
       { ad: 'Su analizi (pH / klor)', ay: 1 },
+      { ad: 'Filtre ters yıkama (backwash)', ay: 1 },
+      { ad: 'Pompa ön filtre temizliği', ay: 1 },
+      { ad: 'Pano kontrolü', ay: 6 },
       { ad: 'Havuz motoru kontrolü', ay: 12 },
+      { ad: 'Isı pompası bakımı', ay: 12 },
       { ad: 'Filtre kumu değişimi', ay: 24 },
       { ad: 'Yaz öncesi genel kontrol', ayNo: 4, mevsim: true },
       { ad: 'Havuz sezon açılışı', ayNo: 5, mevsim: true },
@@ -20,30 +25,39 @@ const KATEGORI = {
   },
   Kuyu: {
     ikon: '💧',
-    cihazlar: ['Dalgıç pompa', 'Kuyu motoru', 'Kontrol panosu', 'Çekvalf / vana', 'Kuyu kablosu', 'Genel kuyu bakımı'],
+    cihazlar: ['Dalgıç pompa', 'Kuyu motoru', 'Kontrol panosu', 'Frekans invertörü', 'Seviye flatörü / şamandıra',
+      'Çekvalf / vana', 'Kuyu kablosu', 'Kolon borusu', 'Su deposu', 'Genel kuyu bakımı'],
     bakimlar: [
       { ad: 'Pano / elektrik kontrolü', ay: 6 },
+      { ad: 'Kontaktör / termik kontrolü', ay: 6 },
+      { ad: 'Kuyu seviye ölçümü', ay: 6 },
       { ad: 'Pompa genel kontrolü', ay: 12 },
       { ad: 'Su debisi ölçümü', ay: 12 },
+      { ad: 'Su analizi', ay: 12 },
       { ad: 'Yaz öncesi kuyu kontrolü', ayNo: 4, mevsim: true },
       { ad: 'Kış kontrolü (don)', ayNo: 1, mevsim: true },
     ],
   },
   Hidrofor: {
     ikon: '🔵',
-    cihazlar: ['Hidrofor tankı', 'Hidrofor pompası', 'Basınç şalteri', 'Genleşme tankı', 'Genel hidrofor bakımı'],
+    cihazlar: ['Hidrofor tankı', 'Hidrofor pompası', 'Paket hidrofor', 'Frekans invertörlü hidrofor', 'Basınç şalteri',
+      'Genleşme tankı', 'Manometre', 'Çekvalf', 'Genel hidrofor bakımı'],
     bakimlar: [
       { ad: 'Tank hava basıncı kontrolü', ay: 3 },
       { ad: 'Basınç şalteri kontrolü', ay: 6 },
+      { ad: 'Manometre kontrolü', ay: 6 },
       { ad: 'Pompa genel kontrolü', ay: 12 },
       { ad: 'Kış kontrolü (don)', ayNo: 1, mevsim: true },
     ],
   },
   Sulama: {
     ikon: '🌱',
-    cihazlar: ['Sulama pompası', 'Sulama kontrol ünitesi', 'Damla sulama hattı', 'Fıskiye / sprinkler', 'Sulama filtresi'],
+    cihazlar: ['Sulama pompası', 'Sulama kontrol ünitesi (timer)', 'Selenoid vana', 'Damla sulama hattı',
+      'Fıskiye / sprinkler', 'Sulama filtresi', 'Gübre tankı', 'Genel sulama bakımı'],
     bakimlar: [
       { ad: 'Sulama filtresi temizliği', ay: 3 },
+      { ad: 'Damla uç / fıskiye temizliği', ay: 3 },
+      { ad: 'Selenoid vana kontrolü', ay: 6 },
       { ad: 'Sistem genel kontrolü', ay: 12 },
       { ad: 'Sulama sezon açılışı', ayNo: 4, mevsim: true },
       { ad: 'Sulama sezon kapanışı (boşaltma)', ayNo: 10, mevsim: true },
@@ -51,29 +65,40 @@ const KATEGORI = {
   },
   Tesisat: {
     ikon: '🔧',
-    cihazlar: ['Temiz su tesisatı', 'Gider / pis su hattı', 'Kollektör / vana', 'Su arıtma / filtre', 'Termosifon / şofben'],
+    cihazlar: ['Temiz su tesisatı', 'Gider / pis su hattı', 'Kollektör / vana', 'Su deposu', 'Basınç düşürücü',
+      'Su arıtma / filtre', 'Termosifon / şofben', 'Batarya / armatür', 'Genel tesisat bakımı'],
     bakimlar: [
       { ad: 'Su filtresi değişimi', ay: 6 },
       { ad: 'Genel tesisat kontrolü', ay: 12 },
+      { ad: 'Depo temizliği', ay: 12 },
+      { ad: 'Basınç düşürücü kontrolü', ay: 12 },
       { ad: 'Kış kontrolü (don / boru)', ayNo: 1, mevsim: true },
     ],
   },
   Elektrik: {
     ikon: '⚡',
-    cihazlar: ['Elektrik panosu', 'Motor / pompa bağlantısı', 'Kaçak akım rölesi', 'Dış aydınlatma'],
+    cihazlar: ['Elektrik panosu', 'Motor / pompa bağlantısı', 'Kontaktör', 'Termik röle', 'Kondansatör',
+      'Motor koruma şalteri', 'Faz koruma rölesi', 'Kaçak akım rölesi', 'Frekans invertörü', 'Topraklama',
+      'Dış aydınlatma'],
     bakimlar: [
       { ad: 'Pano kontrolü', ay: 6 },
+      { ad: 'Kontaktör / termik kontrolü', ay: 6 },
       { ad: 'Kaçak akım testi', ay: 12 },
       { ad: 'Topraklama ölçümü', ay: 12 },
+      { ad: 'Klemens sıkma kontrolü', ay: 12 },
       { ad: 'Kış öncesi elektrik kontrolü', ayNo: 11, mevsim: true },
     ],
   },
 };
 
-const MARKALAR = ['Impo', 'Coverco', 'Diğer'];
-const URUN_TURLERI = ['Dalgıç pompa', 'Dalgıç motor', 'Santrifüj pompa', 'Havuz pompası', 'Hidrofor seti',
-  'Drenaj pompası', 'Sirkülasyon pompası'];
-const GUCLER = ['0.5', '0.75', '1', '1.5', '2', '3', '4', '5.5', '7.5', '10', '15'];
+const MARKALAR = ['Impo', 'Coverco', 'Sumak', 'Standart Pompa', 'Etna', 'Pedrollo', 'Grundfos', 'Wilo', 'Diğer'];
+const URUN_TURLERI = ['Dalgıç pompa', 'Dalgıç motor', 'Santrifüj pompa', 'Monoblok pompa', 'Çok kademeli pompa',
+  'Havuz pompası', 'Hidrofor seti', 'Paket hidrofor', 'Drenaj pompası', 'Sirkülasyon pompası', 'Isı pompası', 'Filtre'];
+const FAZLAR = ['Monofaze (220V)', 'Trifaze (380V)'];
+const GUCLER = ['0.5', '0.75', '1', '1.5', '2', '3', '4', '5.5', '7.5', '10', '15', '20', '25', '30'];
+const PARCALAR = ['Kontaktör', 'Termik röle', 'Kondansatör', 'Motor koruma şalteri', 'Sigorta', 'Kaçak akım rölesi',
+  'Faz koruma rölesi', 'Zaman rölesi', 'Seviye flatörü / şamandıra', 'Basınç şalteri', 'Kuru çalışma koruması',
+  'Frekans invertörü', 'Soft starter', 'Manometre', 'Çekvalf', 'Pano'];
 
 const OZEL_SECENEKLER = [
   ...[1, 2, 3, 6, 12, 24].map((a) => ({ deger: `p-${a}`, yazi: `${a} ayda bir` })),
@@ -120,15 +145,17 @@ function kuralSatiri(k, cihazId, tarih) {
 }
 
 const bosCihaz = () => ({
-  kategori: '', cihaz: '', digerCihaz: '', marka: '', digerMarka: '', urunTuru: '', guc: '', model: '',
-  konum: '', tarih: yerel(new Date()), kurallar: [],
+  kategori: '', cihaz: '', digerCihaz: '', marka: '', digerMarka: '', urunTuru: '', faz: '', guc: '', model: '',
+  parcalar: [], konum: '', tarih: yerel(new Date()), kurallar: [],
 });
 
 async function cihazKaydet(musteriId, c) {
   const cihazAdi = c.cihaz === 'Diğer' ? c.digerCihaz.trim() : c.cihaz;
   if (!c.kategori || !cihazAdi) return 'Kategori ve cihaz / iş seçin.';
   const marka = c.marka === 'Diğer' ? c.digerMarka.trim() : c.marka;
-  const model = [c.urunTuru, c.guc ? `${c.guc} HP` : '', c.model.trim()].filter(Boolean).join(' · ');
+  const model = [c.urunTuru, c.faz, c.guc ? `${c.guc.replace('.', ',')} HP` : '', c.model.trim()]
+    .filter(Boolean).join(' · ');
+  const notlar = c.parcalar.length ? `Parçalar: ${c.parcalar.join(', ')}` : null;
   const { data: yeni, error } = await supabase
     .from('equipment')
     .insert([{
@@ -138,6 +165,7 @@ async function cihazKaydet(musteriId, c) {
       location: c.konum || null,
       brand: marka || null,
       model: model || null,
+      notes: notlar,
       install_date: c.tarih || null,
     }])
     .select()
@@ -160,6 +188,17 @@ function whatsappLink(tel) {
   return `https://wa.me/${n}`;
 }
 
+function CihazBilgi({ e }) {
+  return (
+    <>
+      {(e.brand || e.model) && (
+        <div style={s.kucuk}>🏷️ {[e.brand, e.model].filter(Boolean).join(' · ')}</div>
+      )}
+      {e.notes && <div style={s.kucuk}>🔩 {e.notes}</div>}
+    </>
+  );
+}
+
 function CihazFormu({ deger, setDeger, baslangic, onHata }) {
   const [ozelAd, setOzelAd] = useState('');
   const [ozelSecim, setOzelSecim] = useState('p-12');
@@ -173,6 +212,10 @@ function CihazFormu({ deger, setDeger, baslangic, onHata }) {
   function kuralSec(k) {
     const secili = deger.kurallar.find((x) => x.ad === k.ad);
     set('kurallar', secili ? deger.kurallar.filter((x) => x.ad !== k.ad) : [...deger.kurallar, k]);
+  }
+
+  function parcaSec(p) {
+    set('parcalar', deger.parcalar.includes(p) ? deger.parcalar.filter((x) => x !== p) : [...deger.parcalar, p]);
   }
 
   function ozelEkle() {
@@ -228,6 +271,17 @@ function CihazFormu({ deger, setDeger, baslangic, onHata }) {
             <input style={{ ...s.input, marginTop: 10 }} placeholder="Marka adını yazın"
               value={deger.digerMarka} onChange={(e) => set('digerMarka', e.target.value)} />
           )}
+
+          <div style={s.altEtiket}>Elektrik bağlantısı</div>
+          <div style={s.chipler}>
+            {FAZLAR.map((f) => (
+              <button type="button" key={f} onClick={() => set('faz', deger.faz === f ? '' : f)}
+                style={{ ...s.chip, ...(deger.faz === f ? s.chipSecili : {}) }}>
+                {f.startsWith('Mono') ? '🔌 ' : '⚡ '}{f}
+              </button>
+            ))}
+          </div>
+
           <div style={{ ...s.grid, marginTop: 12 }}>
             <label style={s.etiket}>Ürün türü
               <select style={s.input} value={deger.urunTuru} onChange={(e) => set('urunTuru', e.target.value)}>
@@ -255,7 +309,20 @@ function CihazFormu({ deger, setDeger, baslangic, onHata }) {
             </label>
           </div>
 
-          <div style={s.adim}><span style={s.adimNo}>{baslangic + 3}</span> Hangi bakımları takip edelim?</div>
+          <div style={s.adim}><span style={s.adimNo}>{baslangic + 3}</span> Pano ve parçalar (isteğe bağlı, çoklu seçim)</div>
+          <div style={s.chipler}>
+            {PARCALAR.map((p) => {
+              const secili = deger.parcalar.includes(p);
+              return (
+                <button type="button" key={p} onClick={() => parcaSec(p)}
+                  style={{ ...s.chip, ...(secili ? s.chipParca : {}) }}>
+                  {secili ? '✓ ' : ''}{p}
+                </button>
+              );
+            })}
+          </div>
+
+          <div style={s.adim}><span style={s.adimNo}>{baslangic + 4}</span> Hangi bakımları takip edelim?</div>
           <div style={s.lejant}>
             <span><span style={{ ...s.lejNokta, background: '#1e5a82' }} /> Periyodik (son bakımdan itibaren)</span>
             <span><span style={{ ...s.lejNokta, background: '#b45309' }} /> Mevsimlik (her yıl aynı ay)</span>
@@ -441,9 +508,7 @@ function MusteriKarti({ m, yenile }) {
                     <div style={s.cihazAd}>
                       {kat?.ikon || '🛠️'} {e.category} · {e.equipment_type}{e.location ? ` (${e.location})` : ''}
                     </div>
-                    {(e.brand || e.model) && (
-                      <div style={s.kucuk}>🏷️ {[e.brand, e.model].filter(Boolean).join(' · ')}</div>
-                    )}
+                    <CihazBilgi e={e} />
                   </div>
                   <button style={s.silBtn} onClick={() => cihazSil(e)}>Cihazı sil</button>
                 </div>
@@ -520,9 +585,7 @@ function MusteriKarti({ m, yenile }) {
             {KATEGORI[e.category]?.ikon || '🛠️'} {e.category} · {e.equipment_type}
             {e.location ? ` (${e.location})` : ''}
           </div>
-          {(e.brand || e.model) && (
-            <div style={s.kucuk}>🏷️ {[e.brand, e.model].filter(Boolean).join(' · ')}</div>
-          )}
+          <CihazBilgi e={e} />
           {(e.maintenance_rules || []).map((k) => {
             const d = durum(kalanGun(k.next_due_date));
             return (
@@ -592,7 +655,8 @@ export default function CustomersPage() {
 
   const filtreli = musteriler.filter((m) => {
     const q = arama.toLowerCase();
-    const cihazlar = (m.equipment || []).map((e) => `${e.category} ${e.equipment_type} ${e.brand || ''} ${e.model || ''}`).join(' ');
+    const cihazlar = (m.equipment || [])
+      .map((e) => `${e.category} ${e.equipment_type} ${e.brand || ''} ${e.model || ''} ${e.notes || ''}`).join(' ');
     return !q || [m.name, m.phone, m.address, cihazlar].join(' ').toLowerCase().includes(q);
   });
 
@@ -641,7 +705,7 @@ export default function CustomersPage() {
         </form>
       )}
 
-      <input style={{ ...s.input, marginBottom: 16 }} placeholder="İsim, telefon, adres, cihaz veya marka ara..."
+      <input style={{ ...s.input, marginBottom: 16 }} placeholder="İsim, telefon, adres, cihaz, marka veya parça ara..."
         value={arama} onChange={(e) => setArama(e.target.value)} />
 
       {yukleniyor ? (
@@ -669,6 +733,7 @@ const s = {
     margin: '22px 0 12px' },
   adimNo: { width: 28, height: 28, borderRadius: '50%', background: '#1d6fe0', color: '#fff', fontSize: 14,
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  altEtiket: { fontSize: 13, fontWeight: 700, color: '#334155', margin: '14px 0 8px' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 12 },
   etiket: { display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600, color: '#334155' },
   input: { padding: '11px 12px', borderRadius: 10, border: '1px solid #cbd5e1', fontSize: 15,
@@ -683,6 +748,7 @@ const s = {
     cursor: 'pointer', fontSize: 14, color: '#1e293b' },
   chipSecili: { background: '#1e5a82', color: '#fff', borderColor: '#1e5a82' },
   chipMevsim: { background: '#b45309', color: '#fff', borderColor: '#b45309' },
+  chipParca: { background: '#0f766e', color: '#fff', borderColor: '#0f766e' },
   lejant: { display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 12, color: '#475569', marginBottom: 10 },
   lejNokta: { display: 'inline-block', width: 10, height: 10, borderRadius: '50%', marginRight: 5 },
   ozelSatir: { display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' },
