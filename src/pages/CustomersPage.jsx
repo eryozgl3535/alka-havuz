@@ -860,7 +860,11 @@ export default function CustomersPage() {
   const [yukleniyor, setYukleniyor] = useState(true);
   const [kaydediliyor, setKaydediliyor] = useState(false);
   const [hata, setHata] = useState('');
-  const [arama, setArama] = useState('');
+  const [arama, setArama] = useState(() => {
+    const q = sessionStorage.getItem('alkaArama') || '';
+    sessionStorage.removeItem('alkaArama');
+    return q;
+  });
 
   async function yukle() {
     const { data, error } = await supabase
@@ -960,7 +964,9 @@ export default function CustomersPage() {
       {yukleniyor ? (
         <p style={s.altBaslik}>Yükleniyor...</p>
       ) : filtreli.length === 0 ? (
-        <div style={s.kart}><p style={s.altBaslik}>Henüz müşteri kaydı yok.</p></div>
+        <div style={s.kart}>
+          <p style={s.altBaslik}>{arama ? `"${arama}" için sonuç bulunamadı.` : 'Henüz müşteri kaydı yok.'}</p>
+        </div>
       ) : (
         filtreli.map((m) => <MusteriKarti key={m.id} m={m} yenile={yukle} />)
       )}
