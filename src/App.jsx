@@ -3,7 +3,6 @@ import { supabase } from './supabase';
 import LoginPage from './pages/LoginPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import CustomersPage from './pages/CustomersPage.jsx';
-import EquipmentPage from './pages/EquipmentPage.jsx';
 import CalendarPage from './pages/CalendarPage.jsx';
 import WorkOrdersPage from './pages/WorkOrdersPage.jsx';
 import ReportsPage from './pages/ReportsPage.jsx';
@@ -14,7 +13,6 @@ const MENU = [
   { id: 'musteriler', ad: 'Müşteriler', kisa: 'Müşteriler', ikon: '👥' },
   { id: 'takvim', ad: 'Bakım Takvimi', kisa: 'Takvim', ikon: '📅' },
   { id: 'isemirleri', ad: 'İş Emirleri', kisa: 'İş Emri', ikon: '📋' },
-  { id: 'ekipman', ad: 'Ekipmanlar', kisa: 'Ekipman', ikon: '🛠️' },
   { id: 'raporlar', ad: 'Raporlar', kisa: 'Raporlar', ikon: '📊' },
   { id: 'ayarlar', ad: 'Ayarlar', kisa: 'Ayarlar', ikon: '⚙️' },
 ];
@@ -54,7 +52,8 @@ export default function App() {
   }, []);
 
   function git(id) {
-    setSayfa(id);
+    const hedef = id === 'ekipman' ? 'musteriler' : id;
+    setSayfa(hedef);
     setMenuAcik(false);
     window.scrollTo(0, 0);
   }
@@ -94,7 +93,6 @@ export default function App() {
       {sayfa === 'musteriler' && <CustomersPage />}
       {sayfa === 'takvim' && <CalendarPage />}
       {sayfa === 'isemirleri' && <WorkOrdersPage />}
-      {sayfa === 'ekipman' && <EquipmentPage />}
       {sayfa === 'raporlar' && <ReportsPage />}
       {sayfa === 'ayarlar' && <SettingsPage session={session} />}
     </>
