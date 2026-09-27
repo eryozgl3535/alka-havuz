@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabase';
 
-const IKON = { Havuz: '🏊', Kuyu: '💧', Hidrofor: '🔵', Sulama: '🌱', Tesisat: '🔧', Elektrik: '⚡' };
 const AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 const GUNLER = ['P', 'S', 'Ç', 'P', 'C', 'C', 'P'];
+const IKON = { Havuz: '🏊', Kuyu: '💧', Hidrofor: '🔵', Sulama: '🌱', Tesisat: '🔧', Elektrik: '⚡' };
 
 const yerel = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -24,32 +24,40 @@ function durum(g) {
 
 export default function DashboardPage({ onNavigate }) {
   const [kurallar, setKurallar] = useState([]);
+  const [tamamlananIs, setTamamlananIs] = useState(0);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [takvimAy, setTakvimAy] = useState(new Date());
 
+  const git = (id) => onNavigate && onNavigate(id);
+
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
-        .from('maintenance_rules')
-        .select('*, equipment(*, customers(*))')
-        .eq('active', true);
-      setKurallar(data || []);
+      const bugun = new Date();
+      const ayBas = yerel(new Date(bugun.getFullYear(), bugun.getMonth(), 1));
+      const [k, w] = await Promise.all([
+        supabase
+          .from('maintenance_rules')
+          .select('*, equipment(category, equipment_type, customers(name, address))'),
+        supabase
+          .from('work_orders')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'tamamlandi')
+          .gte('completed_date', ayBas),
+      ]);
+      setKurallar((k.data || []).filter((x) => x.active !== false && x.next_due_date));
+      setTamamlananIs(w.count || 0);
       setYukleniyor(false);
     })();
   }, []);
 
   const bugun = new Date();
-  const buAyBas = yerel(new Date(bugun.getFullYear(), bugun.getMonth(), 1));
-
-  const gecikmis = kurallar.filter((k) => { const g = kalanGun(k.next_due_date); return g !== null && g < 0; });
-  const yaklasan = kurallar.filter((k) => { const g = kalanGun(k.next_due_date); return g !== null && g >= 0 && g <= 30; });
-  const tamamlanan = kurallar.filter((k) =>
-    k.last_service_date && k.last_service_date >= buAyBas &&
-    k.equipment && k.last_service_date !== k.equipment.install_date
-  );
+  const gecikmis = kurallar.filter((k) => kalanGun(k.next_due_date) < 0);
+  const yaklasan = kurallar.filter((k) => {
+    const g = kalanGun(k.next_due_date);
+    return g >= 0 && g <= 30;
+  });
 
   const liste = [...kurallar]
-    .filter((k) => k.next_due_date)
     .sort((a, b) => a.next_due_date.localeCompare(b.next_due_date))
     .slice(0, 8);
 
@@ -63,61 +71,57 @@ export default function DashboardPage({ onNavigate }) {
 
   function gunNokta(d) {
     const t = yerel(new Date(y, a, d));
-    const o = kurallar.filter((k) => k.next_due_date === t);
-    if (!o.length) return null;
-    const g = kalanGun(t);
-    return durum(g).renk;
+    if (!kurallar.some((k) => k.next_due_date === t)) return null;
+    return durum(kalanGun(t)).renk;
   }
 
   const tarihYazi = bugun.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' });
-  const s = stiller;
 
   return (
     <div style={s.sayfa}>
       <div style={s.ust}>
-        <div>
-          <h1 style={s.baslik}>Hoş geldiniz</h1>
-          <div style={s.tarih}>{tarihYazi}</div>
-        </div>
-        <button style={s.anaBtn} onClick={() => onNavigate && onNavigate('ekipman')}>+ Yeni Ekipman</button>
+        <h1 style={s.baslik}>Hoş geldiniz</h1>
+        <div style={s.tarih}>{tarihYazi}</div>
       </div>
 
       <div style={s.istatistikler}>
-        <div style={{ ...s.istKart, background: '#fef2f2' }} onClick={() => onNavigate && onNavigate('ekipman')}>
+        <button style={{ ...s.istKart, background: '#fef2f2' }} onClick={() => git('takvim')}>
           <div style={{ ...s.istIkon, background: '#fee2e2' }}>📅</div>
           <div>
             <div style={{ ...s.istSayi, color: '#dc2626' }}>{gecikmis.length}</div>
             <div style={{ ...s.istEtiket, color: '#dc2626' }}>Bakımı Geçmiş</div>
           </div>
-        </div>
-        <div style={{ ...s.istKart, background: '#fffbeb' }} onClick={() => onNavigate && onNavigate('ekipman')}>
+        </button>
+        <button style={{ ...s.istKart, background: '#fffbeb' }} onClick={() => git('takvim')}>
           <div style={{ ...s.istIkon, background: '#fef3c7' }}>⏳</div>
           <div>
             <div style={{ ...s.istSayi, color: '#0f2d4a' }}>{yaklasan.length}</div>
             <div style={s.istEtiket}>Bakım Yaklaşıyor</div>
             <div style={s.istAlt}>(Önümüzdeki 30 gün)</div>
           </div>
-        </div>
-        <div style={{ ...s.istKart, background: '#eff6ff' }}>
+        </button>
+        <button style={{ ...s.istKart, background: '#eff6ff' }} onClick={() => git('isemirleri')}>
           <div style={{ ...s.istIkon, background: '#dbeafe' }}>🔧</div>
           <div>
-            <div style={{ ...s.istSayi, color: '#0f2d4a' }}>{tamamlanan.length}</div>
-            <div style={s.istEtiket}>Bu Ay Tamamlanan</div>
+            <div style={{ ...s.istSayi, color: '#0f2d4a' }}>{tamamlananIs}</div>
+            <div style={s.istEtiket}>Bu Ay Tamamlanan İş</div>
           </div>
-        </div>
+        </button>
       </div>
 
       <div style={s.izgara}>
         <div style={s.kart}>
           <div style={s.kartBaslikSatir}>
             <h2 style={s.kartBaslik}>📆 Yaklaşan Bakımlar</h2>
-            <button style={s.linkBtn} onClick={() => onNavigate && onNavigate('ekipman')}>Tümünü Gör →</button>
+            <button style={s.linkBtn} onClick={() => git('takvim')}>Tümünü Gör →</button>
           </div>
 
           {yukleniyor ? (
             <p style={s.bos}>Yükleniyor...</p>
           ) : liste.length === 0 ? (
-            <p style={s.bos}>Henüz planlanmış bakım yok. Ekipman ekleyip bakım periyodu seçince burada görünecek.</p>
+            <p style={s.bos}>
+              Henüz planlanmış bakım yok. Müşteriler sayfasından bir müşteriye cihaz ekleyip bakım seçince burada görünecek.
+            </p>
           ) : (
             liste.map((k) => {
               const g = kalanGun(k.next_due_date);
@@ -136,15 +140,13 @@ export default function DashboardPage({ onNavigate }) {
                     <div style={s.musteri}>{m.name || '-'}</div>
                     {m.address && <div style={s.kucuk}>📍 {m.address}</div>}
                   </div>
-                  <div style={{ flex: 1, minWidth: 120 }}>
-                    <div style={s.orta}>{e.category}</div>
-                    <div style={s.kucuk}>{e.equipment_type}</div>
+                  <div style={{ flex: 1, minWidth: 130 }}>
+                    <div style={s.orta}>{k.rule_name}</div>
+                    <div style={s.kucuk}>{e.category} · {e.equipment_type}</div>
                   </div>
-                  <div style={{ flex: 1, minWidth: 120, ...s.orta }}>{k.rule_name}</div>
                   <div style={{ ...s.rozet, color: d.renk, background: d.zemin }}>
-                    {g < 0 ? `${Math.abs(g)} gün geçti` : `${g} gün`}
+                    {g < 0 ? `${Math.abs(g)} gün geçti` : g === 0 ? 'Bugün' : `${g} gün`}
                   </div>
-                  <div style={{ ...s.rozet, color: d.renk, background: d.zemin }}>{d.etiket}</div>
                 </div>
               );
             })
@@ -183,13 +185,14 @@ export default function DashboardPage({ onNavigate }) {
 
           <div style={s.kart}>
             <h2 style={{ ...s.kartBaslik, marginBottom: 12 }}>Hızlı İşlemler</h2>
-            <button style={s.hizliBtn} onClick={() => onNavigate && onNavigate('ekipman')}>🛠️ Yeni Ekipman / Bakım</button>
-            <button style={s.hizliBtn} onClick={() => onNavigate && onNavigate('musteriler')}>👥 Yeni Müşteri</button>
+            <button style={s.hizliBtn} onClick={() => git('musteriler')}>👥 Yeni Müşteri / Cihaz</button>
+            <button style={s.hizliBtn} onClick={() => git('isemirleri')}>📋 Yeni İş Emri</button>
+            <button style={s.hizliBtn} onClick={() => git('takvim')}>📅 Bakım Takvimi</button>
           </div>
 
           <div style={s.kart}>
             <h2 style={{ ...s.kartBaslik, marginBottom: 8 }}>Son Mesajlar</h2>
-            <p style={s.bos}>WhatsApp/SMS bildirimleri (Verimor) bağlandığında burada görünecek.</p>
+            <p style={s.bos}>SMS hatırlatmaları (Verimor) bağlandığında burada görünecek.</p>
           </div>
         </div>
       </div>
@@ -197,16 +200,16 @@ export default function DashboardPage({ onNavigate }) {
   );
 }
 
-const stiller = {
+const s = {
   sayfa: { padding: 24, fontFamily: 'system-ui, sans-serif' },
-  ust: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 20 },
+  ust: { marginBottom: 20 },
   baslik: { margin: 0, fontSize: 30, color: '#0f2d4a', fontWeight: 800 },
   tarih: { color: '#64748b', fontSize: 15, marginTop: 4 },
-  anaBtn: { background: '#1d6fe0', color: '#fff', border: 'none', borderRadius: 12, padding: '14px 22px',
-    fontWeight: 700, fontSize: 16, cursor: 'pointer' },
   istatistikler: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 16, marginBottom: 20 },
-  istKart: { display: 'flex', alignItems: 'center', gap: 16, padding: 20, borderRadius: 16, cursor: 'pointer' },
-  istIkon: { width: 56, height: 56, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 },
+  istKart: { display: 'flex', alignItems: 'center', gap: 16, padding: 20, borderRadius: 16, cursor: 'pointer',
+    border: 'none', textAlign: 'left', fontFamily: 'inherit' },
+  istIkon: { width: 56, height: 56, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: 26, flexShrink: 0 },
   istSayi: { fontSize: 32, fontWeight: 800, lineHeight: 1 },
   istEtiket: { fontSize: 15, color: '#334155', marginTop: 4 },
   istAlt: { fontSize: 12, color: '#64748b' },
@@ -224,7 +227,7 @@ const stiller = {
   ikonKutu: { width: 52, height: 52, borderRadius: 10, background: '#eef2f6', display: 'flex', alignItems: 'center',
     justifyContent: 'center', fontSize: 26 },
   musteri: { fontWeight: 700, color: '#0f2d4a' },
-  orta: { fontSize: 14, color: '#334155' },
+  orta: { fontSize: 14, color: '#334155', fontWeight: 600 },
   kucuk: { fontSize: 13, color: '#64748b' },
   rozet: { padding: '6px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' },
   okBtn: { width: 30, height: 30, borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontSize: 16 },
