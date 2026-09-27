@@ -316,4 +316,88 @@ export default function WorkOrdersPage() {
                     📅 {trTarih(x.scheduled_date)}{x.assigned_to ? ` · 👷 ${x.assigned_to}` : ''}
                     {x.completed_date ? ` · ✓ ${trTarih(x.completed_date)}` : ''}
                   </div>
-                  {x.description && <div style={{ ...s.kucuk,
+                  {x.description && <div style={{ ...s.kucuk, marginTop: 6 }}>📝 {x.description}</div>}
+                  {(x.materials || []).length > 0 && (
+                    <div style={s.malzemeListe}>
+                      {x.materials.map((mz, i) => (
+                        <div key={i}>• {mz.adet} × {mz.ad}{mz.fiyat ? ` (${tl(mz.fiyat)})` : ''}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div style={s.sagTaraf}>
+                  <span style={{ ...s.rozet, color: d.renk, background: d.zemin }}>{d.ad}</span>
+                  <div style={s.tutar}>{tl(toplam)}</div>
+                  <span style={{ ...s.rozet, color: o.renk, background: o.zemin }}>{o.ad}</span>
+                  {kalan > 0 && sayi(x.paid_amount) > 0 && <div style={s.kucuk}>Kalan: {tl(kalan)}</div>}
+                </div>
+              </div>
+
+              <div style={s.aksiyonlar}>
+                {x.status === 'bekliyor' && (
+                  <button style={s.mavBtn} onClick={() => durumDegis(x, 'basladi')}>▶ Başlat</button>
+                )}
+                {x.status !== 'tamamlandi' && (
+                  <button style={s.yesilBtn} onClick={() => durumDegis(x, 'tamamlandi')}>✓ Tamamla</button>
+                )}
+                {x.payment_status !== 'odendi' && toplam > 0 && (
+                  <button style={s.tahsilBtn} onClick={() => tahsilat(x)}>💰 Tahsilat gir</button>
+                )}
+                <button style={s.silBtn} onClick={() => sil(x.id)}>Sil</button>
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+const s = {
+  sayfa: { padding: 20, maxWidth: 950, margin: '0 auto', fontFamily: 'system-ui, sans-serif' },
+  ust: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, gap: 12 },
+  baslik: { margin: 0, fontSize: 26, color: '#0f2d4a' },
+  altBaslik: { margin: '4px 0 0', color: '#64748b', fontSize: 14 },
+  anaBtn: { background: 'linear-gradient(135deg,#1e5a82,#0f2d4a)', color: '#fff', border: 'none',
+    borderRadius: 12, padding: '12px 18px', fontWeight: 600, cursor: 'pointer', fontSize: 15 },
+  kart: { background: '#fff', borderRadius: 16, padding: 20, marginBottom: 14,
+    boxShadow: '0 2px 12px rgba(15,45,74,0.08)' },
+  adim: { display: 'flex', alignItems: 'center', gap: 10, fontSize: 17, fontWeight: 700, color: '#0f2d4a',
+    margin: '18px 0 12px' },
+  adimNo: { width: 28, height: 28, borderRadius: '50%', background: '#1d6fe0', color: '#fff', fontSize: 14,
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 },
+  etiket: { display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600, color: '#334155' },
+  input: { padding: '11px 12px', borderRadius: 10, border: '1px solid #cbd5e1', fontSize: 15,
+    width: '100%', boxSizing: 'border-box' },
+  malzemeSatir: { display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' },
+  xBtn: { width: 42, border: '1px solid #fecaca', background: '#fff', color: '#dc2626', borderRadius: 10,
+    cursor: 'pointer', fontSize: 16 },
+  ekleBtn: { background: '#eff6ff', color: '#1e5a82', border: '1px solid #bfdbfe', borderRadius: 10,
+    padding: '10px 16px', fontWeight: 600, cursor: 'pointer' },
+  ozet: { display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'center', marginTop: 16, padding: 14,
+    background: '#f8fafc', borderRadius: 12, fontSize: 15, color: '#334155' },
+  toplam: { marginLeft: 'auto', fontSize: 20, fontWeight: 800, color: '#0f2d4a' },
+  hata: { background: '#fee2e2', color: '#991b1b', padding: 12, borderRadius: 10, marginBottom: 14 },
+  sekmeler: { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 },
+  sekmeBtn: { padding: '10px 16px', borderRadius: 20, border: '1px solid #cbd5e1', background: '#fff',
+    cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#334155' },
+  sekmeAktif: { background: '#0f2d4a', color: '#fff', borderColor: '#0f2d4a' },
+  kartUst: { display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' },
+  no: { fontSize: 12, color: '#64748b', fontWeight: 600, letterSpacing: 0.5 },
+  isAd: { fontSize: 18, fontWeight: 700, color: '#0f2d4a', margin: '2px 0 6px' },
+  kucuk: { fontSize: 14, color: '#64748b', marginTop: 2 },
+  malzemeListe: { fontSize: 13, color: '#475569', marginTop: 8, background: '#f8fafc', borderRadius: 8, padding: '8px 10px' },
+  sagTaraf: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 },
+  rozet: { padding: '6px 12px', borderRadius: 20, fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' },
+  tutar: { fontSize: 20, fontWeight: 800, color: '#0f2d4a' },
+  aksiyonlar: { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14, paddingTop: 14, borderTop: '1px solid #eef2f6' },
+  mavBtn: { background: '#1d6fe0', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 14px',
+    fontWeight: 600, cursor: 'pointer' },
+  yesilBtn: { background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 14px',
+    fontWeight: 600, cursor: 'pointer' },
+  tahsilBtn: { background: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d', borderRadius: 8,
+    padding: '9px 14px', fontWeight: 600, cursor: 'pointer' },
+  silBtn: { background: 'transparent', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 8,
+    padding: '9px 14px', cursor: 'pointer', marginLeft: 'auto' },
+};
