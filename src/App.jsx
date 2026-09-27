@@ -17,10 +17,12 @@ const MENU = [
   { id: 'ayarlar', ad: 'Ayarlar', ikon: '⚙️', yakinda: true },
 ];
 
-function kullaniciAdi(session) {
+function kullaniciBilgisi(session) {
+  const meta = session?.user?.user_metadata || {};
   const e = session?.user?.email || '';
-  const ad = e.split('@')[0];
-  return ad ? ad.charAt(0).toLocaleUpperCase('tr-TR') + ad.slice(1) : '';
+  const kisa = e.split('@')[0];
+  const yedekAd = kisa ? kisa.charAt(0).toLocaleUpperCase('tr-TR') + kisa.slice(1) : '';
+  return { ad: meta.ad || yedekAd, rol: meta.rol || 'Kullanıcı' };
 }
 
 export default function App() {
@@ -68,7 +70,7 @@ export default function App() {
   }
 
   const menuGorunur = genis || menuAcik;
-  const ad = kullaniciAdi(session);
+  const { ad, rol } = kullaniciBilgisi(session);
 
   return (
     <div style={s.kok}>
@@ -104,10 +106,12 @@ export default function App() {
           </nav>
 
           <div style={s.kullaniciKutu}>
-            <div style={s.avatar}>{ad.charAt(0)}</div>
+            <div style={{ ...s.avatar, background: rol === 'Patron' ? '#b45309' : '#1d6fe0' }}>
+              {ad.charAt(0)}
+            </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={s.kullaniciAd}>{ad}</div>
-              <div style={s.kullaniciRol}>Yönetici</div>
+              <div style={s.kullaniciRol}>{rol === 'Patron' ? '👑 ' : ''}{rol}</div>
             </div>
             <button style={s.cikisBtn} onClick={cikisYap}>Çıkış</button>
           </div>
@@ -155,14 +159,14 @@ const s = {
     background: 'rgba(255,255,255,0.08)', borderRadius: 14,
   },
   avatar: {
-    width: 40, height: 40, borderRadius: '50%', background: '#1d6fe0', color: '#fff',
+    width: 40, height: 40, borderRadius: '50%', color: '#fff', flexShrink: 0,
     display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 18,
   },
-  kullaniciAd: { color: '#fff', fontWeight: 700, fontSize: 15 },
+  kullaniciAd: { color: '#fff', fontWeight: 700, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   kullaniciRol: { color: '#94a3b8', fontSize: 12 },
   cikisBtn: {
     border: '1px solid rgba(255,255,255,0.25)', background: 'transparent', color: '#fca5a5',
-    borderRadius: 8, padding: '7px 10px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+    borderRadius: 8, padding: '7px 10px', fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0,
   },
   icerik: { minHeight: '100vh' },
   mobilUst: {
