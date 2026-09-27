@@ -26,7 +26,9 @@ export default function LoginPage() {
     <div style={s.zemin}>
       <form onSubmit={girisYap} style={s.kart}>
         <div style={s.logoAlan}>
-          <img src="/logopng.jpg" alt="ALKA Havuz" style={s.logo} />
+          <div style={s.logoCerceve}>
+            <img src="/logopng.jpg" alt="ALKA Havuz" style={s.logo} />
+          </div>
           <h1 style={s.baslik}>ALKA Tesisat</h1>
           <p style={s.altBaslik}>Operasyon Sistemi</p>
         </div>
@@ -45,7 +47,7 @@ export default function LoginPage() {
         <label style={s.etiket}>Şifre</label>
         <div style={{ position: 'relative' }}>
           <input
-            style={{ ...s.input, paddingRight: 70 }}
+            style={{ ...s.input, paddingRight: 80 }}
             type={sifreGoster ? 'text' : 'password'}
             value={sifre}
             onChange={(e) => setSifre(e.target.value)}
@@ -76,25 +78,29 @@ const s = {
     fontFamily: 'system-ui, sans-serif', boxSizing: 'border-box',
   },
   kart: {
-    width: '100%', maxWidth: 400, background: '#fff', borderRadius: 20, padding: '32px 28px',
+    width: '100%', maxWidth: 420, background: '#fff', borderRadius: 24, padding: '36px 30px 28px',
     boxShadow: '0 20px 60px rgba(0,0,0,0.35)', boxSizing: 'border-box',
   },
-  logoAlan: { textAlign: 'center', marginBottom: 24 },
-  logo: { width: 190, height: 130, borderRadius: 20, objectFit: 'cover' },
-  baslik: { margin: '14px 0 2px', fontSize: 24, color: '#0f2d4a' },
-  altBaslik: { margin: 0, color: '#64748b', fontSize: 14 },
+  logoAlan: { display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 26 },
+  logoCerceve: {
+    width: 230, height: 230, maxWidth: '70vw', maxHeight: '70vw', borderRadius: 28, overflow: 'hidden',
+    background: '#0b1a2e', boxShadow: '0 10px 30px rgba(15,45,74,0.35)',
+  },
+  logo: { width: '100%', height: '100%', objectFit: 'contain', display: 'block' },
+  baslik: { margin: '18px 0 2px', fontSize: 26, color: '#0f2d4a' },
+  altBaslik: { margin: 0, color: '#64748b', fontSize: 15 },
   etiket: { display: 'block', fontSize: 14, fontWeight: 600, color: '#334155', marginBottom: 6 },
   input: {
-    width: '100%', padding: '13px 14px', border: '1px solid #cbd5e1', borderRadius: 12,
+    width: '100%', padding: '14px 14px', border: '1px solid #cbd5e1', borderRadius: 12,
     fontSize: 16, marginBottom: 16, boxSizing: 'border-box',
   },
   gosterBtn: {
     position: 'absolute', right: 8, top: 8, border: 'none', background: '#eff6ff', color: '#1e5a82',
-    borderRadius: 8, padding: '6px 10px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+    borderRadius: 8, padding: '8px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
   },
   hata: { background: '#fee2e2', color: '#991b1b', padding: 12, borderRadius: 10, marginBottom: 14, fontSize: 14 },
   girisBtn: {
-    width: '100%', padding: 15, border: 'none', borderRadius: 12, fontSize: 17, fontWeight: 700, color: '#fff',
+    width: '100%', padding: 16, border: 'none', borderRadius: 12, fontSize: 17, fontWeight: 700, color: '#fff',
     background: 'linear-gradient(135deg,#1e5a82,#0f2d4a)', cursor: 'pointer',
   },
   alt: { textAlign: 'center', color: '#94a3b8', fontSize: 12, marginTop: 20 },
