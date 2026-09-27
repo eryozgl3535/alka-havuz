@@ -80,7 +80,7 @@ const s = {
     boxShadow: '0 20px 60px rgba(0,0,0,0.35)', boxSizing: 'border-box',
   },
   logoAlan: { textAlign: 'center', marginBottom: 24 },
-  logo: { width: 130, height: 130, borderRadius: 20, objectFit: 'cover' },
+  logo: { width: 190, height: 130, borderRadius: 20, objectFit: 'cover' },
   baslik: { margin: '14px 0 2px', fontSize: 24, color: '#0f2d4a' },
   altBaslik: { margin: 0, color: '#64748b', fontSize: 14 },
   etiket: { display: 'block', fontSize: 14, fontWeight: 600, color: '#334155', marginBottom: 6 },
