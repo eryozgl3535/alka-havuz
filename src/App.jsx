@@ -7,6 +7,7 @@ import CalendarPage from './pages/CalendarPage.jsx';
 import WorkOrdersPage from './pages/WorkOrdersPage.jsx';
 import ReportsPage from './pages/ReportsPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
+import RaporPage from './pages/RaporPage.jsx';
 
 const MENU = [
   { id: 'anasayfa', ad: 'Ana Sayfa', kisa: 'Ana Sayfa', ikon: '🏠' },
@@ -31,6 +32,12 @@ function kullaniciBilgisi(session) {
 }
 
 export default function App() {
+  const eslesme = window.location.pathname.match(/^\/rapor\/([^/?#]+)/);
+  if (eslesme) return <RaporPage token={eslesme[1]} />;
+  return <AnaUygulama />;
+}
+
+function AnaUygulama() {
   const [session, setSession] = useState(null);
   const [hazir, setHazir] = useState(false);
   const [sayfa, setSayfa] = useState('anasayfa');
@@ -118,6 +125,19 @@ export default function App() {
     </button>
   );
 
+  const kullaniciKart = (
+    <div style={s.kullaniciKart}>
+      <div style={s.kullaniciSatir}>
+        <div style={{ ...s.avatar, background: avatarRenk }}>{ad.charAt(0)}</div>
+        <div style={{ minWidth: 0 }}>
+          <div style={s.kullaniciAd}>{ad}</div>
+          <div style={s.kullaniciRol}>{rol === 'Patron' ? '👑 ' : ''}{rol}</div>
+        </div>
+      </div>
+      <button style={s.cikisBtn} onClick={cikisYap}>⎋ Çıkış</button>
+    </div>
+  );
+
   if (genis) {
     return (
       <div style={s.kok}>
@@ -137,17 +157,7 @@ export default function App() {
               </button>
             ))}
           </nav>
-
-          <div style={s.kullaniciKart}>
-            <div style={s.kullaniciSatir}>
-              <div style={{ ...s.avatar, background: avatarRenk }}>{ad.charAt(0)}</div>
-              <div style={{ minWidth: 0 }}>
-                <div style={s.kullaniciAd}>{ad}</div>
-                <div style={s.kullaniciRol}>{rol === 'Patron' ? '👑 ' : ''}{rol}</div>
-              </div>
-            </div>
-            <button style={s.cikisBtn} onClick={cikisYap}>⎋ Çıkış</button>
-          </div>
+          {kullaniciKart}
         </aside>
 
         <div style={{ marginLeft: 260, minHeight: '100vh' }}>
@@ -214,16 +224,7 @@ export default function App() {
                 </button>
               ))}
             </div>
-            <div style={{ ...s.kullaniciKart, marginTop: 14 }}>
-              <div style={s.kullaniciSatir}>
-                <div style={{ ...s.avatar, background: avatarRenk }}>{ad.charAt(0)}</div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={s.kullaniciAd}>{ad}</div>
-                  <div style={s.kullaniciRol}>{rol === 'Patron' ? '👑 ' : ''}{rol}</div>
-                </div>
-              </div>
-              <button style={s.cikisBtn} onClick={cikisYap}>⎋ Çıkış</button>
-            </div>
+            <div style={{ marginTop: 14 }}>{kullaniciKart}</div>
           </div>
         </>
       )}
