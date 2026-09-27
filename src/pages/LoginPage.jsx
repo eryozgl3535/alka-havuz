@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../supabase';
+import EraiImza from '../components/EraiImza.jsx';
 
 export default function LoginPage() {
   const [kullanici, setKullanici] = useState('');
@@ -66,6 +67,10 @@ export default function LoginPage() {
         </button>
 
         <div style={s.alt}>ALKA Havuz · 0533 371 39 35</div>
+
+        <div style={s.imzaSatir}>
+          <EraiImza boyut={15} />
+        </div>
       </form>
     </div>
   );
@@ -78,7 +83,7 @@ const s = {
     fontFamily: 'system-ui, sans-serif', boxSizing: 'border-box',
   },
   kart: {
-    width: '100%', maxWidth: 420, background: '#fff', borderRadius: 24, padding: '36px 30px 28px',
+    width: '100%', maxWidth: 420, background: '#fff', borderRadius: 24, padding: '36px 30px 24px',
     boxShadow: '0 20px 60px rgba(0,0,0,0.35)', boxSizing: 'border-box',
   },
   logoAlan: { display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 26 },
@@ -104,4 +109,7 @@ const s = {
     background: 'linear-gradient(135deg,#1e5a82,#0f2d4a)', cursor: 'pointer',
   },
   alt: { textAlign: 'center', color: '#94a3b8', fontSize: 12, marginTop: 20 },
+  imzaSatir: {
+    display: 'flex', justifyContent: 'center', marginTop: 14, paddingTop: 14, borderTop: '1px solid #eef2f6',
+  },
 };
