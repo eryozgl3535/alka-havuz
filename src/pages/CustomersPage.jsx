@@ -19,16 +19,29 @@ const KW_ISI = ['3', '5', '7', '9', '12', '15', '20', '25', '30'];
 const KW_INV = ['0.75', '1.5', '2.2', '4', '5.5', '7.5', '11', '15', '18.5', '22'];
 
 const MOTOR_PARCA = ['Kontaktör', 'Termik röle', 'Kondansatör', 'Motor koruma şalteri', 'Faz koruma rölesi',
-  'Kuru çalışma koruması', 'Seviye flatörü / şamandıra', 'Çekvalf', 'Pano'];
+  'Kuru çalışma koruması', 'Seviye flatörü / şamandıra', 'Çekvalf', 'Hava küresi', 'Pano'];
 const PANO_PARCA = ['Kontaktör', 'Termik röle', 'Motor koruma şalteri', 'Sigorta', 'Kaçak akım rölesi',
   'Faz koruma rölesi', 'Zaman rölesi', 'Soft starter', 'Frekans invertörü', 'Kompanzasyon'];
+
+const KUYU_ALANLAR = [
+  { k: 'derinlik', etiket: 'Kuyu derinliği', birim: 'm' },
+  { k: 'montaj', etiket: 'Pompa montaj derinliği', birim: 'm' },
+  { k: 'statik', etiket: 'Statik su seviyesi', birim: 'm' },
+  { k: 'cap', etiket: 'Kuyu çapı', secenekler: ['4"', '5"', '6"', '8"', '10"'] },
+  { k: 'debi', etiket: 'Debi', birim: 'm³/saat' },
+];
+const BASINC_ALANLAR = [
+  { k: 'acma', etiket: 'Devreye girme basıncı', birim: 'bar' },
+  { k: 'kapama', etiket: 'Devreden çıkma basıncı', birim: 'bar' },
+];
 
 const TIPLER = {
   pompa_kuyu: {
     markalar: POMPA_M, turler: ['Dalgıç pompa', 'Dalgıç motor', 'Paslanmaz dalgıç pompa', 'Derin kuyu pompası'],
-    faz: true, guc: { birim: 'HP', secenekler: HP }, parcalar: MOTOR_PARCA,
+    faz: true, guc: { birim: 'HP', secenekler: HP }, alanlar: KUYU_ALANLAR, parcalar: MOTOR_PARCA,
     bakimlar: [P('Akım (amper) ölçümü', 6), P('Kontaktör / termik kontrolü', 6), P('Kuyu seviye ölçümü', 6),
-      P('Pompa genel kontrolü', 12), P('Su debisi ölçümü', 12), M('Kış kontrolü (don)', 1)],
+      P('Hava küresi ön şarj kontrolü', 3), P('Pompa genel kontrolü', 12), P('Su debisi ölçümü', 12),
+      M('Kış kontrolü (don)', 1)],
   },
   pompa_havuz: {
     markalar: [...HAVUZ_M, 'Impo', 'Pedrollo'], turler: ['Ön filtreli havuz pompası', 'Değişken hızlı pompa', 'Sirkülasyon pompası'],
@@ -39,15 +52,16 @@ const TIPLER = {
   },
   pompa_hidrofor: {
     markalar: POMPA_M, turler: ['Paket hidrofor', 'Çok kademeli pompa', 'Frekans kontrollü hidrofor', 'Jet pompa'],
-    faz: true, guc: { birim: 'HP', secenekler: HP },
-    parcalar: ['Basınç şalteri', 'Manometre', 'Çekvalf', 'Genleşme tankı', 'Kuru çalışma koruması', 'Akış şalteri',
-      'Kondansatör', 'Kontaktör', 'Termik röle'],
+    faz: true, guc: { birim: 'HP', secenekler: HP }, alanlar: BASINC_ALANLAR,
+    parcalar: ['Basınç şalteri', 'Manometre', 'Çekvalf', 'Hava küresi', 'Genleşme tankı', 'Kuru çalışma koruması',
+      'Akış şalteri', 'Kondansatör', 'Kontaktör', 'Termik röle'],
     bakimlar: [P('Tank hava basıncı kontrolü', 3), P('Basınç şalteri ayarı', 6), P('Pompa genel kontrolü', 12),
       M('Kış kontrolü (don)', 1)],
   },
   pompa_sulama: {
     markalar: POMPA_M, turler: ['Santrifüj pompa', 'Monoblok pompa', 'Çok kademeli pompa', 'Dalgıç pompa'],
-    faz: true, guc: { birim: 'HP', secenekler: HP }, parcalar: MOTOR_PARCA,
+    faz: true, guc: { birim: 'HP', secenekler: HP }, alanlar: [{ k: 'debi', etiket: 'Debi', birim: 'm³/saat' }],
+    parcalar: MOTOR_PARCA,
     bakimlar: [P('Emiş / ön filtre temizliği', 3), P('Pompa genel kontrolü', 12),
       M('Sulama sezon açılışı', 4), M('Sulama sezon kapanışı (boşaltma)', 10)],
   },
@@ -85,6 +99,11 @@ const TIPLER = {
   },
   skimmer: { bakimlar: [P('Sepet temizliği', 1), P('Kapak / flap kontrolü', 12)] },
   havuz_genel: {
+    alanlar: [
+      { k: 'hacim', etiket: 'Havuz hacmi', birim: 'm³' },
+      { k: 'tip', etiket: 'Havuz tipi', secenekler: ['Skimmerli', 'Taşmalı (overflow)', 'Prefabrik', 'Portatif'] },
+      { k: 'kaplama', etiket: 'Kaplama', secenekler: ['Seramik / mozaik', 'Liner', 'Polyester', 'Boyalı beton'] },
+    ],
     bakimlar: [P('Havuz periyodik bakım', 1), P('Su analizi (pH / klor)', 1), M('Yaz öncesi genel kontrol', 4),
       M('Havuz sezon açılışı', 5), M('Havuz sezon kapanışı', 11)],
   },
@@ -106,35 +125,51 @@ const TIPLER = {
   vana: { bakimlar: [P('Sızdırmazlık kontrolü', 12), P('Vana / çekvalf çalışma kontrolü', 12)] },
   kablo: {
     kapasite: { etiket: 'Kablo kesiti', birim: 'mm²', secenekler: ['1.5', '2.5', '4', '6', '10', '16'] },
+    alanlar: [{ k: 'uzunluk', etiket: 'Kablo uzunluğu', birim: 'm' }],
     bakimlar: [P('İzolasyon (megger) ölçümü', 12), P('Ek yeri kontrolü', 12)],
   },
-  boru: { bakimlar: [P('Sızıntı kontrolü', 12), P('Kolon / boru kontrolü', 24)] },
+  boru_kolon: {
+    turler: ['PE boru (polietilen)', 'Galvaniz boru', 'Paslanmaz boru', 'PVC kolon borusu'],
+    alanlar: [
+      { k: 'cap', etiket: 'Boru çapı', secenekler: ['P25', 'P32', 'P40', 'P50', 'P63', 'P75', 'P90',
+        '1"', '1¼"', '1½"', '2"', '2½"', '3"'] },
+      { k: 'uzunluk', etiket: 'Boru uzunluğu', birim: 'm' },
+      { k: 'derinlik', etiket: 'Kuyu derinliği', birim: 'm' },
+    ],
+    bakimlar: [P('Sızıntı / bağlantı kontrolü', 12), P('Korozyon kontrolü (pompa çekiminde)', 24)],
+  },
   kuyu_genel: {
+    alanlar: KUYU_ALANLAR,
     bakimlar: [P('Kuyu seviye ölçümü', 6), P('Pompa genel kontrolü', 12), P('Su debisi ölçümü', 12),
       P('Su analizi', 12), M('Yaz öncesi kuyu kontrolü', 4), M('Kış kontrolü (don)', 1)],
   },
   tank: {
-    markalar: TANK_M, turler: ['Diyaframlı tank', 'Genleşme tankı'],
-    kapasite: { etiket: 'Tank hacmi', birim: 'L', secenekler: ['24', '50', '80', '100', '150', '200', '300', '500'] },
-    bakimlar: [P('Ön şarj (hava basıncı) kontrolü', 3), P('Diyafram kontrolü', 12)],
+    markalar: TANK_M, turler: ['Diyaframlı tank', 'Hava küresi (galvaniz)', 'Genleşme tankı'],
+    kapasite: { etiket: 'Tank hacmi', birim: 'L', secenekler: ['24', '50', '80', '100', '150', '200', '300', '500', '750', '1000'] },
+    alanlar: [{ k: 'onsarj', etiket: 'Ön şarj basıncı', birim: 'bar' }],
+    bakimlar: [P('Ön şarj (hava basıncı) kontrolü', 3), P('Diyafram kontrolü', 12), P('Korozyon / sızıntı kontrolü', 12)],
   },
-  salter: { bakimlar: [P('Basınç şalteri ayarı', 6), P('Kontak kontrolü', 12)] },
+  salter: { alanlar: BASINC_ALANLAR, bakimlar: [P('Basınç şalteri ayarı', 6), P('Kontak kontrolü', 12)] },
   olcum: { bakimlar: [P('Manometre kontrolü', 6)] },
   hidrofor_genel: {
+    alanlar: BASINC_ALANLAR,
     bakimlar: [P('Tank hava basıncı kontrolü', 3), P('Pompa genel kontrolü', 12), M('Kış kontrolü (don)', 1)],
   },
   timer: {
     markalar: SULAMA_M, parcalar: ['Selenoid vana', 'Yağmur sensörü', 'Pil'],
+    alanlar: [{ k: 'istasyon', etiket: 'İstasyon sayısı', secenekler: ['4', '6', '8', '12', '16', '24'] }],
     bakimlar: [P('Program kontrolü', 3), P('Pil değişimi', 12), M('Sezon açılışı', 4), M('Kış moduna alma', 10)],
   },
   selenoid: { markalar: SULAMA_M, bakimlar: [P('Selenoid vana kontrolü', 6), P('Diyafram temizliği', 12)] },
   damla: {
     parcalar: ['Damlatıcı', 'Filtre', 'Basınç regülatörü'],
+    alanlar: [{ k: 'uzunluk', etiket: 'Hat uzunluğu', birim: 'm' }],
     bakimlar: [P('Hat yıkama', 3), P('Damlatıcı uç temizliği', 3), M('Sulama sezon açılışı', 4),
       M('Sulama sezon kapanışı (boşaltma)', 10)],
   },
   fiskiye: {
     markalar: SULAMA_M, parcalar: ['Nozul', 'Sprinkler başlığı'],
+    alanlar: [{ k: 'adet', etiket: 'Fıskiye sayısı', birim: 'adet' }],
     bakimlar: [P('Nozul temizliği', 3), P('Yön ve açı ayarı', 6), M('Sulama sezon açılışı', 4),
       M('Sulama sezon kapanışı (boşaltma)', 10)],
   },
@@ -144,12 +179,19 @@ const TIPLER = {
   },
   gubre: { bakimlar: [P('Tank temizliği', 3), P('Enjektör kontrolü', 6)] },
   sulama_genel: {
+    alanlar: [
+      { k: 'alan', etiket: 'Sulama alanı', birim: 'm²' },
+      { k: 'zon', etiket: 'Zon (hat) sayısı', birim: 'adet' },
+    ],
     bakimlar: [P('Filtre temizliği', 3), P('Sistem genel kontrolü', 12), M('Sulama sezon açılışı', 4),
       M('Sulama sezon kapanışı (boşaltma)', 10)],
   },
   boru_temiz: { bakimlar: [P('Sızıntı kontrolü', 12), M('Kış kontrolü (don / boru)', 1)] },
   gider: { bakimlar: [P('Hat temizliği / açma', 12), P('Sifon ve koku kontrolü', 12)] },
-  basinc_dusurucu: { bakimlar: [P('Basınç ayarı kontrolü', 12), P('Filtre temizliği', 12)] },
+  basinc_dusurucu: {
+    alanlar: [{ k: 'ayar', etiket: 'Ayar basıncı', birim: 'bar' }],
+    bakimlar: [P('Basınç ayarı kontrolü', 12), P('Filtre temizliği', 12)],
+  },
   aritma: {
     turler: ['Kartuş filtre', 'Ters ozmoz (RO)', 'Kireç önleyici'],
     bakimlar: [P('Filtre kartuşu değişimi', 6), P('Dezenfeksiyon', 12), P('Membran değişimi', 24)],
@@ -185,15 +227,16 @@ const KATEGORI = {
   },
   Kuyu: {
     ikon: '💧', genel: 'kuyu_genel',
-    cihazlar: [['Dalgıç pompa', 'pompa_kuyu'], ['Kuyu motoru', 'pompa_kuyu'], ['Kontrol panosu', 'pano'],
+    cihazlar: [['Dalgıç pompa', 'pompa_kuyu'], ['Kuyu motoru', 'pompa_kuyu'], ['Hava küresi', 'tank'],
+      ['Kolon borusu', 'boru_kolon'], ['Kuyu kablosu', 'kablo'], ['Kontrol panosu', 'pano'],
       ['Frekans invertörü', 'invertor'], ['Seviye flatörü / şamandıra', 'flator'], ['Çekvalf / vana', 'vana'],
-      ['Kuyu kablosu', 'kablo'], ['Kolon borusu', 'boru'], ['Su deposu', 'depo'], ['Genel kuyu bakımı', 'kuyu_genel']],
+      ['Su deposu', 'depo'], ['Genel kuyu bakımı', 'kuyu_genel']],
   },
   Hidrofor: {
     ikon: '🔵', genel: 'hidrofor_genel',
-    cihazlar: [['Paket hidrofor', 'pompa_hidrofor'], ['Hidrofor pompası', 'pompa_hidrofor'], ['Hidrofor tankı', 'tank'],
-      ['Genleşme tankı', 'tank'], ['Basınç şalteri', 'salter'], ['Frekans invertörü', 'invertor'],
-      ['Manometre', 'olcum'], ['Genel hidrofor bakımı', 'hidrofor_genel']],
+    cihazlar: [['Paket hidrofor', 'pompa_hidrofor'], ['Hidrofor pompası', 'pompa_hidrofor'], ['Hava küresi', 'tank'],
+      ['Hidrofor tankı', 'tank'], ['Genleşme tankı', 'tank'], ['Basınç şalteri', 'salter'],
+      ['Frekans invertörü', 'invertor'], ['Manometre', 'olcum'], ['Genel hidrofor bakımı', 'hidrofor_genel']],
   },
   Sulama: {
     ikon: '🌱', genel: 'sulama_genel',
@@ -271,7 +314,7 @@ function kuralSatiri(k, cihazId, tarih) {
 
 const bosCihaz = () => ({
   kategori: '', cihaz: '', digerCihaz: '', marka: '', digerMarka: '', urunTuru: '', faz: '', guc: '', kapasite: '',
-  model: '', parcalar: [], konum: '', tarih: yerel(new Date()), kurallar: [],
+  alanlar: {}, model: '', parcalar: [], konum: '', tarih: yerel(new Date()), kurallar: [],
 });
 
 async function cihazKaydet(musteriId, c) {
@@ -279,11 +322,15 @@ async function cihazKaydet(musteriId, c) {
   if (!c.kategori || !cihazAdi) return 'Kategori ve cihaz / iş seçin.';
   const tip = tipBul(c.kategori, c.cihaz);
   const marka = c.marka === 'Diğer' ? c.digerMarka.trim() : c.marka;
+  const alanYazilari = (tip.alanlar || [])
+    .filter((a) => String(c.alanlar[a.k] || '').trim())
+    .map((a) => `${a.etiket}: ${virgul(String(c.alanlar[a.k]).trim())}${a.birim ? ' ' + a.birim : ''}`);
   const model = [
     c.urunTuru,
     c.faz,
     c.guc && tip.guc ? `${virgul(c.guc)} ${tip.guc.birim}` : '',
     c.kapasite && tip.kapasite ? `${tip.kapasite.etiket}: ${virgul(c.kapasite)} ${tip.kapasite.birim}` : '',
+    ...alanYazilari,
     c.model.trim(),
   ].filter(Boolean).join(' · ');
   const notlar = c.parcalar.length ? `Parçalar: ${c.parcalar.join(', ')}` : null;
@@ -336,6 +383,7 @@ function CihazFormu({ deger, setDeger, baslangic, onHata }) {
   const kat = deger.kategori ? KATEGORI[deger.kategori] : null;
   const tip = deger.cihaz ? tipBul(deger.kategori, deger.cihaz) : null;
   const set = (alan, v) => setDeger({ ...deger, [alan]: v });
+  const alanSet = (k, v) => setDeger({ ...deger, alanlar: { ...deger.alanlar, [k]: v } });
 
   function kategoriSec(k) {
     setDeger({ ...bosCihaz(), tarih: deger.tarih, konum: deger.konum, kategori: deger.kategori === k ? '' : k });
@@ -344,7 +392,7 @@ function CihazFormu({ deger, setDeger, baslangic, onHata }) {
   function cihazSec(c) {
     setDeger({
       ...deger, cihaz: c, digerCihaz: '', marka: '', digerMarka: '', urunTuru: '', faz: '', guc: '',
-      kapasite: '', model: '', parcalar: [], kurallar: [],
+      kapasite: '', alanlar: {}, model: '', parcalar: [], kurallar: [],
     });
   }
 
@@ -475,6 +523,20 @@ function CihazFormu({ deger, setDeger, baslangic, onHata }) {
                 </select>
               </label>
             )}
+            {(tip.alanlar || []).map((a) => (
+              <label key={a.k} style={s.etiket}>
+                {a.etiket}{a.birim ? ` (${a.birim})` : ''}
+                {a.secenekler ? (
+                  <select style={s.input} value={deger.alanlar[a.k] || ''} onChange={(e) => alanSet(a.k, e.target.value)}>
+                    <option value="">Seçilmedi</option>
+                    {a.secenekler.map((o) => <option key={o}>{o}</option>)}
+                  </select>
+                ) : (
+                  <input style={s.input} inputMode="decimal" placeholder={a.birim ? `Örn: ${a.birim === 'm' ? '120' : '3'}` : ''}
+                    value={deger.alanlar[a.k] || ''} onChange={(e) => alanSet(a.k, e.target.value)} />
+                )}
+              </label>
+            ))}
             {tip.markalar && (
               <label style={s.etiket}>Model / seri kodu
                 <input style={s.input} placeholder="Katalogdaki model" value={deger.model}
@@ -892,7 +954,7 @@ export default function CustomersPage() {
         </form>
       )}
 
-      <input style={{ ...s.input, marginBottom: 16 }} placeholder="İsim, telefon, adres, cihaz, marka veya parça ara..."
+      <input style={{ ...s.input, marginBottom: 16 }} placeholder="İsim, telefon, adres, cihaz, marka, P32, derinlik..."
         value={arama} onChange={(e) => setArama(e.target.value)} />
 
       {yukleniyor ? (
