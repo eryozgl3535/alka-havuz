@@ -5,6 +5,7 @@ import DashboardPage from './pages/DashboardPage.jsx';
 import CustomersPage from './pages/CustomersPage.jsx';
 import CalendarPage from './pages/CalendarPage.jsx';
 import WorkOrdersPage from './pages/WorkOrdersPage.jsx';
+import GelislerPage from './pages/GelislerPage.jsx';
 import ReportsPage from './pages/ReportsPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import RaporPage from './pages/RaporPage.jsx';
@@ -14,6 +15,7 @@ const MENU = [
   { id: 'musteriler', ad: 'Müşteriler', kisa: 'Müşteriler', ikon: '👥' },
   { id: 'takvim', ad: 'Bakım Takvimi', kisa: 'Takvim', ikon: '📅' },
   { id: 'isemirleri', ad: 'İş Emirleri', kisa: 'İş Emri', ikon: '📋' },
+  { id: 'gelisler', ad: 'Geliş Planı', kisa: 'Geliş', ikon: '🏡' },
   { id: 'raporlar', ad: 'Raporlar', kisa: 'Raporlar', ikon: '📊' },
   { id: 'ayarlar', ad: 'Ayarlar', kisa: 'Ayarlar', ikon: '⚙️' },
 ];
@@ -113,6 +115,7 @@ function AnaUygulama() {
       {sayfa === 'musteriler' && <CustomersPage key={aramaAnahtar} />}
       {sayfa === 'takvim' && <CalendarPage />}
       {sayfa === 'isemirleri' && <WorkOrdersPage />}
+      {sayfa === 'gelisler' && <GelislerPage />}
       {sayfa === 'raporlar' && <ReportsPage />}
       {sayfa === 'ayarlar' && <SettingsPage session={session} />}
     </>
@@ -268,11 +271,11 @@ const s = {
     padding: '22px 16px 18px', boxSizing: 'border-box', overflowY: 'auto',
     display: 'flex', flexDirection: 'column',
   },
-  logoAlan: { display: 'flex', justifyContent: 'center', marginBottom: 26 },
-  logo: { width: 190, height: 190, borderRadius: 22, objectFit: 'cover', boxShadow: '0 8px 30px rgba(0,0,0,0.35)' },
+  logoAlan: { display: 'flex', justifyContent: 'center', marginBottom: 22 },
+  logo: { width: 180, height: 180, borderRadius: 22, objectFit: 'cover', boxShadow: '0 8px 30px rgba(0,0,0,0.35)' },
   menuBtn: {
-    display: 'flex', alignItems: 'center', gap: 14, width: '100%', padding: '14px 18px',
-    marginBottom: 6, border: 'none', borderRadius: 14, background: 'transparent',
+    display: 'flex', alignItems: 'center', gap: 14, width: '100%', padding: '13px 18px',
+    marginBottom: 5, border: 'none', borderRadius: 14, background: 'transparent',
     color: '#e2e8f0', fontSize: 16, fontWeight: 500, cursor: 'pointer', textAlign: 'left',
   },
   menuAktif: {
