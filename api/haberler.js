@@ -4,29 +4,32 @@ const KONULAR = {
     sorgular: [
       ['havuz teknolojisi', 'tr'],
       ['havuz ekipmanı', 'tr'],
-      ['havuz sektörü yenilik', 'tr'],
+      ['yüzme havuzu yenilik', 'tr'],
       ['pool equipment new product', 'en'],
       ['swimming pool technology innovation', 'en'],
     ],
+    anahtar: ['havuz', 'yüzme', 'jakuzi', 'spa ', 'pool', 'swimming', 'hot tub', 'klor', 'chlorin'],
   },
   pompa: {
     ad: 'Pompa & Kuyu',
     sorgular: [
       ['dalgıç pompa', 'tr'],
-      ['pompa teknolojisi', 'tr'],
-      ['pompa sektörü yeni ürün', 'tr'],
+      ['su pompası teknoloji', 'tr'],
+      ['hidrofor', 'tr'],
       ['submersible pump new technology', 'en'],
       ['water pump innovation', 'en'],
     ],
+    anahtar: ['pompa', 'pump', 'kuyu', 'hidrofor', 'booster', 'borehole', 'well water', 'dalgıç', 'submersible'],
   },
   sulama: {
     ad: 'Sulama',
     sorgular: [
       ['akıllı sulama', 'tr'],
       ['sulama teknolojisi', 'tr'],
-      ['damla sulama yenilik', 'tr'],
+      ['damla sulama', 'tr'],
       ['smart irrigation technology', 'en'],
     ],
+    anahtar: ['sulama', 'damla', 'irrigation', 'drip', 'sprinkler', 'fıskiye', 'yağmurlama'],
   },
   enerji: {
     ad: 'Enerji & Isı Pompası',
@@ -34,10 +37,23 @@ const KONULAR = {
       ['ısı pompası', 'tr'],
       ['güneş enerjili pompa', 'tr'],
       ['enerji verimli pompa', 'tr'],
-      ['pool heat pump new', 'en'],
+      ['pool heat pump', 'en'],
+      ['heat pump innovation', 'en'],
     ],
+    anahtar: ['ısı pompası', 'heat pump', 'güneş enerjili', 'solar pump', 'solar-powered pump', 'enerji verimli', 'inverter'],
   },
 };
+
+const HARIC = [
+  'benzin', 'motorin', 'akaryakıt', 'mazot', 'yakıt', 'lpg', 'petrol', 'fuel', 'gasoline',
+  'maç', 'futbol', 'basketbol', 'spor', 'sports', 'football', 'soccer', 'lig ',
+  'borsa', 'hisse', 'dolar', 'altın fiyat', 'stock', 'shares',
+  'seçim', 'belediye başkan', 'milletvekili', 'election',
+  'cinayet', 'kaza', 'yangın', 'deprem', 'murder', 'crash',
+  'burç', 'magazin', 'dizi', 'film',
+];
+
+const TR_HARIC_SORGU = ' -benzin -motorin -akaryakıt -zam -maç';
 
 const DIL = {
   tr: 'hl=tr&gl=TR&ceid=TR:tr',
@@ -63,8 +79,15 @@ function al(parca, etiket) {
   return m ? temizle(m[1]) : '';
 }
 
+function alakaliMi(baslik, konu) {
+  const t = ' ' + baslik.toLocaleLowerCase('tr-TR') + ' ';
+  if (HARIC.some((k) => t.includes(k))) return false;
+  return KONULAR[konu].anahtar.some((k) => t.includes(k));
+}
+
 async function sorgula(sorgu, dil, konu) {
-  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(sorgu + ' when:30d')}&${DIL[dil]}`;
+  const tamSorgu = sorgu + (dil === 'tr' ? TR_HARIC_SORGU : '') + ' when:30d';
+  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(tamSorgu)}&${DIL[dil]}`;
   const kontrol = new AbortController();
   const zaman = setTimeout(() => kontrol.abort(), 6000);
   try {
@@ -82,7 +105,7 @@ async function sorgula(sorgu, dil, konu) {
       const t = tarihHam ? new Date(tarihHam) : null;
       const tarih = t && !isNaN(t) ? t.toISOString() : null;
       return { baslik, link: al(parca, 'link'), kaynak, tarih, konu, dil };
-    }).filter((h) => h.baslik && h.link);
+    }).filter((h) => h.baslik && h.link && alakaliMi(h.baslik, konu));
   } catch {
     return [];
   } finally {
