@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabase';
+import EraiImza from '../components/EraiImza.jsx';
 
 const YETKILI = ['Patron', 'Sistem Yöneticisi'];
 const ROLLER = ['Patron', 'Sistem Yöneticisi', 'Çalışan'];
@@ -24,7 +25,7 @@ async function apiCagir(metod, govde) {
   });
   let sonuc = {};
   try { sonuc = await yanit.json(); } catch { sonuc = {}; }
-  if (!yanit.ok) throw new Error(sonuc.hata || 'İşlem başarısız.');
+  if (!yanit.ok) throw new Error(sonuc.hata || `İşlem başarısız (kod ${yanit.status}).`);
   return sonuc;
 }
 
@@ -337,7 +338,10 @@ export default function SettingsPage({ session }) {
         <div style={s.bilgiSatir}><span>Uygulama</span><b>ALKA Tesisat Operasyon Sistemi</b></div>
         <div style={s.bilgiSatir}><span>Sürüm</span><b>1.0</b></div>
         <div style={s.bilgiSatir}><span>Firma</span><b>ALKA Havuz · 0533 371 39 35</b></div>
-        <div style={s.bilgiSatir}><span>Geliştirici</span><b style={s.erai}>Built by ERAİ</b></div>
+        <div style={{ ...s.bilgiSatir, alignItems: 'center' }}>
+          <span>Geliştirici</span>
+          <EraiImza boyut={14} />
+        </div>
         <button style={s.cikisBtn} onClick={cikisYap}>Çıkış Yap</button>
       </div>
     </div>
@@ -384,8 +388,6 @@ const s = {
     padding: '9px 12px', fontWeight: 600, cursor: 'pointer', fontSize: 14 },
   bilgiSatir: { display: 'flex', justifyContent: 'space-between', gap: 12, padding: '11px 0',
     borderBottom: '1px solid #eef2f6', fontSize: 14, color: '#475569', flexWrap: 'wrap' },
-  erai: { background: 'linear-gradient(90deg,#0ea5e9,#a855f7)', WebkitBackgroundClip: 'text',
-    backgroundClip: 'text', color: 'transparent', letterSpacing: 1 },
   cikisBtn: { marginTop: 18, background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 12,
     padding: '12px 20px', fontWeight: 700, cursor: 'pointer', fontSize: 15 },
 };
