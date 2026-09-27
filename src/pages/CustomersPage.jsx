@@ -2,18 +2,32 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../supabase';
 
 const KATEGORILER = ['Havuz', 'Kuyu', 'Hidrofor', 'Sulama', 'Tesisat', 'Elektrik'];
+const AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 
-const HAZIR_KURALLAR = [
+const PERIYODIK = [
   { ad: 'Hidrofor hava kontrolü', ay: 3 },
   { ad: 'Pompa genel kontrolü', ay: 12 },
   { ad: 'Havuz filtre kumu değişimi', ay: 24 },
-  { ad: 'Havuz sezon açılışı', ay: 12 },
-  { ad: 'Havuz sezon kapanışı', ay: 12 },
   { ad: 'Havuz periyodik bakım', ay: 1 },
+];
+
+const MEVSIMLIK = [
+  { ad: 'Yaz öncesi genel kontrol', ayNo: 4, mevsim: true },
+  { ad: 'Havuz sezon açılışı', ayNo: 5, mevsim: true },
+  { ad: 'Havuz sezon kapanışı', ayNo: 11, mevsim: true },
+  { ad: 'Kış kontrolü (don / boru)', ayNo: 1, mevsim: true },
 ];
 
 const yerel = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+function mevsimTarihi(ayNo) {
+  const bugun = new Date();
+  let yil = bugun.getFullYear();
+  let hedef = new Date(yil, ayNo - 1, 1);
+  if (yerel(hedef) <= yerel(bugun)) hedef = new Date(yil + 1, ayNo - 1, 1);
+  return yerel(hedef);
+}
 
 function kalanGun(tarih) {
   if (!tarih) return null;
@@ -31,6 +45,8 @@ function durum(g) {
 
 const trTarih = (t) => (t ? new Date(t + 'T00:00:00').toLocaleDateString('tr-TR') : '-');
 
+const kuralYazi = (k) => (k.mevsim ? `her yıl ${AYLAR[k.ayNo - 1]}` : `${k.ay} ayda bir`);
+
 const bosMusteri = { name: '', phone: '', address: '', notes: '' };
 const bosIs = { category: 'Havuz', equipment_type: '', location: '', brand: '', install_date: yerel(new Date()) };
 
@@ -41,6 +57,8 @@ export default function CustomersPage() {
   const [kurallar, setKurallar] = useState([]);
   const [ozelAd, setOzelAd] = useState('');
   const [ozelAy, setOzelAy] = useState('');
+  const [mevsimAd, setMevsimAd] = useState('');
+  const [mevsimAyNo, setMevsimAyNo] = useState('5');
   const [formAcik, setFormAcik] = useState(false);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [kaydediliyor, setKaydediliyor] = useState(false);
@@ -66,14 +84,15 @@ export default function CustomersPage() {
 
   function ozelEkle() {
     const ay = parseInt(ozelAy, 10);
-    if (!ozelAd.trim() || !ay || ay < 1) {
-      setHata('Özel bakım için ad ve ay sayısı girin.');
-      return;
-    }
+    if (!ozelAd.trim() || !ay || ay < 1) { setHata('Özel periyodik bakım için ad ve ay sayısı girin.'); return; }
     setKurallar((o) => [...o, { ad: ozelAd.trim(), ay }]);
-    setOzelAd('');
-    setOzelAy('');
-    setHata('');
+    setOzelAd(''); setOzelAy(''); setHata('');
+  }
+
+  function mevsimEkle() {
+    if (!mevsimAd.trim()) { setHata('Mevsimlik bakım için bir ad girin.'); return; }
+    setKurallar((o) => [...o, { ad: mevsimAd.trim(), ayNo: parseInt(mevsimAyNo, 10), mevsim: true }]);
+    setMevsimAd(''); setHata('');
   }
 
   function formuKapat() {
@@ -105,12 +124,13 @@ export default function CustomersPage() {
       if (eHata) { setHata(eHata.message); setKaydediliyor(false); yukle(); return; }
 
       if (kurallar.length) {
-        const satirlar = kurallar.map((k) => ({
-          equipment_id: yeniCihaz.id,
-          rule_name: k.ad,
-          period_months: k.ay,
-          last_service_date: is.install_date,
-        }));
+        const satirlar = kurallar.map((k) =>
+          k.mevsim
+            ? { equipment_id: yeniCihaz.id, rule_name: k.ad, period_months: 12,
+                last_service_date: null, next_due_date: mevsimTarihi(k.ayNo) }
+            : { equipment_id: yeniCihaz.id, rule_name: k.ad, period_months: k.ay,
+                last_service_date: is.install_date }
+        );
         const { error: kHata } = await supabase.from('maintenance_rules').insert(satirlar);
         if (kHata) setHata(kHata.message);
       }
@@ -141,6 +161,10 @@ export default function CustomersPage() {
     const cihazlar = (m.equipment || []).map((e) => `${e.category} ${e.equipment_type}`).join(' ');
     return !q || [m.name, m.phone, m.address, cihazlar].join(' ').toLowerCase().includes(q);
   });
+
+  const ekstralar = kurallar.filter(
+    (k) => !PERIYODIK.find((h) => h.ad === k.ad) && !MEVSIMLIK.find((h) => h.ad === k.ad)
+  );
 
   return (
     <div style={s.sayfa}>
@@ -205,32 +229,58 @@ export default function CustomersPage() {
             </label>
           </div>
 
-          <div style={{ ...s.etiket, marginTop: 16 }}>Bakım periyodu (sistem tarihi otomatik hesaplar)</div>
+          <div style={s.altBolum}>🔁 Periyodik bakım <span style={s.aciklama}>(son bakımdan itibaren hesaplanır)</span></div>
           <div style={s.chipler}>
-            {HAZIR_KURALLAR.map((k) => {
+            {PERIYODIK.map((k) => {
               const secili = kurallar.find((x) => x.ad === k.ad);
               return (
                 <button type="button" key={k.ad} onClick={() => kuralSec(k)}
                   style={{ ...s.chip, ...(secili ? s.chipSecili : {}) }}>
-                  {k.ad} · {k.ay} ay
+                  {k.ad} · {kuralYazi(k)}
                 </button>
               );
             })}
-            {kurallar.filter((k) => !HAZIR_KURALLAR.find((h) => h.ad === k.ad)).map((k) => (
-              <button type="button" key={k.ad} onClick={() => kuralSec(k)}
-                style={{ ...s.chip, ...s.chipSecili }}>
-                {k.ad} · {k.ay} ay ✕
-              </button>
-            ))}
           </div>
-
           <div style={s.ozelSatir}>
-            <input style={{ ...s.input, flex: 2 }} placeholder="Listede yoksa: özel bakım adı"
+            <input style={{ ...s.input, flex: 2 }} placeholder="Listede yoksa: bakım adı"
               value={ozelAd} onChange={(e) => setOzelAd(e.target.value)} />
             <input style={{ ...s.input, flex: 1 }} placeholder="Kaç ayda bir" type="number" min="1"
               value={ozelAy} onChange={(e) => setOzelAy(e.target.value)} />
             <button type="button" style={s.ekleBtn} onClick={ozelEkle}>+ Ekle</button>
           </div>
+
+          <div style={s.altBolum}>☀️❄️ Mevsimlik bakım <span style={s.aciklama}>(her yıl aynı ayda düşer)</span></div>
+          <div style={s.chipler}>
+            {MEVSIMLIK.map((k) => {
+              const secili = kurallar.find((x) => x.ad === k.ad);
+              return (
+                <button type="button" key={k.ad} onClick={() => kuralSec(k)}
+                  style={{ ...s.chip, ...(secili ? s.chipMevsim : {}) }}>
+                  {k.ad} · {kuralYazi(k)}
+                </button>
+              );
+            })}
+          </div>
+          <div style={s.ozelSatir}>
+            <input style={{ ...s.input, flex: 2 }} placeholder="Listede yoksa: mevsimlik bakım adı"
+              value={mevsimAd} onChange={(e) => setMevsimAd(e.target.value)} />
+            <select style={{ ...s.input, flex: 1 }} value={mevsimAyNo}
+              onChange={(e) => setMevsimAyNo(e.target.value)}>
+              {AYLAR.map((ay, i) => <option key={ay} value={i + 1}>{ay}</option>)}
+            </select>
+            <button type="button" style={s.ekleBtn} onClick={mevsimEkle}>+ Ekle</button>
+          </div>
+
+          {ekstralar.length > 0 && (
+            <div style={{ ...s.chipler, marginTop: 12 }}>
+              {ekstralar.map((k) => (
+                <button type="button" key={k.ad} onClick={() => kuralSec(k)}
+                  style={{ ...s.chip, ...(k.mevsim ? s.chipMevsim : s.chipSecili) }}>
+                  {k.ad} · {kuralYazi(k)} ✕
+                </button>
+              ))}
+            </div>
+          )}
 
           <button type="submit" disabled={kaydediliyor}
             style={{ ...s.anaBtn, marginTop: 20, width: '100%', opacity: kaydediliyor ? 0.6 : 1 }}>
@@ -299,6 +349,8 @@ const s = {
   kart: { background: '#fff', borderRadius: 16, padding: 18, marginBottom: 14,
     boxShadow: '0 2px 12px rgba(15,45,74,0.08)' },
   bolumBaslik: { fontSize: 16, fontWeight: 700, color: '#0f2d4a', marginBottom: 12 },
+  altBolum: { fontSize: 14, fontWeight: 700, color: '#0f2d4a', marginTop: 20 },
+  aciklama: { fontWeight: 400, color: '#64748b', fontSize: 12 },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 },
   etiket: { display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600, color: '#334155' },
   input: { padding: '10px 12px', borderRadius: 10, border: '1px solid #cbd5e1', fontSize: 15,
@@ -307,7 +359,8 @@ const s = {
   chip: { padding: '8px 12px', borderRadius: 20, border: '1px solid #cbd5e1', background: '#f8fafc',
     cursor: 'pointer', fontSize: 13 },
   chipSecili: { background: '#1e5a82', color: '#fff', borderColor: '#1e5a82' },
-  ozelSatir: { display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' },
+  chipMevsim: { background: '#b45309', color: '#fff', borderColor: '#b45309' },
+  ozelSatir: { display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' },
   ekleBtn: { background: '#eff6ff', color: '#1e5a82', border: '1px solid #bfdbfe', borderRadius: 10,
     padding: '10px 16px', fontWeight: 600, cursor: 'pointer' },
   hata: { background: '#fee2e2', color: '#991b1b', padding: 12, borderRadius: 10, marginBottom: 14 },
