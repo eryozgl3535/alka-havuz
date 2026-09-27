@@ -1,21 +1,78 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabase';
 
-const KATEGORILER = ['Havuz', 'Kuyu', 'Hidrofor', 'Sulama', 'Tesisat', 'Elektrik'];
 const AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 
-const PERIYODIK = [
-  { ad: 'Hidrofor hava kontrolü', ay: 3 },
-  { ad: 'Pompa genel kontrolü', ay: 12 },
-  { ad: 'Havuz filtre kumu değişimi', ay: 24 },
-  { ad: 'Havuz periyodik bakım', ay: 1 },
-];
+const KATEGORI = {
+  Havuz: {
+    ikon: '🏊',
+    cihazlar: ['Kum filtresi', 'Havuz motoru (pompa)', 'Isı pompası', 'Klor / tuz jeneratörü',
+      'Dozaj pompası', 'Havuz aydınlatma', 'Havuz robotu', 'Genel havuz bakımı'],
+    bakimlar: [
+      { ad: 'Havuz periyodik bakım', ay: 1 },
+      { ad: 'Su analizi (pH / klor)', ay: 1 },
+      { ad: 'Havuz motoru kontrolü', ay: 12 },
+      { ad: 'Filtre kumu değişimi', ay: 24 },
+      { ad: 'Yaz öncesi genel kontrol', ayNo: 4, mevsim: true },
+      { ad: 'Havuz sezon açılışı', ayNo: 5, mevsim: true },
+      { ad: 'Havuz sezon kapanışı', ayNo: 11, mevsim: true },
+    ],
+  },
+  Kuyu: {
+    ikon: '💧',
+    cihazlar: ['Dalgıç pompa', 'Kuyu motoru', 'Kontrol panosu', 'Çekvalf / vana', 'Kuyu kablosu', 'Genel kuyu bakımı'],
+    bakimlar: [
+      { ad: 'Pano / elektrik kontrolü', ay: 6 },
+      { ad: 'Pompa genel kontrolü', ay: 12 },
+      { ad: 'Su debisi ölçümü', ay: 12 },
+      { ad: 'Yaz öncesi kuyu kontrolü', ayNo: 4, mevsim: true },
+      { ad: 'Kış kontrolü (don)', ayNo: 1, mevsim: true },
+    ],
+  },
+  Hidrofor: {
+    ikon: '🔵',
+    cihazlar: ['Hidrofor tankı', 'Hidrofor pompası', 'Basınç şalteri', 'Genleşme tankı', 'Genel hidrofor bakımı'],
+    bakimlar: [
+      { ad: 'Tank hava basıncı kontrolü', ay: 3 },
+      { ad: 'Basınç şalteri kontrolü', ay: 6 },
+      { ad: 'Pompa genel kontrolü', ay: 12 },
+      { ad: 'Kış kontrolü (don)', ayNo: 1, mevsim: true },
+    ],
+  },
+  Sulama: {
+    ikon: '🌱',
+    cihazlar: ['Sulama pompası', 'Sulama kontrol ünitesi', 'Damla sulama hattı', 'Fıskiye / sprinkler', 'Sulama filtresi'],
+    bakimlar: [
+      { ad: 'Sulama filtresi temizliği', ay: 3 },
+      { ad: 'Sistem genel kontrolü', ay: 12 },
+      { ad: 'Sulama sezon açılışı', ayNo: 4, mevsim: true },
+      { ad: 'Sulama sezon kapanışı (boşaltma)', ayNo: 10, mevsim: true },
+    ],
+  },
+  Tesisat: {
+    ikon: '🔧',
+    cihazlar: ['Temiz su tesisatı', 'Gider / pis su hattı', 'Kollektör / vana', 'Su arıtma / filtre', 'Termosifon / şofben'],
+    bakimlar: [
+      { ad: 'Su filtresi değişimi', ay: 6 },
+      { ad: 'Genel tesisat kontrolü', ay: 12 },
+      { ad: 'Kış kontrolü (don / boru)', ayNo: 1, mevsim: true },
+    ],
+  },
+  Elektrik: {
+    ikon: '⚡',
+    cihazlar: ['Elektrik panosu', 'Motor / pompa bağlantısı', 'Kaçak akım rölesi', 'Dış aydınlatma'],
+    bakimlar: [
+      { ad: 'Pano kontrolü', ay: 6 },
+      { ad: 'Kaçak akım testi', ay: 12 },
+      { ad: 'Topraklama ölçümü', ay: 12 },
+      { ad: 'Kış öncesi elektrik kontrolü', ayNo: 11, mevsim: true },
+    ],
+  },
+};
 
-const MEVSIMLIK = [
-  { ad: 'Yaz öncesi genel kontrol', ayNo: 4, mevsim: true },
-  { ad: 'Havuz sezon açılışı', ayNo: 5, mevsim: true },
-  { ad: 'Havuz sezon kapanışı', ayNo: 11, mevsim: true },
-  { ad: 'Kış kontrolü (don / boru)', ayNo: 1, mevsim: true },
+const OZEL_SECENEKLER = [
+  ...[1, 2, 3, 6, 12, 24].map((a) => ({ deger: `p-${a}`, yazi: `${a} ayda bir` })),
+  ...AYLAR.map((ay, i) => ({ deger: `m-${i + 1}`, yazi: `Her yıl ${ay}` })),
 ];
 
 const yerel = (d) =>
@@ -23,9 +80,8 @@ const yerel = (d) =>
 
 function mevsimTarihi(ayNo) {
   const bugun = new Date();
-  let yil = bugun.getFullYear();
-  let hedef = new Date(yil, ayNo - 1, 1);
-  if (yerel(hedef) <= yerel(bugun)) hedef = new Date(yil + 1, ayNo - 1, 1);
+  let hedef = new Date(bugun.getFullYear(), ayNo - 1, 1);
+  if (yerel(hedef) <= yerel(bugun)) hedef = new Date(bugun.getFullYear() + 1, ayNo - 1, 1);
   return yerel(hedef);
 }
 
@@ -44,21 +100,22 @@ function durum(g) {
 }
 
 const trTarih = (t) => (t ? new Date(t + 'T00:00:00').toLocaleDateString('tr-TR') : '-');
-
 const kuralYazi = (k) => (k.mevsim ? `her yıl ${AYLAR[k.ayNo - 1]}` : `${k.ay} ayda bir`);
 
 const bosMusteri = { name: '', phone: '', address: '', notes: '' };
-const bosIs = { category: 'Havuz', equipment_type: '', location: '', brand: '', install_date: yerel(new Date()) };
 
 export default function CustomersPage() {
   const [musteriler, setMusteriler] = useState([]);
   const [musteri, setMusteri] = useState(bosMusteri);
-  const [is, setIs] = useState(bosIs);
+  const [kategori, setKategori] = useState('');
+  const [cihaz, setCihaz] = useState('');
+  const [digerCihaz, setDigerCihaz] = useState('');
+  const [konum, setKonum] = useState('');
+  const [marka, setMarka] = useState('');
+  const [tarih, setTarih] = useState(yerel(new Date()));
   const [kurallar, setKurallar] = useState([]);
   const [ozelAd, setOzelAd] = useState('');
-  const [ozelAy, setOzelAy] = useState('');
-  const [mevsimAd, setMevsimAd] = useState('');
-  const [mevsimAyNo, setMevsimAyNo] = useState('5');
+  const [ozelSecim, setOzelSecim] = useState('p-12');
   const [formAcik, setFormAcik] = useState(false);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [kaydediliyor, setKaydediliyor] = useState(false);
@@ -78,48 +135,55 @@ export default function CustomersPage() {
 
   useEffect(() => { yukle(); }, []);
 
+  function kategoriSec(k) {
+    setKategori(kategori === k ? '' : k);
+    setCihaz('');
+    setDigerCihaz('');
+    setKurallar([]);
+  }
+
   function kuralSec(k) {
     setKurallar((o) => (o.find((x) => x.ad === k.ad) ? o.filter((x) => x.ad !== k.ad) : [...o, k]));
   }
 
   function ozelEkle() {
-    const ay = parseInt(ozelAy, 10);
-    if (!ozelAd.trim() || !ay || ay < 1) { setHata('Özel periyodik bakım için ad ve ay sayısı girin.'); return; }
-    setKurallar((o) => [...o, { ad: ozelAd.trim(), ay }]);
-    setOzelAd(''); setOzelAy(''); setHata('');
-  }
-
-  function mevsimEkle() {
-    if (!mevsimAd.trim()) { setHata('Mevsimlik bakım için bir ad girin.'); return; }
-    setKurallar((o) => [...o, { ad: mevsimAd.trim(), ayNo: parseInt(mevsimAyNo, 10), mevsim: true }]);
-    setMevsimAd(''); setHata('');
+    if (!ozelAd.trim()) { setHata('Özel bakım için bir ad yazın.'); return; }
+    const [tur, sayi] = ozelSecim.split('-');
+    const n = parseInt(sayi, 10);
+    const yeni = tur === 'm' ? { ad: ozelAd.trim(), ayNo: n, mevsim: true } : { ad: ozelAd.trim(), ay: n };
+    setKurallar((o) => [...o, yeni]);
+    setOzelAd('');
+    setHata('');
   }
 
   function formuKapat() {
     setMusteri(bosMusteri);
-    setIs(bosIs);
+    setKategori(''); setCihaz(''); setDigerCihaz('');
+    setKonum(''); setMarka(''); setTarih(yerel(new Date()));
     setKurallar([]);
     setFormAcik(false);
   }
+
+  const cihazAdi = cihaz === 'Diğer' ? digerCihaz.trim() : cihaz;
 
   async function kaydet(e) {
     e.preventDefault();
     setHata('');
     if (!musteri.name.trim()) { setHata('Müşteri adı zorunlu.'); return; }
-    if (kurallar.length && !is.equipment_type.trim()) {
-      setHata('Bakım seçtiyseniz "Cihaz / İş" alanını da doldurun.');
-      return;
-    }
+    if (kategori && !cihazAdi) { setHata('Kategori seçtiyseniz cihaz / iş seçin.'); return; }
     setKaydediliyor(true);
 
     const { data: yeniMusteri, error: mHata } = await supabase
       .from('customers').insert([musteri]).select().single();
     if (mHata) { setHata(mHata.message); setKaydediliyor(false); return; }
 
-    if (is.equipment_type.trim()) {
+    if (kategori && cihazAdi) {
       const { data: yeniCihaz, error: eHata } = await supabase
         .from('equipment')
-        .insert([{ ...is, customer_id: yeniMusteri.id }])
+        .insert([{
+          customer_id: yeniMusteri.id, category: kategori, equipment_type: cihazAdi,
+          location: konum, brand: marka, install_date: tarih,
+        }])
         .select().single();
       if (eHata) { setHata(eHata.message); setKaydediliyor(false); yukle(); return; }
 
@@ -129,7 +193,7 @@ export default function CustomersPage() {
             ? { equipment_id: yeniCihaz.id, rule_name: k.ad, period_months: 12,
                 last_service_date: null, next_due_date: mevsimTarihi(k.ayNo) }
             : { equipment_id: yeniCihaz.id, rule_name: k.ad, period_months: k.ay,
-                last_service_date: is.install_date }
+                last_service_date: tarih }
         );
         const { error: kHata } = await supabase.from('maintenance_rules').insert(satirlar);
         if (kHata) setHata(kHata.message);
@@ -162,9 +226,8 @@ export default function CustomersPage() {
     return !q || [m.name, m.phone, m.address, cihazlar].join(' ').toLowerCase().includes(q);
   });
 
-  const ekstralar = kurallar.filter(
-    (k) => !PERIYODIK.find((h) => h.ad === k.ad) && !MEVSIMLIK.find((h) => h.ad === k.ad)
-  );
+  const kat = kategori ? KATEGORI[kategori] : null;
+  const ekstralar = kat ? kurallar.filter((k) => !kat.bakimlar.find((b) => b.ad === k.ad)) : [];
 
   return (
     <div style={s.sayfa}>
@@ -182,7 +245,7 @@ export default function CustomersPage() {
 
       {formAcik && (
         <form onSubmit={kaydet} style={s.kart}>
-          <div style={s.bolumBaslik}>👤 Müşteri Bilgileri</div>
+          <div style={s.adim}><span style={s.adimNo}>1</span> Müşteri bilgileri</div>
           <div style={s.grid}>
             <label style={s.etiket}>Ad Soyad *
               <input style={s.input} placeholder="Örn: Mehmet Yılmaz" value={musteri.name}
@@ -202,88 +265,86 @@ export default function CustomersPage() {
             </label>
           </div>
 
-          <div style={{ ...s.bolumBaslik, marginTop: 24 }}>🛠️ Ne için gidiyoruz?</div>
-          <div style={s.grid}>
-            <label style={s.etiket}>Kategori
-              <select style={s.input} value={is.category}
-                onChange={(e) => setIs({ ...is, category: e.target.value })}>
-                {KATEGORILER.map((k) => <option key={k}>{k}</option>)}
-              </select>
-            </label>
-            <label style={s.etiket}>Cihaz / İş
-              <input style={s.input} placeholder="Örn: Kum filtresi, Dalgıç pompa, Hidrofor tankı"
-                value={is.equipment_type}
-                onChange={(e) => setIs({ ...is, equipment_type: e.target.value })} />
-            </label>
-            <label style={s.etiket}>Konum
-              <input style={s.input} placeholder="Örn: Makine dairesi, Bahçe" value={is.location}
-                onChange={(e) => setIs({ ...is, location: e.target.value })} />
-            </label>
-            <label style={s.etiket}>Marka / Model
-              <input style={s.input} value={is.brand}
-                onChange={(e) => setIs({ ...is, brand: e.target.value })} />
-            </label>
-            <label style={s.etiket}>Kurulum / Son bakım tarihi
-              <input type="date" style={s.input} value={is.install_date}
-                onChange={(e) => setIs({ ...is, install_date: e.target.value })} />
-            </label>
+          <div style={s.adim}><span style={s.adimNo}>2</span> Ne için gidiyoruz?</div>
+          <div style={s.kategoriler}>
+            {Object.keys(KATEGORI).map((k) => (
+              <button type="button" key={k} onClick={() => kategoriSec(k)}
+                style={{ ...s.kategoriBtn, ...(kategori === k ? s.kategoriSecili : {}) }}>
+                <span style={{ fontSize: 30 }}>{KATEGORI[k].ikon}</span>
+                <span>{k}</span>
+              </button>
+            ))}
           </div>
 
-          <div style={s.altBolum}>🔁 Periyodik bakım <span style={s.aciklama}>(son bakımdan itibaren hesaplanır)</span></div>
-          <div style={s.chipler}>
-            {PERIYODIK.map((k) => {
-              const secili = kurallar.find((x) => x.ad === k.ad);
-              return (
-                <button type="button" key={k.ad} onClick={() => kuralSec(k)}
-                  style={{ ...s.chip, ...(secili ? s.chipSecili : {}) }}>
-                  {k.ad} · {kuralYazi(k)}
-                </button>
-              );
-            })}
-          </div>
-          <div style={s.ozelSatir}>
-            <input style={{ ...s.input, flex: 2 }} placeholder="Listede yoksa: bakım adı"
-              value={ozelAd} onChange={(e) => setOzelAd(e.target.value)} />
-            <input style={{ ...s.input, flex: 1 }} placeholder="Kaç ayda bir" type="number" min="1"
-              value={ozelAy} onChange={(e) => setOzelAy(e.target.value)} />
-            <button type="button" style={s.ekleBtn} onClick={ozelEkle}>+ Ekle</button>
-          </div>
+          {kat && (
+            <>
+              <div style={s.adim}><span style={s.adimNo}>3</span> Hangi cihaz / iş?</div>
+              <div style={s.chipler}>
+                {[...kat.cihazlar, 'Diğer'].map((c) => (
+                  <button type="button" key={c} onClick={() => setCihaz(c)}
+                    style={{ ...s.chip, ...(cihaz === c ? s.chipSecili : {}) }}>
+                    {c}
+                  </button>
+                ))}
+              </div>
+              {cihaz === 'Diğer' && (
+                <input style={{ ...s.input, marginTop: 10 }} placeholder="Cihaz / iş adını yazın"
+                  value={digerCihaz} onChange={(e) => setDigerCihaz(e.target.value)} />
+              )}
 
-          <div style={s.altBolum}>☀️❄️ Mevsimlik bakım <span style={s.aciklama}>(her yıl aynı ayda düşer)</span></div>
-          <div style={s.chipler}>
-            {MEVSIMLIK.map((k) => {
-              const secili = kurallar.find((x) => x.ad === k.ad);
-              return (
-                <button type="button" key={k.ad} onClick={() => kuralSec(k)}
-                  style={{ ...s.chip, ...(secili ? s.chipMevsim : {}) }}>
-                  {k.ad} · {kuralYazi(k)}
-                </button>
-              );
-            })}
-          </div>
-          <div style={s.ozelSatir}>
-            <input style={{ ...s.input, flex: 2 }} placeholder="Listede yoksa: mevsimlik bakım adı"
-              value={mevsimAd} onChange={(e) => setMevsimAd(e.target.value)} />
-            <select style={{ ...s.input, flex: 1 }} value={mevsimAyNo}
-              onChange={(e) => setMevsimAyNo(e.target.value)}>
-              {AYLAR.map((ay, i) => <option key={ay} value={i + 1}>{ay}</option>)}
-            </select>
-            <button type="button" style={s.ekleBtn} onClick={mevsimEkle}>+ Ekle</button>
-          </div>
+              <div style={{ ...s.grid, marginTop: 14 }}>
+                <label style={s.etiket}>Konum (isteğe bağlı)
+                  <input style={s.input} placeholder="Örn: Makine dairesi, Bahçe" value={konum}
+                    onChange={(e) => setKonum(e.target.value)} />
+                </label>
+                <label style={s.etiket}>Marka / Model (isteğe bağlı)
+                  <input style={s.input} placeholder="Örn: Impo 2 HP" value={marka}
+                    onChange={(e) => setMarka(e.target.value)} />
+                </label>
+                <label style={s.etiket}>Kurulum / Son bakım tarihi
+                  <input type="date" style={s.input} value={tarih}
+                    onChange={(e) => setTarih(e.target.value)} />
+                </label>
+              </div>
 
-          {ekstralar.length > 0 && (
-            <div style={{ ...s.chipler, marginTop: 12 }}>
-              {ekstralar.map((k) => (
-                <button type="button" key={k.ad} onClick={() => kuralSec(k)}
-                  style={{ ...s.chip, ...(k.mevsim ? s.chipMevsim : s.chipSecili) }}>
-                  {k.ad} · {kuralYazi(k)} ✕
-                </button>
-              ))}
-            </div>
+              <div style={s.adim}><span style={s.adimNo}>4</span> Hangi bakımları takip edelim?</div>
+              <div style={s.lejant}>
+                <span><span style={{ ...s.lejNokta, background: '#1e5a82' }} /> Periyodik (son bakımdan itibaren)</span>
+                <span><span style={{ ...s.lejNokta, background: '#b45309' }} /> Mevsimlik (her yıl aynı ay)</span>
+              </div>
+              <div style={s.chipler}>
+                {kat.bakimlar.map((b) => {
+                  const secili = kurallar.find((x) => x.ad === b.ad);
+                  const renk = b.mevsim ? s.chipMevsim : s.chipSecili;
+                  return (
+                    <button type="button" key={b.ad} onClick={() => kuralSec(b)}
+                      style={{ ...s.chip, ...(secili ? renk : {}), borderColor: b.mevsim ? '#f59e0b' : '#93c5fd' }}>
+                      {secili ? '✓ ' : ''}{b.ad} · <b>{kuralYazi(b)}</b>
+                    </button>
+                  );
+                })}
+                {ekstralar.map((b) => (
+                  <button type="button" key={b.ad} onClick={() => kuralSec(b)}
+                    style={{ ...s.chip, ...(b.mevsim ? s.chipMevsim : s.chipSecili) }}>
+                    ✓ {b.ad} · <b>{kuralYazi(b)}</b> ✕
+                  </button>
+                ))}
+              </div>
+
+              <div style={s.ozelSatir}>
+                <input style={{ ...s.input, flex: 2, minWidth: 180 }} placeholder="Listede yoksa: bakım adı yazın"
+                  value={ozelAd} onChange={(e) => setOzelAd(e.target.value)} />
+                <select style={{ ...s.input, flex: 1, minWidth: 150 }} value={ozelSecim}
+                  onChange={(e) => setOzelSecim(e.target.value)}>
+                  {OZEL_SECENEKLER.map((o) => <option key={o.deger} value={o.deger}>{o.yazi}</option>)}
+                </select>
+                <button type="button" style={s.ekleBtn} onClick={ozelEkle}>+ Ekle</button>
+              </div>
+            </>
           )}
 
           <button type="submit" disabled={kaydediliyor}
-            style={{ ...s.anaBtn, marginTop: 20, width: '100%', opacity: kaydediliyor ? 0.6 : 1 }}>
+            style={{ ...s.anaBtn, marginTop: 24, width: '100%', padding: 16, fontSize: 17, opacity: kaydediliyor ? 0.6 : 1 }}>
             {kaydediliyor ? 'Kaydediliyor...' : 'Kaydet'}
           </button>
         </form>
@@ -318,7 +379,7 @@ export default function CustomersPage() {
             {(m.equipment || []).map((e) => (
               <div key={e.id} style={s.cihazKutu}>
                 <div style={s.cihazAd}>
-                  {e.category} · {e.equipment_type}
+                  {KATEGORI[e.category]?.ikon || '🛠️'} {e.category} · {e.equipment_type}
                   {e.location ? ` (${e.location})` : ''}
                 </div>
                 {(e.maintenance_rules || []).map((k) => {
@@ -346,21 +407,29 @@ const s = {
   altBaslik: { margin: '4px 0 0', color: '#64748b', fontSize: 14 },
   anaBtn: { background: 'linear-gradient(135deg,#1e5a82,#0f2d4a)', color: '#fff', border: 'none',
     borderRadius: 12, padding: '12px 18px', fontWeight: 600, cursor: 'pointer', fontSize: 15 },
-  kart: { background: '#fff', borderRadius: 16, padding: 18, marginBottom: 14,
+  kart: { background: '#fff', borderRadius: 16, padding: 20, marginBottom: 14,
     boxShadow: '0 2px 12px rgba(15,45,74,0.08)' },
-  bolumBaslik: { fontSize: 16, fontWeight: 700, color: '#0f2d4a', marginBottom: 12 },
-  altBolum: { fontSize: 14, fontWeight: 700, color: '#0f2d4a', marginTop: 20 },
-  aciklama: { fontWeight: 400, color: '#64748b', fontSize: 12 },
+  adim: { display: 'flex', alignItems: 'center', gap: 10, fontSize: 17, fontWeight: 700, color: '#0f2d4a',
+    margin: '22px 0 12px' },
+  adimNo: { width: 28, height: 28, borderRadius: '50%', background: '#1d6fe0', color: '#fff', fontSize: 14,
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 },
   etiket: { display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600, color: '#334155' },
-  input: { padding: '10px 12px', borderRadius: 10, border: '1px solid #cbd5e1', fontSize: 15,
+  input: { padding: '11px 12px', borderRadius: 10, border: '1px solid #cbd5e1', fontSize: 15,
     width: '100%', boxSizing: 'border-box' },
-  chipler: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  chip: { padding: '8px 12px', borderRadius: 20, border: '1px solid #cbd5e1', background: '#f8fafc',
-    cursor: 'pointer', fontSize: 13 },
+  kategoriler: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(110px,1fr))', gap: 10 },
+  kategoriBtn: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '16px 8px',
+    borderRadius: 14, border: '2px solid #e2e8f0', background: '#f8fafc', cursor: 'pointer',
+    fontSize: 15, fontWeight: 600, color: '#0f2d4a' },
+  kategoriSecili: { borderColor: '#1d6fe0', background: '#eff6ff', boxShadow: '0 0 0 3px rgba(29,111,224,0.15)' },
+  chipler: { display: 'flex', flexWrap: 'wrap', gap: 8 },
+  chip: { padding: '10px 14px', borderRadius: 22, border: '1px solid #cbd5e1', background: '#fff',
+    cursor: 'pointer', fontSize: 14, color: '#1e293b' },
   chipSecili: { background: '#1e5a82', color: '#fff', borderColor: '#1e5a82' },
   chipMevsim: { background: '#b45309', color: '#fff', borderColor: '#b45309' },
-  ozelSatir: { display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' },
+  lejant: { display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 12, color: '#475569', marginBottom: 10 },
+  lejNokta: { display: 'inline-block', width: 10, height: 10, borderRadius: '50%', marginRight: 5 },
+  ozelSatir: { display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' },
   ekleBtn: { background: '#eff6ff', color: '#1e5a82', border: '1px solid #bfdbfe', borderRadius: 10,
     padding: '10px 16px', fontWeight: 600, cursor: 'pointer' },
   hata: { background: '#fee2e2', color: '#991b1b', padding: 12, borderRadius: 10, marginBottom: 14 },
