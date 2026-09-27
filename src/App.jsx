@@ -19,6 +19,9 @@ const MENU = [
 
 const ALT_MENU = ['anasayfa', 'musteriler', 'takvim', 'isemirleri'];
 
+const yerel = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 function kullaniciBilgisi(session) {
   const meta = session?.user?.user_metadata || {};
   const e = session?.user?.email || '';
@@ -33,6 +36,9 @@ export default function App() {
   const [sayfa, setSayfa] = useState('anasayfa');
   const [genis, setGenis] = useState(window.innerWidth >= 900);
   const [menuAcik, setMenuAcik] = useState(false);
+  const [gecikmis, setGecikmis] = useState(0);
+  const [arama, setArama] = useState('');
+  const [aramaAnahtar, setAramaAnahtar] = useState(0);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -51,11 +57,29 @@ export default function App() {
     return () => window.removeEventListener('resize', f);
   }, []);
 
+  useEffect(() => {
+    if (!session) return;
+    supabase
+      .from('maintenance_rules')
+      .select('id', { count: 'exact', head: true })
+      .lt('next_due_date', yerel(new Date()))
+      .then(({ count }) => setGecikmis(count || 0));
+  }, [session, sayfa]);
+
   function git(id) {
     const hedef = id === 'ekipman' ? 'musteriler' : id;
     setSayfa(hedef);
     setMenuAcik(false);
     window.scrollTo(0, 0);
+  }
+
+  function aramaYap(e) {
+    e.preventDefault();
+    if (!arama.trim()) return;
+    sessionStorage.setItem('alkaArama', arama.trim());
+    setArama('');
+    setAramaAnahtar((n) => n + 1);
+    git('musteriler');
   }
 
   async function cikisYap() {
@@ -76,26 +100,22 @@ export default function App() {
   const { ad, rol } = kullaniciBilgisi(session);
   const avatarRenk = rol === 'Patron' ? '#b45309' : '#1d6fe0';
 
-  const kullaniciKutu = (
-    <div style={s.kullaniciKutu}>
-      <div style={{ ...s.avatar, background: avatarRenk }}>{ad.charAt(0)}</div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={s.kullaniciAd}>{ad}</div>
-        <div style={s.kullaniciRol}>{rol === 'Patron' ? '👑 ' : ''}{rol}</div>
-      </div>
-      <button style={s.cikisBtn} onClick={cikisYap}>Çıkış</button>
-    </div>
-  );
-
   const sayfaIcerik = (
     <>
-      {sayfa === 'anasayfa' && <DashboardPage onNavigate={git} />}
-      {sayfa === 'musteriler' && <CustomersPage />}
+      {sayfa === 'anasayfa' && <DashboardPage onNavigate={git} ad={ad} />}
+      {sayfa === 'musteriler' && <CustomersPage key={aramaAnahtar} />}
       {sayfa === 'takvim' && <CalendarPage />}
       {sayfa === 'isemirleri' && <WorkOrdersPage />}
       {sayfa === 'raporlar' && <ReportsPage />}
       {sayfa === 'ayarlar' && <SettingsPage session={session} />}
     </>
+  );
+
+  const zil = (
+    <button style={s.zil} onClick={() => git('takvim')} title="Gecikmiş bakımlar">
+      🔔
+      {gecikmis > 0 && <span style={s.zilRozet}>{gecikmis > 99 ? '99+' : gecikmis}</span>}
+    </button>
   );
 
   if (genis) {
@@ -112,14 +132,42 @@ export default function App() {
                 onClick={() => git(m.id)}
                 style={{ ...s.menuBtn, ...(sayfa === m.id ? s.menuAktif : {}) }}
               >
-                <span style={{ fontSize: 20 }}>{m.ikon}</span>
+                <span style={{ fontSize: 20, width: 26, textAlign: 'center' }}>{m.ikon}</span>
                 <span>{m.ad}</span>
               </button>
             ))}
           </nav>
-          {kullaniciKutu}
+
+          <div style={s.kullaniciKart}>
+            <div style={s.kullaniciSatir}>
+              <div style={{ ...s.avatar, background: avatarRenk }}>{ad.charAt(0)}</div>
+              <div style={{ minWidth: 0 }}>
+                <div style={s.kullaniciAd}>{ad}</div>
+                <div style={s.kullaniciRol}>{rol === 'Patron' ? '👑 ' : ''}{rol}</div>
+              </div>
+            </div>
+            <button style={s.cikisBtn} onClick={cikisYap}>⎋ Çıkış</button>
+          </div>
         </aside>
-        <main style={{ minHeight: '100vh', marginLeft: 260 }}>{sayfaIcerik}</main>
+
+        <div style={{ marginLeft: 260, minHeight: '100vh' }}>
+          <header style={s.ustCubuk}>
+            <form onSubmit={aramaYap} style={s.aramaKutu}>
+              <span style={{ fontSize: 17, opacity: 0.6 }}>🔍</span>
+              <input
+                style={s.aramaInput}
+                value={arama}
+                onChange={(e) => setArama(e.target.value)}
+                placeholder="Müşteri, adres, cihaz veya marka ara... (Enter)"
+              />
+            </form>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              {zil}
+              <button style={s.yeniIsBtn} onClick={() => git('isemirleri')}>+ Yeni İş Emri</button>
+            </div>
+          </header>
+          <main>{sayfaIcerik}</main>
+        </div>
       </div>
     );
   }
@@ -129,12 +177,22 @@ export default function App() {
   return (
     <div style={s.kok}>
       <header style={s.mobilUst}>
-        <div style={{ width: 44 }} />
+        {zil}
         <img src="/logopng.jpg" alt="ALKA Havuz" style={s.mobilLogo} onClick={() => git('anasayfa')} />
         <button style={{ ...s.mobilAvatar, background: avatarRenk }} onClick={() => git('ayarlar')}>
           {ad.charAt(0)}
         </button>
       </header>
+
+      <form onSubmit={aramaYap} style={s.mobilArama}>
+        <span style={{ fontSize: 16, opacity: 0.6 }}>🔍</span>
+        <input
+          style={s.aramaInput}
+          value={arama}
+          onChange={(e) => setArama(e.target.value)}
+          placeholder="Müşteri, adres, cihaz ara..."
+        />
+      </form>
 
       <main style={s.mobilIcerik}>{sayfaIcerik}</main>
 
@@ -156,7 +214,16 @@ export default function App() {
                 </button>
               ))}
             </div>
-            {kullaniciKutu}
+            <div style={{ ...s.kullaniciKart, marginTop: 14 }}>
+              <div style={s.kullaniciSatir}>
+                <div style={{ ...s.avatar, background: avatarRenk }}>{ad.charAt(0)}</div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={s.kullaniciAd}>{ad}</div>
+                  <div style={s.kullaniciRol}>{rol === 'Patron' ? '👑 ' : ''}{rol}</div>
+                </div>
+              </div>
+              <button style={s.cikisBtn} onClick={cikisYap}>⎋ Çıkış</button>
+            </div>
           </div>
         </>
       )}
@@ -167,7 +234,7 @@ export default function App() {
           const aktif = sayfa === id && !menuAcik;
           return (
             <button key={id} onClick={() => git(id)} style={{ ...s.altBtn, ...(aktif ? s.altBtnAktif : {}) }}>
-              <span style={{ fontSize: 22, filter: aktif ? 'none' : 'grayscale(0.4)' }}>{m.ikon}</span>
+              <span style={{ fontSize: 22 }}>{m.ikon}</span>
               <span>{m.kisa}</span>
             </button>
           );
@@ -190,50 +257,88 @@ const s = {
     background: '#0f2d4a', color: '#fff', fontFamily: 'system-ui, sans-serif', fontSize: 18,
   },
   kok: { minHeight: '100vh', background: '#f1f5fb', fontFamily: 'system-ui, sans-serif' },
+
   yan: {
     position: 'fixed', top: 0, left: 0, bottom: 0, width: 260, zIndex: 20,
-    background: 'linear-gradient(180deg,#0f2d4a 0%,#0b2440 60%,#082038 100%)',
-    padding: '20px 16px', boxSizing: 'border-box', overflowY: 'auto',
+    background:
+      'radial-gradient(ellipse at 50% 115%, rgba(56,189,248,0.55) 0%, rgba(14,116,184,0.30) 30%, transparent 58%),' +
+      'radial-gradient(ellipse at 20% 100%, rgba(125,211,252,0.25) 0%, transparent 40%),' +
+      'linear-gradient(180deg,#0b2a4a 0%,#0a2440 50%,#063a63 100%)',
+    padding: '22px 16px 18px', boxSizing: 'border-box', overflowY: 'auto',
     display: 'flex', flexDirection: 'column',
   },
-  logoAlan: { display: 'flex', justifyContent: 'center', marginBottom: 24 },
-  logo: { width: 180, height: 180, borderRadius: 20, objectFit: 'cover' },
+  logoAlan: { display: 'flex', justifyContent: 'center', marginBottom: 26 },
+  logo: { width: 190, height: 190, borderRadius: 22, objectFit: 'cover', boxShadow: '0 8px 30px rgba(0,0,0,0.35)' },
   menuBtn: {
-    display: 'flex', alignItems: 'center', gap: 14, width: '100%', padding: '14px 16px',
-    marginBottom: 6, border: 'none', borderRadius: 12, background: 'transparent',
+    display: 'flex', alignItems: 'center', gap: 14, width: '100%', padding: '14px 18px',
+    marginBottom: 6, border: 'none', borderRadius: 14, background: 'transparent',
     color: '#e2e8f0', fontSize: 16, fontWeight: 500, cursor: 'pointer', textAlign: 'left',
   },
-  menuAktif: { background: '#1d6fe0', color: '#fff', fontWeight: 700 },
-  kullaniciKutu: {
-    display: 'flex', alignItems: 'center', gap: 10, marginTop: 16, padding: 12,
-    background: 'rgba(255,255,255,0.08)', borderRadius: 14,
+  menuAktif: {
+    background: 'linear-gradient(135deg,#1d6fe0,#2563eb)', color: '#fff', fontWeight: 700,
+    boxShadow: '0 6px 20px rgba(29,111,224,0.45)',
   },
+  kullaniciKart: {
+    marginTop: 16, padding: 14, background: 'rgba(10,30,55,0.75)', borderRadius: 16,
+    border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(6px)',
+  },
+  kullaniciSatir: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 },
   avatar: {
-    width: 40, height: 40, borderRadius: '50%', color: '#fff', flexShrink: 0,
-    display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 18,
+    width: 44, height: 44, borderRadius: '50%', color: '#fff', flexShrink: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 18,
   },
-  kullaniciAd: { color: '#fff', fontWeight: 700, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  kullaniciAd: { color: '#fff', fontWeight: 700, fontSize: 15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   kullaniciRol: { color: '#94a3b8', fontSize: 12 },
   cikisBtn: {
-    border: '1px solid rgba(255,255,255,0.25)', background: 'transparent', color: '#fca5a5',
-    borderRadius: 8, padding: '7px 10px', fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0,
+    width: '100%', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.04)', color: '#e2e8f0',
+    borderRadius: 10, padding: '9px 10px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+  },
+
+  ustCubuk: {
+    position: 'sticky', top: 0, zIndex: 15, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    gap: 16, padding: '14px 28px', background: 'rgba(241,245,251,0.88)', backdropFilter: 'blur(10px)',
+  },
+  aramaKutu: {
+    flex: 1, maxWidth: 620, display: 'flex', alignItems: 'center', gap: 10, background: '#e8eef7',
+    borderRadius: 14, padding: '0 16px', border: '1px solid #dbe4f0',
+  },
+  aramaInput: {
+    flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: 15, padding: '13px 0',
+    color: '#0f2d4a', minWidth: 0,
+  },
+  zil: {
+    position: 'relative', width: 46, height: 46, borderRadius: '50%', border: 'none', background: '#fff',
+    boxShadow: '0 2px 10px rgba(15,45,74,0.12)', fontSize: 20, cursor: 'pointer', flexShrink: 0,
+  },
+  zilRozet: {
+    position: 'absolute', top: -2, right: -2, minWidth: 20, height: 20, borderRadius: 10, background: '#ef4444',
+    color: '#fff', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    padding: '0 5px', border: '2px solid #fff', boxSizing: 'border-box',
+  },
+  yeniIsBtn: {
+    background: 'linear-gradient(135deg,#1d6fe0,#2563eb)', color: '#fff', border: 'none', borderRadius: 14,
+    padding: '13px 22px', fontSize: 16, fontWeight: 700, cursor: 'pointer', boxShadow: '0 6px 18px rgba(29,111,224,0.35)',
+    whiteSpace: 'nowrap',
   },
 
   mobilUst: {
     position: 'sticky', top: 0, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    background: 'linear-gradient(135deg,#0f2d4a,#1e5a82)', padding: '10px 14px',
-    paddingTop: 'max(10px, env(safe-area-inset-top))',
-    boxShadow: '0 2px 12px rgba(15,45,74,0.25)',
+    background: 'linear-gradient(135deg,#0b2a4a,#1e5a82)', padding: '10px 14px',
+    paddingTop: 'max(10px, env(safe-area-inset-top))', boxShadow: '0 2px 12px rgba(15,45,74,0.25)',
   },
   mobilLogo: { height: 72, width: 72, borderRadius: 14, objectFit: 'cover', cursor: 'pointer' },
   mobilAvatar: {
-    width: 44, height: 44, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.5)', color: '#fff',
+    width: 46, height: 46, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.5)', color: '#fff',
     fontWeight: 800, fontSize: 18, cursor: 'pointer',
+  },
+  mobilArama: {
+    display: 'flex', alignItems: 'center', gap: 8, margin: '12px 14px 0', background: '#fff', borderRadius: 12,
+    padding: '0 14px', border: '1px solid #dbe4f0',
   },
   mobilIcerik: { paddingBottom: 'calc(84px + env(safe-area-inset-bottom))' },
   altMenu: {
     position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 30, display: 'flex',
-    background: '#0f2d4a', borderTop: '1px solid rgba(255,255,255,0.08)',
+    background: '#0b2a4a', borderTop: '1px solid rgba(255,255,255,0.08)',
     paddingBottom: 'env(safe-area-inset-bottom)', boxShadow: '0 -4px 16px rgba(0,0,0,0.2)',
   },
   altBtn: {
@@ -244,7 +349,7 @@ const s = {
   karartma: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 25 },
   altPanel: {
     position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 28,
-    background: 'linear-gradient(180deg,#0f2d4a,#082038)', borderRadius: '20px 20px 0 0',
+    background: 'linear-gradient(180deg,#0b2a4a,#063a63)', borderRadius: '20px 20px 0 0',
     padding: '10px 16px', paddingBottom: 'calc(84px + env(safe-area-inset-bottom))',
     boxShadow: '0 -8px 30px rgba(0,0,0,0.35)',
   },
