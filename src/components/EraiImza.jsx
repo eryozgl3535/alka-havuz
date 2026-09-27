@@ -1,81 +1,57 @@
 const CSS = `
-@keyframes eraiKay {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
+@keyframes eraiRenkAkis {
+  0% { background-position: 0% 50%; }
+  100% { background-position: -200% 50%; }
 }
-@keyframes eraiNeonYazi {
-  0%, 100% {
-    color: #7dd3fc;
-    text-shadow: 0 0 2px #e0f2fe, 0 0 6px #38bdf8, 0 0 12px #0ea5e9, 0 0 22px #2563eb;
-  }
-  50% {
-    color: #f9a8d4;
-    text-shadow: 0 0 2px #fdf2f8, 0 0 6px #f472b6, 0 0 12px #ec4899, 0 0 22px #db2777;
-  }
+@keyframes eraiParilti {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(56,189,248,0.75)); }
+  50% { filter: drop-shadow(0 0 3px rgba(236,72,153,0.75)); }
 }
-@keyframes eraiNeonCerceve {
-  0%, 100% {
-    border-color: rgba(56,189,248,0.7);
-    box-shadow: 0 0 6px rgba(56,189,248,0.6), inset 0 0 8px rgba(56,189,248,0.35);
-  }
-  50% {
-    border-color: rgba(236,72,153,0.75);
-    box-shadow: 0 0 6px rgba(236,72,153,0.6), inset 0 0 8px rgba(236,72,153,0.35);
-  }
+@keyframes eraiCizgiRenk {
+  0%, 100% { background-color: #38bdf8; box-shadow: 0 0 4px #38bdf8; }
+  50% { background-color: #ec4899; box-shadow: 0 0 4px #ec4899; }
 }
 `;
 
-export default function EraiImza({ boyut = 14, genislik }) {
-  const panelGenislik = genislik || Math.round(boyut * 15);
-  const tekrar = [0, 1, 2, 3];
-
-  const yazi = (anahtar) => (
-    <span
-      key={anahtar}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        paddingRight: Math.round(boyut * 1.6),
-        fontSize: boyut,
-        fontWeight: 800,
-        letterSpacing: Math.round(boyut * 0.3),
-        whiteSpace: 'nowrap',
-        animation: 'eraiNeonYazi 4s ease-in-out infinite',
-      }}
-    >
-      BUILT BY&nbsp;&nbsp;ERAİ
-      <span style={{ marginLeft: Math.round(boyut * 1.6), opacity: 0.8 }}>✦</span>
-    </span>
-  );
+export default function EraiImza({ boyut = 14 }) {
+  const cizgi = (yon) => ({
+    width: Math.round(boyut * 2.6),
+    height: 1.5,
+    borderRadius: 2,
+    animation: 'eraiCizgiRenk 4s ease-in-out infinite',
+    WebkitMaskImage: `linear-gradient(${yon}, transparent, #000)`,
+    maskImage: `linear-gradient(${yon}, transparent, #000)`,
+  });
 
   return (
-    <span
-      style={{
-        display: 'inline-block',
-        width: panelGenislik,
-        maxWidth: '100%',
-        overflow: 'hidden',
-        padding: `${Math.round(boyut * 0.5)}px 0`,
-        borderRadius: 10,
-        border: '1px solid',
-        background: 'radial-gradient(ellipse at center, #111c33 0%, #060b16 100%)',
-        animation: 'eraiNeonCerceve 4s ease-in-out infinite',
-        WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, #000 12%, #000 88%, transparent 100%)',
-        maskImage: 'linear-gradient(90deg, transparent 0%, #000 12%, #000 88%, transparent 100%)',
-        verticalAlign: 'middle',
-      }}
-    >
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: Math.round(boyut * 0.8) }}>
       <style>{CSS}</style>
+
+      <span style={cizgi('90deg')} />
+
       <span
         style={{
-          display: 'inline-flex',
+          fontSize: boyut,
+          fontWeight: 800,
+          letterSpacing: Math.round(boyut * 0.35),
+          lineHeight: 1.3,
           whiteSpace: 'nowrap',
-          animation: 'eraiKay 9s linear infinite',
+          display: 'inline-block',
+          backgroundImage:
+            'linear-gradient(90deg, #1d4ed8 0%, #38bdf8 25%, #ec4899 50%, #f9a8d4 75%, #1d4ed8 100%)',
+          backgroundSize: '200% 100%',
+          backgroundRepeat: 'repeat',
+          WebkitBackgroundClip: 'text',
+          backgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          color: 'transparent',
+          animation: 'eraiRenkAkis 4s linear infinite, eraiParilti 4s ease-in-out infinite',
         }}
       >
-        {tekrar.map((i) => yazi(`a${i}`))}
-        {tekrar.map((i) => yazi(`b${i}`))}
+        BUILT BY ERAİ
       </span>
+
+      <span style={cizgi('270deg')} />
     </span>
   );
 }
