@@ -10,14 +10,16 @@ import ReportsPage from './pages/ReportsPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 
 const MENU = [
-  { id: 'anasayfa', ad: 'Ana Sayfa', ikon: '🏠' },
-  { id: 'musteriler', ad: 'Müşteriler', ikon: '👥' },
-  { id: 'takvim', ad: 'Bakım Takvimi', ikon: '📅' },
-  { id: 'isemirleri', ad: 'İş Emirleri', ikon: '📋' },
-  { id: 'ekipman', ad: 'Ekipmanlar', ikon: '🛠️' },
-  { id: 'raporlar', ad: 'Raporlar', ikon: '📊' },
-  { id: 'ayarlar', ad: 'Ayarlar', ikon: '⚙️' },
+  { id: 'anasayfa', ad: 'Ana Sayfa', kisa: 'Ana Sayfa', ikon: '🏠' },
+  { id: 'musteriler', ad: 'Müşteriler', kisa: 'Müşteriler', ikon: '👥' },
+  { id: 'takvim', ad: 'Bakım Takvimi', kisa: 'Takvim', ikon: '📅' },
+  { id: 'isemirleri', ad: 'İş Emirleri', kisa: 'İş Emri', ikon: '📋' },
+  { id: 'ekipman', ad: 'Ekipmanlar', kisa: 'Ekipman', ikon: '🛠️' },
+  { id: 'raporlar', ad: 'Raporlar', kisa: 'Raporlar', ikon: '📊' },
+  { id: 'ayarlar', ad: 'Ayarlar', kisa: 'Ayarlar', ikon: '⚙️' },
 ];
+
+const ALT_MENU = ['anasayfa', 'musteriler', 'takvim', 'isemirleri'];
 
 function kullaniciBilgisi(session) {
   const meta = session?.user?.user_metadata || {};
@@ -61,6 +63,7 @@ export default function App() {
     if (!window.confirm('Çıkış yapılsın mı?')) return;
     await supabase.auth.signOut();
     setSayfa('anasayfa');
+    setMenuAcik(false);
   }
 
   if (!hazir) {
@@ -71,64 +74,114 @@ export default function App() {
     return <LoginPage />;
   }
 
-  const menuGorunur = genis || menuAcik;
   const { ad, rol } = kullaniciBilgisi(session);
+  const avatarRenk = rol === 'Patron' ? '#b45309' : '#1d6fe0';
 
-  return (
-    <div style={s.kok}>
-      {!genis && (
-        <div style={s.mobilUst}>
-          <button style={s.hamburger} onClick={() => setMenuAcik(!menuAcik)}>☰</button>
-          <img src="/logopng.jpg" alt="ALKA" style={{ height: 44, borderRadius: 8 }} />
-          <div style={{ width: 44 }} />
-        </div>
-      )}
+  const kullaniciKutu = (
+    <div style={s.kullaniciKutu}>
+      <div style={{ ...s.avatar, background: avatarRenk }}>{ad.charAt(0)}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={s.kullaniciAd}>{ad}</div>
+        <div style={s.kullaniciRol}>{rol === 'Patron' ? '👑 ' : ''}{rol}</div>
+      </div>
+      <button style={s.cikisBtn} onClick={cikisYap}>Çıkış</button>
+    </div>
+  );
 
-      {menuGorunur && (
-        <aside style={{ ...s.yan, ...(genis ? {} : s.yanMobil) }}>
+  const sayfaIcerik = (
+    <>
+      {sayfa === 'anasayfa' && <DashboardPage onNavigate={git} />}
+      {sayfa === 'musteriler' && <CustomersPage />}
+      {sayfa === 'takvim' && <CalendarPage />}
+      {sayfa === 'isemirleri' && <WorkOrdersPage />}
+      {sayfa === 'ekipman' && <EquipmentPage />}
+      {sayfa === 'raporlar' && <ReportsPage />}
+      {sayfa === 'ayarlar' && <SettingsPage session={session} />}
+    </>
+  );
+
+  if (genis) {
+    return (
+      <div style={s.kok}>
+        <aside style={s.yan}>
           <div style={s.logoAlan}>
             <img src="/logopng.jpg" alt="ALKA Havuz" style={s.logo} />
           </div>
           <nav style={{ flex: 1 }}>
-            {MENU.map((m) => {
-              const aktif = sayfa === m.id;
-              return (
+            {MENU.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => git(m.id)}
+                style={{ ...s.menuBtn, ...(sayfa === m.id ? s.menuAktif : {}) }}
+              >
+                <span style={{ fontSize: 20 }}>{m.ikon}</span>
+                <span>{m.ad}</span>
+              </button>
+            ))}
+          </nav>
+          {kullaniciKutu}
+        </aside>
+        <main style={{ minHeight: '100vh', marginLeft: 260 }}>{sayfaIcerik}</main>
+      </div>
+    );
+  }
+
+  const menudeMi = !ALT_MENU.includes(sayfa);
+
+  return (
+    <div style={s.kok}>
+      <header style={s.mobilUst}>
+        <div style={{ width: 44 }} />
+        <img src="/logopng.jpg" alt="ALKA Havuz" style={s.mobilLogo} onClick={() => git('anasayfa')} />
+        <button style={{ ...s.mobilAvatar, background: avatarRenk }} onClick={() => git('ayarlar')}>
+          {ad.charAt(0)}
+        </button>
+      </header>
+
+      <main style={s.mobilIcerik}>{sayfaIcerik}</main>
+
+      {menuAcik && (
+        <>
+          <div style={s.karartma} onClick={() => setMenuAcik(false)} />
+          <div style={s.altPanel}>
+            <div style={s.panelTutamac} />
+            <div style={s.panelBaslik}>Menü</div>
+            <div style={s.panelIzgara}>
+              {MENU.map((m) => (
                 <button
                   key={m.id}
                   onClick={() => git(m.id)}
-                  style={{ ...s.menuBtn, ...(aktif ? s.menuAktif : {}) }}
+                  style={{ ...s.panelBtn, ...(sayfa === m.id ? s.panelBtnAktif : {}) }}
                 >
-                  <span style={{ fontSize: 20 }}>{m.ikon}</span>
+                  <span style={{ fontSize: 26 }}>{m.ikon}</span>
                   <span>{m.ad}</span>
                 </button>
-              );
-            })}
-          </nav>
-
-          <div style={s.kullaniciKutu}>
-            <div style={{ ...s.avatar, background: rol === 'Patron' ? '#b45309' : '#1d6fe0' }}>
-              {ad.charAt(0)}
+              ))}
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={s.kullaniciAd}>{ad}</div>
-              <div style={s.kullaniciRol}>{rol === 'Patron' ? '👑 ' : ''}{rol}</div>
-            </div>
-            <button style={s.cikisBtn} onClick={cikisYap}>Çıkış</button>
+            {kullaniciKutu}
           </div>
-        </aside>
+        </>
       )}
 
-      {!genis && menuAcik && <div style={s.karartma} onClick={() => setMenuAcik(false)} />}
-
-      <main style={{ ...s.icerik, marginLeft: genis ? 260 : 0 }}>
-        {sayfa === 'anasayfa' && <DashboardPage onNavigate={git} />}
-        {sayfa === 'musteriler' && <CustomersPage />}
-        {sayfa === 'takvim' && <CalendarPage />}
-        {sayfa === 'isemirleri' && <WorkOrdersPage />}
-        {sayfa === 'ekipman' && <EquipmentPage />}
-        {sayfa === 'raporlar' && <ReportsPage />}
-        {sayfa === 'ayarlar' && <SettingsPage session={session} />}
-      </main>
+      <nav style={s.altMenu}>
+        {ALT_MENU.map((id) => {
+          const m = MENU.find((x) => x.id === id);
+          const aktif = sayfa === id && !menuAcik;
+          return (
+            <button key={id} onClick={() => git(id)} style={{ ...s.altBtn, ...(aktif ? s.altBtnAktif : {}) }}>
+              <span style={{ fontSize: 22, filter: aktif ? 'none' : 'grayscale(0.4)' }}>{m.ikon}</span>
+              <span>{m.kisa}</span>
+            </button>
+          );
+        })}
+        <button
+          onClick={() => setMenuAcik(!menuAcik)}
+          style={{ ...s.altBtn, ...(menuAcik || menudeMi ? s.altBtnAktif : {}) }}
+        >
+          <span style={{ fontSize: 22 }}>☰</span>
+          <span>Menü</span>
+        </button>
+      </nav>
     </div>
   );
 }
@@ -145,7 +198,6 @@ const s = {
     padding: '20px 16px', boxSizing: 'border-box', overflowY: 'auto',
     display: 'flex', flexDirection: 'column',
   },
-  yanMobil: { boxShadow: '4px 0 24px rgba(0,0,0,0.3)' },
   logoAlan: { display: 'flex', justifyContent: 'center', marginBottom: 24 },
   logo: { width: 180, height: 180, borderRadius: 20, objectFit: 'cover' },
   menuBtn: {
@@ -168,12 +220,43 @@ const s = {
     border: '1px solid rgba(255,255,255,0.25)', background: 'transparent', color: '#fca5a5',
     borderRadius: 8, padding: '7px 10px', fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0,
   },
-  icerik: { minHeight: '100vh' },
+
   mobilUst: {
     position: 'sticky', top: 0, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    background: '#0f2d4a', padding: '8px 12px',
+    background: 'linear-gradient(135deg,#0f2d4a,#1e5a82)', padding: '10px 14px',
+    paddingTop: 'max(10px, env(safe-area-inset-top))',
+    boxShadow: '0 2px 12px rgba(15,45,74,0.25)',
   },
-  hamburger: { width: 44, height: 44, border: 'none', borderRadius: 10, background: 'rgba(255,255,255,0.12)',
-    color: '#fff', fontSize: 22, cursor: 'pointer' },
-  karartma: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 15 },
+  mobilLogo: { height: 72, width: 72, borderRadius: 14, objectFit: 'cover', cursor: 'pointer' },
+  mobilAvatar: {
+    width: 44, height: 44, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.5)', color: '#fff',
+    fontWeight: 800, fontSize: 18, cursor: 'pointer',
+  },
+  mobilIcerik: { paddingBottom: 'calc(84px + env(safe-area-inset-bottom))' },
+  altMenu: {
+    position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 30, display: 'flex',
+    background: '#0f2d4a', borderTop: '1px solid rgba(255,255,255,0.08)',
+    paddingBottom: 'env(safe-area-inset-bottom)', boxShadow: '0 -4px 16px rgba(0,0,0,0.2)',
+  },
+  altBtn: {
+    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '10px 2px 8px',
+    border: 'none', background: 'transparent', color: '#94a3b8', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+  },
+  altBtnAktif: { color: '#fff', background: 'rgba(29,111,224,0.35)' },
+  karartma: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 25 },
+  altPanel: {
+    position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 28,
+    background: 'linear-gradient(180deg,#0f2d4a,#082038)', borderRadius: '20px 20px 0 0',
+    padding: '10px 16px', paddingBottom: 'calc(84px + env(safe-area-inset-bottom))',
+    boxShadow: '0 -8px 30px rgba(0,0,0,0.35)',
+  },
+  panelTutamac: { width: 44, height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.3)', margin: '0 auto 12px' },
+  panelBaslik: { color: '#fff', fontWeight: 800, fontSize: 18, marginBottom: 12 },
+  panelIzgara: { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 },
+  panelBtn: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '14px 6px',
+    borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.06)',
+    color: '#e2e8f0', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+  },
+  panelBtnAktif: { background: '#1d6fe0', color: '#fff', borderColor: '#1d6fe0' },
 };
