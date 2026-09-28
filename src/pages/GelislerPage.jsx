@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabase';
 
-export const HAZIRLIK = [
+const HAZIRLIK = [
   'Havuz hazırlama (temizlik + kimyasal ayar)',
   'Su vanalarını açma',
   'Hidrofor / basınç kontrolü',
@@ -11,7 +11,7 @@ export const HAZIRLIK = [
   'Elektrik panosu kontrolü',
 ];
 
-export const KAPANIS = [
+const KAPANIS = [
   'Su vanalarını kapatma',
   'Havuzu kapatma / koruma moduna alma',
   'Sulamayı kapatma / boşaltma',
@@ -19,10 +19,13 @@ export const KAPANIS = [
   'Genel kontrol ve fotoğraflı rapor',
 ];
 
+const YENI = '__yeni__';
+
 const yerel = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const bugunStr = () => yerel(new Date());
-const trTarih = (t) => (t ? new Date(t + 'T00:00:00').toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'short' }) : '-');
+const trTarih = (t) =>
+  t ? new Date(t + 'T00:00:00').toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'short' }) : '-';
 
 function gunEkle(tarih, n) {
   const d = new Date(tarih + 'T00:00:00');
@@ -44,8 +47,14 @@ function telefonWa(tel) {
   return n;
 }
 
+function hazirlikTarihiHesapla(gelis, gun) {
+  const t = gunEkle(gelis, -gun);
+  return t < bugunStr() ? bugunStr() : t;
+}
+
 const bosForm = {
-  customer_id: '', gelis_tarihi: '', ayrilis_tarihi: '', istekler: [HAZIRLIK[0], HAZIRLIK[1]],
+  customer_id: '', yeniAd: '', yeniTel: '', yeniAdres: '',
+  gelis_tarihi: '', ayrilis_tarihi: '', istekler: [HAZIRLIK[0], HAZIRLIK[1]],
   ayrilis_istekleri: [], hazirlikGun: '2', notlar: '',
 };
 
@@ -54,8 +63,8 @@ export default function GelislerPage() {
   const [musteriler, setMusteriler] = useState([]);
   const [form, setForm] = useState(bosForm);
   const [formAcik, setFormAcik] = useState(false);
-  const [linkMusteri, setLinkMusteri] = useState('');
   const [gecmisAcik, setGecmisAcik] = useState(false);
+  const [duzenlenen, setDuzenlenen] = useState(null);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [kaydediliyor, setKaydediliyor] = useState(false);
   const [mesaj, setMesaj] = useState(null);
@@ -68,7 +77,7 @@ export default function GelislerPage() {
       supabase.from('gelisler')
         .select('*, customers(name, phone, address)')
         .order('gelis_tarihi', { ascending: true }),
-      supabase.from('customers').select('id, name, phone, gelis_token').order('name', { ascending: true }),
+      supabase.from('customers').select('id, name, phone').order('name', { ascending: true }),
     ]);
     if (g.error) hata(g.error.message);
     setGelisler(g.data || []);
@@ -84,7 +93,7 @@ export default function GelislerPage() {
   }
 
   async function isEmriAc(musteriId, baslik, maddeler, tarih, not) {
-    const aciklama = maddeler.map((x) => `• ${x}`).join('\n') + (not ? `\n\nMüşteri notu: ${not}` : '');
+    const aciklama = maddeler.map((x) => `• ${x}`).join('\n') + (not ? `\n\nNot: ${not}` : '');
     const { data, error } = await supabase.from('work_orders')
       .insert([{ customer_id: musteriId, title: baslik, description: aciklama, scheduled_date: tarih, materials: [] }])
       .select('id')
@@ -96,32 +105,39 @@ export default function GelislerPage() {
   async function kaydet(e) {
     e.preventDefault();
     setMesaj(null);
-    if (!form.customer_id) { hata('Müşteri seçin.'); return; }
+    const yeniMi = form.customer_id === YENI;
+    if (!form.customer_id) { hata('Müşteri seçin ya da yeni müşteri ekleyin.'); return; }
+    if (yeniMi && !form.yeniAd.trim()) { hata('Yeni müşterinin adını yazın.'); return; }
     if (!form.gelis_tarihi) { hata('Geliş tarihini seçin.'); return; }
     if (!form.istekler.length) { hata('En az bir hazırlık işi seçin.'); return; }
     if (form.ayrilis_tarihi && form.ayrilis_tarihi < form.gelis_tarihi) { hata('Ayrılış tarihi gelişten önce olamaz.'); return; }
     setKaydediliyor(true);
     try {
-      let hazirlikTarihi = gunEkle(form.gelis_tarihi, -parseInt(form.hazirlikGun, 10));
-      if (hazirlikTarihi < bugunStr()) hazirlikTarihi = bugunStr();
+      let musteriId = form.customer_id;
+      if (yeniMi) {
+        const { data: yeniM, error: mHata } = await supabase.from('customers')
+          .insert([{ name: form.yeniAd.trim(), phone: form.yeniTel.trim(), address: form.yeniAdres.trim() }])
+          .select('id')
+          .single();
+        if (mHata) throw mHata;
+        musteriId = yeniM.id;
+      }
 
+      const hazirlikTarihi = hazirlikTarihiHesapla(form.gelis_tarihi, parseInt(form.hazirlikGun, 10));
       const hazirlikId = await isEmriAc(
-        form.customer_id,
-        `🏡 Geliş hazırlığı (${trTarih(form.gelis_tarihi)})`,
-        form.istekler, hazirlikTarihi, form.notlar
+        musteriId, `🏡 Geliş hazırlığı (${trTarih(form.gelis_tarihi)})`, form.istekler, hazirlikTarihi, form.notlar
       );
 
       let kapanisId = null;
       if (form.ayrilis_tarihi && form.ayrilis_istekleri.length) {
         kapanisId = await isEmriAc(
-          form.customer_id,
-          `🔒 Ayrılış sonrası kapatma (${trTarih(form.ayrilis_tarihi)})`,
+          musteriId, `🔒 Ayrılış sonrası kapatma (${trTarih(form.ayrilis_tarihi)})`,
           form.ayrilis_istekleri, gunEkle(form.ayrilis_tarihi, 1), form.notlar
         );
       }
 
       const { error } = await supabase.from('gelisler').insert([{
-        customer_id: form.customer_id,
+        customer_id: musteriId,
         gelis_tarihi: form.gelis_tarihi,
         ayrilis_tarihi: form.ayrilis_tarihi || null,
         istekler: form.istekler,
@@ -133,7 +149,10 @@ export default function GelislerPage() {
       }]);
       if (error) throw error;
 
-      tamam(`Geliş kaydedildi. Hazırlık iş emri ${trTarih(hazirlikTarihi)} tarihine açıldı${kapanisId ? ', kapatma iş emri de oluşturuldu' : ''}.`);
+      tamam(
+        `Geliş kaydedildi${yeniMi ? ', yeni müşteri eklendi' : ''}. Hazırlık iş emri ${trTarih(hazirlikTarihi)} tarihine açıldı` +
+        `${kapanisId ? ', ayrılış sonrası kapatma iş emri de oluşturuldu' : ''}.`
+      );
       setForm(bosForm);
       setFormAcik(false);
       yukle();
@@ -141,6 +160,41 @@ export default function GelislerPage() {
       hata(err.message);
     }
     setKaydediliyor(false);
+  }
+
+  async function tarihGuncelle() {
+    const g = duzenlenen;
+    if (!g.gelis_tarihi) { hata('Geliş tarihi boş olamaz.'); return; }
+    if (g.ayrilis_tarihi && g.ayrilis_tarihi < g.gelis_tarihi) { hata('Ayrılış tarihi gelişten önce olamaz.'); return; }
+    try {
+      const { error } = await supabase.from('gelisler')
+        .update({ gelis_tarihi: g.gelis_tarihi, ayrilis_tarihi: g.ayrilis_tarihi || null })
+        .eq('id', g.id);
+      if (error) throw error;
+      if (g.hazirlik_is_id) {
+        await supabase.from('work_orders')
+          .update({
+            scheduled_date: hazirlikTarihiHesapla(g.gelis_tarihi, 2),
+            title: `🏡 Geliş hazırlığı (${trTarih(g.gelis_tarihi)})`,
+          })
+          .eq('id', g.hazirlik_is_id)
+          .neq('status', 'tamamlandi');
+      }
+      if (g.kapanis_is_id && g.ayrilis_tarihi) {
+        await supabase.from('work_orders')
+          .update({
+            scheduled_date: gunEkle(g.ayrilis_tarihi, 1),
+            title: `🔒 Ayrılış sonrası kapatma (${trTarih(g.ayrilis_tarihi)})`,
+          })
+          .eq('id', g.kapanis_is_id)
+          .neq('status', 'tamamlandi');
+      }
+      tamam('Tarihler güncellendi, bağlı iş emirleri de kaydırıldı.');
+      setDuzenlenen(null);
+      yukle();
+    } catch (err) {
+      hata(err.message);
+    }
   }
 
   async function hazir(g) {
@@ -153,7 +207,7 @@ export default function GelislerPage() {
         `Havuzunuz ve sistemleriniz hazır, Çeşme'de iyi tatiller dileriz! 🌊`;
       window.open(`https://wa.me/${numara}?text=${encodeURIComponent(metin)}`, '_blank');
     } else {
-      tamam('Hazır olarak işaretlendi. Müşterinin telefonu kayıtlı olmadığı için mesaj gönderilemedi.');
+      tamam('Hazır olarak işaretlendi. Müşterinin telefonu kayıtlı olmadığı için mesaj açılamadı.');
     }
     yukle();
   }
@@ -174,31 +228,6 @@ export default function GelislerPage() {
     yukle();
   }
 
-  const secilenLinkMusteri = musteriler.find((m) => m.id === linkMusteri);
-  const musteriLinki = secilenLinkMusteri?.gelis_token
-    ? `${window.location.origin}/gelis/${secilenLinkMusteri.gelis_token}`
-    : '';
-
-  function linkGonder() {
-    if (!musteriLinki) { hata('Önce müşteri seçin.'); return; }
-    const numara = telefonWa(secilenLinkMusteri.phone);
-    if (!numara) { hata('Bu müşterinin telefonu kayıtlı değil; linki kopyalayıp elle gönderebilirsiniz.'); return; }
-    const metin =
-      `Sayın ${secilenLinkMusteri.name}, Çeşme'ye gelmeden önce geliş tarihinizi bu linkten bildirebilirsiniz. ` +
-      `Siz gelmeden havuzunuzu ve sistemlerinizi hazırlayalım, kapıdan girdiğinizde her şey çalışıyor olsun:\n${musteriLinki}`;
-    window.open(`https://wa.me/${numara}?text=${encodeURIComponent(metin)}`, '_blank');
-  }
-
-  async function linkKopyala() {
-    if (!musteriLinki) { hata('Önce müşteri seçin.'); return; }
-    try {
-      await navigator.clipboard.writeText(musteriLinki);
-      tamam('Link kopyalandı.');
-    } catch {
-      window.prompt('Linki kopyalayın:', musteriLinki);
-    }
-  }
-
   const bugun = bugunStr();
   const aktifler = gelisler.filter((g) => g.durum !== 'iptal' && (g.ayrilis_tarihi || g.gelis_tarihi) >= bugun);
   const gecmis = gelisler.filter((g) => !aktifler.includes(g)).reverse();
@@ -209,7 +238,8 @@ export default function GelislerPage() {
     if (g.durum === 'iptal') rozet = { yazi: 'İptal', renk: '#64748b', zemin: '#f1f5f9' };
     else if (kalan > 0) rozet = { yazi: `${kalan} gün sonra geliyor`, renk: kalan <= 3 ? '#b45309' : '#1d4ed8', zemin: kalan <= 3 ? '#fef3c7' : '#dbeafe' };
     else if (kalan === 0) rozet = { yazi: 'Bugün geliyor', renk: '#b45309', zemin: '#fef3c7' };
-    else rozet = { yazi: 'Çeşme\'de', renk: '#15803d', zemin: '#dcfce7' };
+    else rozet = { yazi: "Çeşme'de", renk: '#15803d', zemin: '#dcfce7' };
+    const duzenleniyor = duzenlenen && duzenlenen.id === g.id;
 
     return (
       <div style={{ ...s.kart, ...(g.durum === 'hazir' ? s.kartHazir : {}) }}>
@@ -217,6 +247,7 @@ export default function GelislerPage() {
           <div style={{ flex: 1, minWidth: 200 }}>
             <div style={s.isim}>{g.customers?.name || '-'}</div>
             {g.customers?.address && <div style={s.kucuk}>📍 {g.customers.address}</div>}
+            {g.customers?.phone && <div style={s.kucuk}>📞 {g.customers.phone}</div>}
             <div style={s.tarihSatir}>
               <span>🛬 <b>{trTarih(g.gelis_tarihi)}</b></span>
               {g.ayrilis_tarihi && <span>🛫 {trTarih(g.ayrilis_tarihi)}</span>}
@@ -225,7 +256,6 @@ export default function GelislerPage() {
           <div style={s.sagTaraf}>
             <span style={{ ...s.rozet, color: rozet.renk, background: rozet.zemin }}>{rozet.yazi}</span>
             {g.durum === 'hazir' && <span style={{ ...s.rozet, color: '#15803d', background: '#dcfce7' }}>✓ Hazır</span>}
-            {g.kaynak === 'musteri' && <span style={{ ...s.rozet, color: '#6d28d9', background: '#ede9fe' }}>Müşteri bildirdi</span>}
           </div>
         </div>
 
@@ -239,9 +269,29 @@ export default function GelislerPage() {
         )}
         {g.notlar && <div style={{ ...s.kucuk, marginTop: 8 }}>📝 {g.notlar}</div>}
 
+        {duzenleniyor && (
+          <div style={s.duzenleKutu}>
+            <div style={s.grid}>
+              <label style={s.etiket}>Yeni geliş tarihi
+                <input type="date" style={s.input} value={duzenlenen.gelis_tarihi}
+                  onChange={(e) => setDuzenlenen({ ...duzenlenen, gelis_tarihi: e.target.value })} />
+              </label>
+              <label style={s.etiket}>Yeni ayrılış tarihi
+                <input type="date" style={s.input} value={duzenlenen.ayrilis_tarihi || ''}
+                  onChange={(e) => setDuzenlenen({ ...duzenlenen, ayrilis_tarihi: e.target.value })} />
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+              <button style={s.kaydetBtn} onClick={tarihGuncelle}>Kaydet</button>
+              <button style={s.vazgecBtn} onClick={() => setDuzenlenen(null)}>Vazgeç</button>
+            </div>
+          </div>
+        )}
+
         <div style={s.aksiyonlar}>
-          {g.durum === 'planlandi' && (
-            <button style={s.hazirBtn} onClick={() => hazir(g)}>✓ Hazır + WhatsApp</button>
+          {g.durum === 'planlandi' && <button style={s.hazirBtn} onClick={() => hazir(g)}>✓ Hazır + WhatsApp</button>}
+          {g.durum !== 'iptal' && !duzenleniyor && (
+            <button style={s.duzenleBtn} onClick={() => setDuzenlenen({ ...g })}>✏️ Tarih değiştir</button>
           )}
           {g.durum !== 'iptal' && <button style={s.iptalBtn} onClick={() => iptal(g)}>İptal</button>}
           <button style={s.silBtn} onClick={() => sil(g)}>Sil</button>
@@ -257,7 +307,7 @@ export default function GelislerPage() {
           <h1 style={s.baslik}>🏡 Geliş Planı</h1>
           <p style={s.altBaslik}>Siz gelmeden havuzunuz hazır · {aktifler.length} yaklaşan geliş</p>
         </div>
-        <button style={s.anaBtn} onClick={() => setFormAcik(!formAcik)}>
+        <button style={s.anaBtn} onClick={() => { setFormAcik(!formAcik); setMesaj(null); }}>
           {formAcik ? 'Kapat' : '+ Geliş Ekle'}
         </button>
       </div>
@@ -270,13 +320,35 @@ export default function GelislerPage() {
 
       {formAcik && (
         <form onSubmit={kaydet} style={s.kart}>
+          <div style={s.bolum}>👤 Müşteri</div>
           <div style={s.grid}>
             <label style={s.etiket}>Müşteri *
               <select style={s.input} value={form.customer_id} onChange={(e) => setForm({ ...form, customer_id: e.target.value })}>
                 <option value="">Seçin</option>
+                <option value={YENI}>+ Yeni müşteri ekle</option>
                 {musteriler.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
             </label>
+          </div>
+          {form.customer_id === YENI && (
+            <div style={{ ...s.grid, marginTop: 12, padding: 14, background: '#f8fafc', borderRadius: 12 }}>
+              <label style={s.etiket}>Ad Soyad *
+                <input style={s.input} placeholder="Örn: Mehmet Yılmaz" value={form.yeniAd}
+                  onChange={(e) => setForm({ ...form, yeniAd: e.target.value })} />
+              </label>
+              <label style={s.etiket}>Telefon
+                <input style={s.input} type="tel" placeholder="05XX XXX XX XX" value={form.yeniTel}
+                  onChange={(e) => setForm({ ...form, yeniTel: e.target.value })} />
+              </label>
+              <label style={s.etiket}>Adres
+                <input style={s.input} placeholder="Örn: Alaçatı, Çeşme" value={form.yeniAdres}
+                  onChange={(e) => setForm({ ...form, yeniAdres: e.target.value })} />
+              </label>
+            </div>
+          )}
+
+          <div style={s.bolum}>📅 Tarihler</div>
+          <div style={s.grid}>
             <label style={s.etiket}>Geliş tarihi *
               <input type="date" style={s.input} value={form.gelis_tarihi} min={bugun}
                 onChange={(e) => setForm({ ...form, gelis_tarihi: e.target.value })} />
@@ -285,7 +357,7 @@ export default function GelislerPage() {
               <input type="date" style={s.input} value={form.ayrilis_tarihi} min={form.gelis_tarihi || bugun}
                 onChange={(e) => setForm({ ...form, ayrilis_tarihi: e.target.value })} />
             </label>
-            <label style={s.etiket}>Hazırlık kaç gün önce yapılsın?
+            <label style={s.etiket}>Hazırlık kaç gün önce?
               <select style={s.input} value={form.hazirlikGun} onChange={(e) => setForm({ ...form, hazirlikGun: e.target.value })}>
                 <option value="1">1 gün önce</option>
                 <option value="2">2 gün önce</option>
@@ -330,27 +402,12 @@ export default function GelislerPage() {
         </form>
       )}
 
-      <div style={{ ...s.kart, background: 'linear-gradient(135deg,#f5f3ff,#eef6ff)' }}>
-        <div style={s.bolumBaslik}>🔗 Müşteriye geliş bildirim linki gönder</div>
-        <p style={{ ...s.kucuk, margin: '0 0 12px' }}>
-          Müşteri bu linkten giriş yapmadan geliş tarihini ve isteklerini bildirir; kayıt buraya otomatik düşer.
-        </p>
-        <div style={s.linkSatir}>
-          <select style={{ ...s.input, flex: 2, minWidth: 180 }} value={linkMusteri} onChange={(e) => setLinkMusteri(e.target.value)}>
-            <option value="">Müşteri seçin</option>
-            {musteriler.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-          </select>
-          <button style={s.waBtn} onClick={linkGonder}>💬 WhatsApp'tan gönder</button>
-          <button style={s.kopyaBtn} onClick={linkKopyala}>📋 Kopyala</button>
-        </div>
-      </div>
-
       {yukleniyor ? (
         <p style={s.altBaslik}>Yükleniyor...</p>
       ) : aktifler.length === 0 ? (
         <div style={{ ...s.kart, textAlign: 'center' }}>
           <div style={{ fontSize: 44 }}>🏖️</div>
-          <p style={s.altBaslik}>Yaklaşan geliş yok. Müşterilerinize geliş linkini göndererek başlayabilirsiniz.</p>
+          <p style={s.altBaslik}>Yaklaşan geliş yok. "+ Geliş Ekle" ile ilk gelişi planlayın.</p>
         </div>
       ) : (
         aktifler.map((g) => <GelisKarti key={g.id} g={g} />)
@@ -384,7 +441,6 @@ const s = {
   etiket: { display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600, color: '#334155' },
   input: { padding: '11px 12px', borderRadius: 10, border: '1px solid #cbd5e1', fontSize: 15, width: '100%', boxSizing: 'border-box', background: '#fff' },
   bolum: { fontSize: 16, fontWeight: 700, color: '#0f2d4a', margin: '18px 0 10px' },
-  bolumBaslik: { fontSize: 16, fontWeight: 800, color: '#0f2d4a', marginBottom: 6 },
   chipler: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   chip: { padding: '10px 14px', borderRadius: 22, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontSize: 14, color: '#1e293b' },
   chipSecili: { background: '#1d6fe0', color: '#fff', borderColor: '#1d6fe0' },
@@ -397,12 +453,13 @@ const s = {
   tarihSatir: { display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 8, fontSize: 15, color: '#334155' },
   sagTaraf: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 },
   rozet: { padding: '6px 12px', borderRadius: 20, fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' },
+  duzenleKutu: { marginTop: 12, padding: 14, background: '#f8fafc', borderRadius: 12, border: '1px dashed #93c5fd' },
   aksiyonlar: { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14, paddingTop: 14, borderTop: '1px solid #eef2f6' },
   hazirBtn: { background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 14px', fontWeight: 700, cursor: 'pointer' },
+  duzenleBtn: { background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 8, padding: '9px 14px', fontWeight: 600, cursor: 'pointer' },
   iptalBtn: { background: '#fff', color: '#b45309', border: '1px solid #fcd34d', borderRadius: 8, padding: '9px 14px', fontWeight: 600, cursor: 'pointer' },
   silBtn: { background: 'transparent', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 8, padding: '9px 14px', cursor: 'pointer', marginLeft: 'auto' },
-  linkSatir: { display: 'flex', gap: 8, flexWrap: 'wrap' },
-  waBtn: { background: '#16a34a', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 14px', fontWeight: 700, cursor: 'pointer' },
-  kopyaBtn: { background: '#fff', color: '#1e5a82', border: '1px solid #bfdbfe', borderRadius: 10, padding: '10px 14px', fontWeight: 700, cursor: 'pointer' },
+  kaydetBtn: { background: 'linear-gradient(135deg,#1e5a82,#0f2d4a)', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 18px', fontWeight: 700, cursor: 'pointer' },
+  vazgecBtn: { background: '#fff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 18px', fontWeight: 600, cursor: 'pointer' },
   gecmisBtn: { background: 'none', border: 'none', color: '#475569', fontWeight: 700, cursor: 'pointer', fontSize: 14, margin: '8px 0 12px' },
 };
