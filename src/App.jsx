@@ -6,6 +6,7 @@ import CustomersPage from './pages/CustomersPage.jsx';
 import CalendarPage from './pages/CalendarPage.jsx';
 import WorkOrdersPage from './pages/WorkOrdersPage.jsx';
 import GelislerPage from './pages/GelislerPage.jsx';
+import TopluMesajPage from './pages/TopluMesajPage.jsx';
 import ReportsPage from './pages/ReportsPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import RaporPage from './pages/RaporPage.jsx';
@@ -16,6 +17,7 @@ const MENU = [
   { id: 'takvim', ad: 'Bakım Takvimi', kisa: 'Takvim', ikon: '📅' },
   { id: 'isemirleri', ad: 'İş Emirleri', kisa: 'İş Emri', ikon: '📋' },
   { id: 'gelisler', ad: 'Geliş Planı', kisa: 'Geliş', ikon: '🏡' },
+  { id: 'toplumesaj', ad: 'Toplu Mesaj', kisa: 'Mesaj', ikon: '📣' },
   { id: 'raporlar', ad: 'Raporlar', kisa: 'Raporlar', ikon: '📊' },
   { id: 'ayarlar', ad: 'Ayarlar', kisa: 'Ayarlar', ikon: '⚙️' },
 ];
@@ -116,6 +118,7 @@ function AnaUygulama() {
       {sayfa === 'takvim' && <CalendarPage />}
       {sayfa === 'isemirleri' && <WorkOrdersPage />}
       {sayfa === 'gelisler' && <GelislerPage />}
+      {sayfa === 'toplumesaj' && <TopluMesajPage />}
       {sayfa === 'raporlar' && <ReportsPage />}
       {sayfa === 'ayarlar' && <SettingsPage session={session} />}
     </>
@@ -268,14 +271,14 @@ const s = {
       'radial-gradient(ellipse at 50% 115%, rgba(56,189,248,0.55) 0%, rgba(14,116,184,0.30) 30%, transparent 58%),' +
       'radial-gradient(ellipse at 20% 100%, rgba(125,211,252,0.25) 0%, transparent 40%),' +
       'linear-gradient(180deg,#0b2a4a 0%,#0a2440 50%,#063a63 100%)',
-    padding: '22px 16px 18px', boxSizing: 'border-box', overflowY: 'auto',
+    padding: '20px 16px 16px', boxSizing: 'border-box', overflowY: 'auto',
     display: 'flex', flexDirection: 'column',
   },
-  logoAlan: { display: 'flex', justifyContent: 'center', marginBottom: 22 },
-  logo: { width: 180, height: 180, borderRadius: 22, objectFit: 'cover', boxShadow: '0 8px 30px rgba(0,0,0,0.35)' },
+  logoAlan: { display: 'flex', justifyContent: 'center', marginBottom: 18 },
+  logo: { width: 160, height: 160, borderRadius: 20, objectFit: 'cover', boxShadow: '0 8px 30px rgba(0,0,0,0.35)' },
   menuBtn: {
-    display: 'flex', alignItems: 'center', gap: 14, width: '100%', padding: '13px 18px',
-    marginBottom: 5, border: 'none', borderRadius: 14, background: 'transparent',
+    display: 'flex', alignItems: 'center', gap: 14, width: '100%', padding: '12px 18px',
+    marginBottom: 4, border: 'none', borderRadius: 14, background: 'transparent',
     color: '#e2e8f0', fontSize: 16, fontWeight: 500, cursor: 'pointer', textAlign: 'left',
   },
   menuAktif: {
@@ -283,7 +286,7 @@ const s = {
     boxShadow: '0 6px 20px rgba(29,111,224,0.45)',
   },
   kullaniciKart: {
-    marginTop: 16, padding: 14, background: 'rgba(10,30,55,0.75)', borderRadius: 16,
+    marginTop: 14, padding: 14, background: 'rgba(10,30,55,0.75)', borderRadius: 16,
     border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(6px)',
   },
   kullaniciSatir: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 },
