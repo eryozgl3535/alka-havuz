@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabase';
 import { FIRMA } from '../firma';
 
 const AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 const KATEGORI_IKON = { Havuz: '🏊', Kuyu: '💧', Hidrofor: '🔵', Sulama: '🌱', Tesisat: '🔧', Elektrik: '⚡' };
-const GUNLER = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
 const HIZLI_ANAHTAR = 'alkaHizliIslemler1';
 
 const yerel = (d) =>
@@ -90,11 +89,8 @@ function hizliOku() {
 
 export default function DashboardPage({ onNavigate }) {
   const [kurallar, setKurallar] = useState([]);
-  const [bugunIsler, setBugunIsler] = useState([]);
   const [tamamlanan, setTamamlanan] = useState(0);
   const [musteriSayi, setMusteriSayi] = useState(0);
-  const [hava, setHava] = useState(null);
-  const [tahmin, setTahmin] = useState([]);
   const [hizli, setHizli] = useState(hizliOku);
   const [duzenle, setDuzenle] = useState(false);
 
@@ -103,43 +99,17 @@ export default function DashboardPage({ onNavigate }) {
   useEffect(() => {
     (async () => {
       const bugun = new Date();
-      const bugunStr = yerel(bugun);
       const ayBas = yerel(new Date(bugun.getFullYear(), bugun.getMonth(), 1));
-      const [k, b, t, m] = await Promise.all([
+      const [k, t, m] = await Promise.all([
         supabase.from('maintenance_rules').select('*, equipment(category, equipment_type, customers(name, address))'),
-        supabase.from('work_orders').select('id, title, status, customers(name)').eq('scheduled_date', bugunStr).neq('status', 'tamamlandi'),
         supabase.from('work_orders').select('id', { count: 'exact', head: true }).eq('status', 'tamamlandi').gte('completed_date', ayBas),
         supabase.from('customers').select('id', { count: 'exact', head: true }),
       ]);
       setKurallar((k.data || []).filter((x) => x.active !== false && x.next_due_date));
-      setBugunIsler(b.data || []);
       setTamamlanan(t.count || 0);
       setMusteriSayi(m.count || 0);
     })();
 
-    const enlem = FIRMA.enlem || 38.3236;
-    const boylam = FIRMA.boylam || 26.3058;
-    fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${enlem}&longitude=${boylam}` +
-      '&current=temperature_2m,weather_code' +
-      '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max' +
-      '&forecast_days=7&timezone=Europe%2FIstanbul'
-    )
-      .then((r) => r.json())
-      .then((d) => {
-        if (d?.current) setHava({ derece: Math.round(d.current.temperature_2m), ...havaBilgi(d.current.weather_code) });
-        if (d?.daily?.time) {
-          setTahmin(d.daily.time.map((t, i) => ({
-            tarih: t,
-            ...havaBilgi(d.daily.weather_code[i]),
-            max: Math.round(d.daily.temperature_2m_max[i]),
-            min: Math.round(d.daily.temperature_2m_min[i]),
-            yagmur: d.daily.precipitation_probability_max?.[i] ?? null,
-            ruzgar: Math.round(d.daily.wind_speed_10m_max?.[i] ?? 0),
-          })));
-        }
-      })
-      .catch(() => {});
   }, []);
 
   function hizliDegis(id) {
@@ -161,59 +131,10 @@ export default function DashboardPage({ onNavigate }) {
   ];
 
   const gorunenHizli = duzenle ? TUM_HIZLI : hizli.map((id) => TUM_HIZLI.find((h) => h.id === id)).filter(Boolean);
-  const isSayi = bugunIsler.length;
 
   return (
     <div style={s.sayfa}>
-      {/* Bugün kartı */}
-      <section style={s.bugunKart}>
-        <div style={s.bugunFoto} />
-        <div style={s.bugunSol}>
-          <div style={s.bugunEtiket}>Bugün</div>
-          <div style={s.bugunSatir}>
-            <span style={s.bugunSayi}>{isSayi}</span>
-            <span style={s.bugunBirim}>iş emri</span>
-          </div>
-          <div style={s.bugunAlt}>
-            {isSayi === 0
-              ? 'Planlanan işiniz bulunmuyor.'
-              : bugunIsler.slice(0, 2).map((x) => x.customers?.name || x.title).filter(Boolean).join(', ') + (isSayi > 2 ? ` +${isSayi - 2}` : '')}
-          </div>
-          <button style={s.yeniIsBtn} onClick={() => git('isemirleri')}>
-            {isSayi === 0 ? '＋ Yeni İş Ekle' : 'İşleri Gör ›'}
-          </button>
-        </div>
-        {hava && (
-          <div style={s.havaCip}>
-            <span style={{ fontSize: 30, lineHeight: 1 }}>{hava.ikon}</span>
-            <div>
-              <div style={s.havaDerece}>{hava.derece}°C</div>
-              <div style={s.havaSehir}>{FIRMA.sehir || 'Çeşme'}</div>
-            </div>
-          </div>
-        )}
-        {tahmin.length > 0 && (
-          <div style={s.tahminSerit}>
-            {tahmin.map((g, i) => {
-              const d = new Date(g.tarih + 'T00:00:00');
-              const uyari = (g.yagmur ?? 0) >= 50 || g.ruzgar >= 40;
-              return (
-                <div key={g.tarih} style={{ ...s.tahminGun, ...(i === 0 ? s.tahminBugun : {}) }}
-                  title={`${g.ad} · Yağış %${g.yagmur ?? 0} · Rüzgâr ${g.ruzgar} km/sa`}>
-                  <div style={s.tahminAd}>{i === 0 ? 'Bugün' : GUNLER[d.getDay()]}</div>
-                  <div style={{ fontSize: 22, lineHeight: 1.1 }}>{g.ikon}</div>
-                  <div style={s.tahminDerece}>
-                    <b>{g.max}°</b> <span style={{ color: '#64748b' }}>{g.min}°</span>
-                  </div>
-                  <div style={{ ...s.tahminEk, color: uyari ? '#dc2626' : '#2563eb' }}>
-                    {(g.yagmur ?? 0) >= 20 ? `💧%${g.yagmur}` : `💨${g.ruzgar}`}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
+      <HavaKarti />
 
       {/* Özet kartları */}
       <div style={s.istIzgara}>
@@ -372,4 +293,439 @@ const s = {
   bakimSag: { flexShrink: 0, textAlign: 'left' },
   bakimTarih: { display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, color: '#64748b' },
   bakimKalan: { fontSize: 13.5, fontWeight: 800, marginTop: 3 },
+};
+
+// ================= HAVA DURUMU KARTI =================
+
+const GUN_TAM = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+const GUN_KISA = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
+const SAAT_GENISLIK = 60;
+const YENILEME_DK = 10;
+
+function havaTip(kod) {
+  if (kod === 0) return 'acik';
+  if (kod <= 2) return 'azBulut';
+  if (kod === 3) return 'bulut';
+  if (kod <= 48) return 'sis';
+  if (kod <= 67 || (kod >= 80 && kod <= 82)) return 'yagmur';
+  if (kod <= 77 || kod === 85 || kod === 86) return 'kar';
+  return 'firtina';
+}
+
+const TIP_AD = {
+  acik: { gun: 'Güneşli', gece: 'Açık' },
+  azBulut: { gun: 'Parçalı bulutlu', gece: 'Parçalı bulutlu' },
+  bulut: { gun: 'Bulutlu', gece: 'Bulutlu' },
+  sis: { gun: 'Sisli', gece: 'Sisli' },
+  yagmur: { gun: 'Yağmurlu', gece: 'Yağmurlu' },
+  kar: { gun: 'Karlı', gece: 'Karlı' },
+  firtina: { gun: 'Gök gürültülü', gece: 'Gök gürültülü' },
+};
+
+const saatYazi = (iso) => iso.slice(11, 16);
+
+const HAVA_CSS = `
+.hv-kart{position:relative;overflow:hidden;border-radius:26px;color:#fff;margin-bottom:14px;
+  box-shadow:0 14px 40px rgba(15,45,74,.25);transition:background 1.2s ease;isolation:isolate}
+.hv-katman{position:absolute;inset:0;pointer-events:none;z-index:0}
+.hv-bulut{position:absolute;border-radius:50%;background:radial-gradient(closest-side,rgba(255,255,255,.55),rgba(255,255,255,0));
+  filter:blur(6px);animation:hv-suz linear infinite}
+@keyframes hv-suz{from{transform:translateX(-40vw)}to{transform:translateX(140vw)}}
+.hv-gunes-isik{position:absolute;top:-120px;right:-80px;width:340px;height:340px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,236,150,.85) 0%,rgba(255,214,90,.35) 35%,rgba(255,214,90,0) 70%);
+  animation:hv-nefes 6s ease-in-out infinite}
+@keyframes hv-nefes{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.12);opacity:1}}
+.hv-isinlar{position:absolute;top:-60px;right:-20px;width:220px;height:220px;
+  background:repeating-conic-gradient(rgba(255,255,255,.18) 0 6deg,transparent 6deg 24deg);
+  border-radius:50%;mask:radial-gradient(circle,#000 20%,transparent 70%);-webkit-mask:radial-gradient(circle,#000 20%,transparent 70%);
+  animation:hv-don 40s linear infinite}
+.hv-yagmur{position:absolute;inset:-50% 0 0 0;
+  background-image:repeating-linear-gradient(105deg,rgba(255,255,255,.0) 0 14px,rgba(255,255,255,.28) 14px 15px,rgba(255,255,255,0) 15px 34px);
+  animation:hv-yagis .7s linear infinite}
+@keyframes hv-yagis{from{transform:translateY(0)}to{transform:translateY(34%)}}
+.hv-yildiz{position:absolute;inset:0;
+  background-image:radial-gradient(1.5px 1.5px at 20% 30%,#fff,transparent),radial-gradient(1px 1px at 60% 20%,#fff,transparent),
+  radial-gradient(1.5px 1.5px at 80% 60%,#fff,transparent),radial-gradient(1px 1px at 35% 70%,#fff,transparent),
+  radial-gradient(1px 1px at 90% 15%,#fff,transparent),radial-gradient(1.5px 1.5px at 10% 80%,#fff,transparent),
+  radial-gradient(1px 1px at 50% 50%,#fff,transparent),radial-gradient(1px 1px at 70% 85%,#fff,transparent);
+  animation:hv-parilti 3s ease-in-out infinite alternate}
+@keyframes hv-parilti{from{opacity:.35}to{opacity:1}}
+.hv-simsek{position:absolute;inset:0;background:#fff;opacity:0;animation:hv-cak 7s infinite}
+@keyframes hv-cak{0%,91%,95%,100%{opacity:0}92%{opacity:.45}93%{opacity:.05}94%{opacity:.3}}
+.hv-icerik{position:relative;z-index:1;padding:18px 18px 14px}
+.hv-cam{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);border-radius:18px}
+.hv-gir{animation:hv-gir .55s cubic-bezier(.2,.8,.2,1)}
+@keyframes hv-gir{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.hv-kaydir{overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
+.hv-kaydir::-webkit-scrollbar{display:none}
+.hv-gunbtn{transition:transform .2s,background .3s,color .3s}
+.hv-gunbtn:hover{transform:translateY(-2px)}
+.hv-cizgi{stroke-dasharray:2000;stroke-dashoffset:2000;animation:hv-ciz 1.4s ease forwards}
+@keyframes hv-ciz{to{stroke-dashoffset:0}}
+.hv-nokta{animation:hv-belir .5s ease both}
+@keyframes hv-belir{from{opacity:0;transform:scale(.3)}to{opacity:1;transform:none}}
+.hv-don{animation:hv-don 12s linear infinite;transform-origin:center;transform-box:fill-box}
+@keyframes hv-don{to{transform:rotate(360deg)}}
+.hv-sall{animation:hv-sall 4s ease-in-out infinite alternate}
+@keyframes hv-sall{from{transform:translateX(-2.5px)}to{transform:translateX(2.5px)}}
+.hv-damla{animation:hv-damla 1.1s linear infinite}
+@keyframes hv-damla{0%{transform:translateY(-3px);opacity:0}30%{opacity:1}100%{transform:translateY(9px);opacity:0}}
+.hv-kar{animation:hv-karyag 2.2s linear infinite}
+@keyframes hv-karyag{0%{transform:translate(0,-3px);opacity:0}30%{opacity:1}100%{transform:translate(2px,9px);opacity:0}}
+.hv-yanip{animation:hv-yanip 2.4s infinite}
+@keyframes hv-yanip{0%,70%,100%{opacity:1}75%{opacity:.15}80%{opacity:1}85%{opacity:.2}}
+.hv-sis{animation:hv-sis 3.5s ease-in-out infinite alternate}
+@keyframes hv-sis{from{transform:translateX(-3px)}to{transform:translateX(3px)}}
+.hv-nabiz{animation:hv-nabiz 3s ease-in-out infinite}
+@keyframes hv-nabiz{0%,100%{opacity:.85}50%{opacity:1;filter:drop-shadow(0 0 6px rgba(255,230,140,.9))}}
+.hv-yenile.donuyor{animation:hv-don .9s linear infinite}
+.hv-iskelet{background:linear-gradient(90deg,rgba(255,255,255,.12),rgba(255,255,255,.3),rgba(255,255,255,.12));
+  background-size:200% 100%;animation:hv-parla 1.4s linear infinite;border-radius:12px}
+@keyframes hv-parla{from{background-position:200% 0}to{background-position:-200% 0}}
+@media (prefers-reduced-motion: reduce){.hv-kart *{animation:none!important}}
+`;
+
+const BULUT_YOL = 'M18 50h30a11 11 0 0 0 1-22 15 15 0 0 0-28.5-4A11.5 11.5 0 0 0 18 50z';
+
+function HavaIkon({ tip, gece, boyut = 40 }) {
+  const gunes = (cx, cy, r) => (
+    <g className="hv-nabiz">
+      <g className="hv-don">
+        {Array.from({ length: 8 }).map((_, i) => {
+          const a = (i * Math.PI) / 4;
+          return <line key={i} x1={cx + Math.cos(a) * (r + 4)} y1={cy + Math.sin(a) * (r + 4)}
+            x2={cx + Math.cos(a) * (r + 9)} y2={cy + Math.sin(a) * (r + 9)} stroke="#FFC93C" strokeWidth="3.2" strokeLinecap="round" />;
+        })}
+      </g>
+      <circle cx={cx} cy={cy} r={r} fill="url(#hvGunes)" />
+    </g>
+  );
+  const ay = (cx, cy, r) => (
+    <g className="hv-nabiz">
+      <path d={`M${cx + r * 0.3} ${cy - r} a${r} ${r} 0 1 0 ${r * 0.7} ${r * 1.55} a${r * 0.8} ${r * 0.8} 0 1 1 ${-r * 0.7} ${-r * 1.55}z`} fill="#FDE68A" />
+    </g>
+  );
+  const bulut = (renk = '#fff', ek = '') => (
+    <g className="hv-sall"><path d={BULUT_YOL} fill={renk} stroke="rgba(15,45,74,.08)" strokeWidth="1" transform={ek} /></g>
+  );
+  let icerik;
+  if (tip === 'acik') icerik = gece ? ay(32, 32, 15) : gunes(32, 32, 13);
+  else if (tip === 'azBulut') icerik = <>{gece ? ay(24, 22, 11) : gunes(24, 22, 10)}{bulut('#fff', 'translate(4 4)')}</>;
+  else if (tip === 'bulut') icerik = <>{bulut('#cbd5e1', 'translate(-8 -6) scale(.85)')}{bulut('#fff', 'translate(4 4)')}</>;
+  else if (tip === 'sis') icerik = <>{bulut('#e2e8f0', 'translate(0 -6)')}<g className="hv-sis" stroke="#e2e8f0" strokeWidth="3.2" strokeLinecap="round"><line x1="12" y1="50" x2="44" y2="50" /><line x1="20" y1="57" x2="52" y2="57" /></g></>;
+  else if (tip === 'yagmur' || tip === 'firtina' || tip === 'kar') {
+    icerik = (
+      <>
+        {bulut(tip === 'firtina' ? '#94a3b8' : '#e2e8f0', 'translate(0 -8)')}
+        {tip === 'yagmur' && [20, 31, 42].map((x, i) => (
+          <line key={x} className="hv-damla" style={{ animationDelay: `${i * 0.35}s` }} x1={x} y1="47" x2={x - 2} y2="53" stroke="#60a5fa" strokeWidth="3" strokeLinecap="round" />
+        ))}
+        {tip === 'kar' && [20, 31, 42].map((x, i) => (
+          <circle key={x} className="hv-kar" style={{ animationDelay: `${i * 0.6}s` }} cx={x} cy="50" r="2.6" fill="#fff" />
+        ))}
+        {tip === 'firtina' && <path className="hv-yanip" d="M33 42l-7 11h6l-3 9 10-13h-6l4-7z" fill="#FACC15" />}
+      </>
+    );
+  }
+  return (
+    <svg width={boyut} height={boyut} viewBox="0 0 64 64" style={{ display: 'block', overflow: 'visible' }}>
+      <defs>
+        <radialGradient id="hvGunes" cx="40%" cy="35%" r="70%">
+          <stop offset="0%" stopColor="#FFF3B0" /><stop offset="55%" stopColor="#FFC93C" /><stop offset="100%" stopColor="#F59E0B" />
+        </radialGradient>
+      </defs>
+      {icerik}
+    </svg>
+  );
+}
+
+function arkaPlan(tip, gece) {
+  if (gece) {
+    if (tip === 'yagmur' || tip === 'firtina') return 'linear-gradient(160deg,#0f172a 0%,#1e293b 50%,#334155 100%)';
+    return 'linear-gradient(160deg,#081229 0%,#13265a 50%,#2a3f80 100%)';
+  }
+  switch (tip) {
+    case 'acik': return 'linear-gradient(160deg,#1e88e5 0%,#42a5f5 45%,#7cc8f8 100%)';
+    case 'azBulut': return 'linear-gradient(160deg,#2f80d0 0%,#5aa2df 50%,#93c4ec 100%)';
+    case 'bulut': return 'linear-gradient(160deg,#5b7aa0 0%,#7f9cc0 50%,#a9bfd8 100%)';
+    case 'sis': return 'linear-gradient(160deg,#7c8ea3 0%,#9fb0c2 50%,#c5d1dd 100%)';
+    case 'kar': return 'linear-gradient(160deg,#7aa0c8 0%,#a6c2df 50%,#dbe7f3 100%)';
+    default: return 'linear-gradient(160deg,#334a68 0%,#4f6a8c 50%,#7590b0 100%)';
+  }
+}
+
+function HavaKarti() {
+  const [veri, setVeri] = useState(null);
+  const [hata, setHata] = useState(false);
+  const [yukleniyor, setYukleniyor] = useState(false);
+  const [guncel, setGuncel] = useState(null);
+  const [secili, setSecili] = useState(0);
+  const [simdi, setSimdi] = useState(new Date());
+  const saatRef = useRef(null);
+
+  async function getir() {
+    setYukleniyor(true);
+    try {
+      const enlem = FIRMA.enlem || 38.3236;
+      const boylam = FIRMA.boylam || 26.3058;
+      const r = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${enlem}&longitude=${boylam}` +
+        '&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,is_day' +
+        '&hourly=temperature_2m,weather_code,precipitation_probability,wind_speed_10m,is_day' +
+        '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,sunrise,sunset,uv_index_max' +
+        '&forecast_days=7&timezone=Europe%2FIstanbul'
+      );
+      const d = await r.json();
+      if (!d?.current || !d?.daily) throw new Error('veri yok');
+      setVeri(d);
+      setGuncel(new Date());
+      setHata(false);
+    } catch {
+      setHata(true);
+    }
+    setYukleniyor(false);
+  }
+
+  useEffect(() => {
+    getir();
+    const yenile = setInterval(getir, YENILEME_DK * 60 * 1000);
+    const saat = setInterval(() => setSimdi(new Date()), 60 * 1000);
+    const gorunur = () => { if (document.visibilityState === 'visible') getir(); };
+    document.addEventListener('visibilitychange', gorunur);
+    return () => { clearInterval(yenile); clearInterval(saat); document.removeEventListener('visibilitychange', gorunur); };
+  }, []);
+
+  const sehir = FIRMA.sehir || 'Çeşme';
+
+  if (!veri) {
+    return (
+      <section className="hv-kart" style={{ background: arkaPlan('azBulut', false) }}>
+        <style>{HAVA_CSS}</style>
+        <div className="hv-icerik">
+          {hata ? (
+            <div style={{ padding: '30px 0', textAlign: 'center' }}>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>Hava durumu şu an alınamadı</div>
+              <button onClick={getir} style={hs.tekrarBtn}>Tekrar dene</button>
+            </div>
+          ) : (
+            <>
+              <div className="hv-iskelet" style={{ height: 90, marginBottom: 14 }} />
+              <div className="hv-iskelet" style={{ height: 110, marginBottom: 14 }} />
+              <div className="hv-iskelet" style={{ height: 80 }} />
+            </>
+          )}
+        </div>
+      </section>
+    );
+  }
+
+  const c = veri.current;
+  const anlikTip = havaTip(c.weather_code);
+  const anlikGece = c.is_day === 0;
+  const gunler = veri.daily.time.map((t, i) => ({
+    tarih: t,
+    tip: havaTip(veri.daily.weather_code[i]),
+    max: Math.round(veri.daily.temperature_2m_max[i]),
+    min: Math.round(veri.daily.temperature_2m_min[i]),
+    yagmur: veri.daily.precipitation_probability_max?.[i] ?? 0,
+    ruzgar: Math.round(veri.daily.wind_speed_10m_max?.[i] ?? 0),
+    dogus: veri.daily.sunrise?.[i], batis: veri.daily.sunset?.[i],
+    uv: veri.daily.uv_index_max?.[i],
+  }));
+  const haftaMin = Math.min(...gunler.map((g) => g.min));
+  const haftaMax = Math.max(...gunler.map((g) => g.max));
+  const sg = gunler[secili];
+
+  const simdiSaat = `${yerel(simdi)}T${String(simdi.getHours()).padStart(2, '0')}:00`;
+  const saatler = veri.hourly.time
+    .map((t, i) => ({
+      t,
+      sicaklik: Math.round(veri.hourly.temperature_2m[i]),
+      tip: havaTip(veri.hourly.weather_code[i]),
+      gece: veri.hourly.is_day?.[i] === 0,
+      yagmur: veri.hourly.precipitation_probability?.[i] ?? 0,
+      ruzgar: Math.round(veri.hourly.wind_speed_10m?.[i] ?? 0),
+    }))
+    .filter((h) => h.t.startsWith(sg.tarih) && (secili !== 0 || h.t >= simdiSaat));
+
+  const sMin = Math.min(...saatler.map((h) => h.sicaklik));
+  const sMax = Math.max(...saatler.map((h) => h.sicaklik));
+  const grafikY = 66;
+  const yHesap = (v) => (sMax === sMin ? grafikY / 2 + 10 : 24 + ((sMax - v) / (sMax - sMin)) * (grafikY - 30));
+  const noktalar = saatler.map((h, i) => [i * SAAT_GENISLIK + SAAT_GENISLIK / 2, yHesap(h.sicaklik)]);
+  let yol = '';
+  noktalar.forEach(([x, y], i) => {
+    if (i === 0) { yol = `M${x} ${y}`; return; }
+    const [px, py] = noktalar[i - 1];
+    const cx = (px + x) / 2;
+    yol += ` C${cx} ${py} ${cx} ${y} ${x} ${y}`;
+  });
+  const genislik = saatler.length * SAAT_GENISLIK;
+  const alanYol = noktalar.length ? `${yol} L${noktalar[noktalar.length - 1][0]} ${grafikY + 8} L${noktalar[0][0]} ${grafikY + 8} Z` : '';
+
+  const gunEtiket = (i, t) => (i === 0 ? 'Bugün' : i === 1 ? 'Yarın' : GUN_KISA[new Date(t + 'T00:00:00').getDay()]);
+  const tamGun = (i, t) => {
+    const d = new Date(t + 'T00:00:00');
+    return `${i === 0 ? 'Bugün' : i === 1 ? 'Yarın' : GUN_TAM[d.getDay()]} · ${d.getDate()} ${AYLAR[d.getMonth()]}`;
+  };
+
+  return (
+    <section className="hv-kart" style={{ background: arkaPlan(anlikTip, anlikGece) }}>
+      <style>{HAVA_CSS}</style>
+
+      {/* Hareketli arka plan */}
+      <div className="hv-katman">
+        {anlikGece && <div className="hv-yildiz" />}
+        {!anlikGece && (anlikTip === 'acik' || anlikTip === 'azBulut') && <><div className="hv-gunes-isik" /><div className="hv-isinlar" /></>}
+        {[{ t: 10, w: 260, h: 90, s: 70, d: -10 }, { t: 45, w: 340, h: 110, s: 95, d: -50 }, { t: 70, w: 220, h: 80, s: 60, d: -30 }]
+          .slice(0, anlikTip === 'acik' ? 1 : 3)
+          .map((b, i) => (
+            <div key={i} className="hv-bulut" style={{ top: `${b.t}%`, width: b.w, height: b.h, animationDuration: `${b.s}s`, animationDelay: `${b.d}s`,
+              opacity: anlikTip === 'acik' ? 0.5 : 0.9 }} />
+          ))}
+        {(anlikTip === 'yagmur' || anlikTip === 'firtina') && <div className="hv-yagmur" />}
+        {anlikTip === 'firtina' && <div className="hv-simsek" />}
+      </div>
+
+      <div className="hv-icerik">
+        {/* Üst: anlık durum + seçili gün özeti */}
+        <div style={hs.ust}>
+          <div style={{ minWidth: 0 }}>
+            <div style={hs.konum}>
+              📍 {sehir}
+              <button onClick={getir} style={hs.yenileBtn} title="Yenile">
+                <span className={`hv-yenile${yukleniyor ? ' donuyor' : ''}`} style={{ display: 'inline-block' }}>⟳</span>
+              </button>
+            </div>
+            <div style={hs.anlik}>
+              <HavaIkon tip={anlikTip} gece={anlikGece} boyut={74} />
+              <div>
+                <div style={hs.buyukDerece}>{Math.round(c.temperature_2m)}°</div>
+                <div style={hs.durum}>{TIP_AD[anlikTip][anlikGece ? 'gece' : 'gun']}</div>
+              </div>
+            </div>
+            <div style={hs.detaySatir}>
+              <span>🌡️ Hissedilen {Math.round(c.apparent_temperature)}°</span>
+              <span>💧 Nem %{c.relative_humidity_2m}</span>
+              <span>💨 {Math.round(c.wind_speed_10m)} km/sa</span>
+            </div>
+          </div>
+
+          <div key={sg.tarih} className="hv-cam hv-gir" style={hs.ozet}>
+            <div style={hs.ozetBaslik}>{tamGun(secili, sg.tarih)}</div>
+            <div style={hs.ozetDerece}>
+              <span style={{ fontSize: 26, fontWeight: 900 }}>{sg.max}°</span>
+              <span style={{ opacity: 0.75, fontSize: 18 }}> / {sg.min}°</span>
+            </div>
+            <div style={hs.ozetDetay}>
+              <span>☔ %{sg.yagmur}</span><span>💨 {sg.ruzgar} km/sa</span>
+              {sg.uv != null && <span>🔆 UV {Math.round(sg.uv)}</span>}
+              {sg.dogus && <span>🌅 {saatYazi(sg.dogus)} · 🌇 {saatYazi(sg.batis)}</span>}
+            </div>
+          </div>
+        </div>
+
+        {/* Saatlik tahmin */}
+        <div className="hv-cam" style={{ marginTop: 14, padding: '10px 0 8px' }}>
+          <div style={hs.bolumBaslik}>🕒 Saatlik tahmin · {secili === 0 ? 'bugün' : tamGun(secili, sg.tarih).split(' · ')[0].toLocaleLowerCase('tr-TR')}</div>
+          <div className="hv-kaydir" ref={saatRef}>
+            <div key={sg.tarih} className="hv-gir" style={{ position: 'relative', width: Math.max(genislik, 1), padding: '0 6px' }}>
+              <div style={{ display: 'flex' }}>
+                {saatler.map((h, i) => (
+                  <div key={h.t} style={{ ...hs.saatKol, ...(secili === 0 && i === 0 ? hs.saatSimdi : {}) }}>
+                    <div style={hs.saatEtiket}>{secili === 0 && i === 0 ? 'Şimdi' : saatYazi(h.t)}</div>
+                    <HavaIkon tip={h.tip} gece={h.gece} boyut={30} />
+                  </div>
+                ))}
+              </div>
+              <svg width={genislik} height={grafikY + 10} style={{ display: 'block' }}>
+                <defs>
+                  <linearGradient id="hvAlan" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#fff" stopOpacity="0.45" />
+                    <stop offset="100%" stopColor="#fff" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                {alanYol && <path d={alanYol} fill="url(#hvAlan)" className="hv-nokta" />}
+                <path d={yol} fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" className="hv-cizgi" />
+                {noktalar.map(([x, y], i) => (
+                  <g key={i} className="hv-nokta" style={{ animationDelay: `${0.2 + i * 0.03}s` }}>
+                    <circle cx={x} cy={y} r="3.6" fill="#fff" />
+                    <text x={x} y={y - 8} textAnchor="middle" fontSize="13" fontWeight="800" fill="#fff"
+                      style={{ textShadow: '0 1px 3px rgba(0,0,0,.35)' }}>{saatler[i].sicaklik}°</text>
+                  </g>
+                ))}
+              </svg>
+              <div style={{ display: 'flex' }}>
+                {saatler.map((h) => (
+                  <div key={h.t} style={{ ...hs.saatKol, paddingTop: 0 }}>
+                    <div style={{ ...hs.saatYagis, opacity: h.yagmur >= 10 ? 1 : 0.55 }}>💧%{h.yagmur}</div>
+                    <div style={hs.saatRuzgar}>💨{h.ruzgar}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 7 günlük */}
+        <div className="hv-kaydir" style={{ display: 'flex', gap: 8, marginTop: 12, paddingBottom: 2 }}>
+          {gunler.map((g, i) => {
+            const aktif = i === secili;
+            const sol = ((g.min - haftaMin) / Math.max(1, haftaMax - haftaMin)) * 100;
+            const gen = ((g.max - g.min) / Math.max(1, haftaMax - haftaMin)) * 100;
+            return (
+              <button key={g.tarih} className={`hv-gunbtn${aktif ? '' : ' hv-cam'}`} onClick={() => setSecili(i)}
+                style={{ ...hs.gunBtn, ...(aktif ? hs.gunBtnAktif : {}) }}>
+                <div style={{ fontSize: 12.5, fontWeight: 800 }}>{gunEtiket(i, g.tarih)}</div>
+                <div style={aktif ? { filter: 'drop-shadow(0 1px 2px rgba(15,45,74,.45))' } : undefined}>
+                  <HavaIkon tip={g.tip} gece={false} boyut={34} />
+                </div>
+                <div style={{ fontSize: 13, whiteSpace: 'nowrap' }}><b>{g.max}°</b> <span style={{ opacity: 0.7 }}>{g.min}°</span></div>
+                <div style={{ ...hs.aralik, background: aktif ? '#dbeafe' : 'rgba(255,255,255,.25)' }}>
+                  <div style={{ position: 'absolute', left: `${sol}%`, width: `${Math.max(gen, 8)}%`, top: 0, bottom: 0, borderRadius: 3,
+                    background: 'linear-gradient(90deg,#60a5fa,#fbbf24,#f97316)' }} />
+                </div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, color: aktif ? (g.yagmur >= 50 ? '#dc2626' : '#2563eb') : (g.yagmur >= 50 ? '#fecaca' : '#e0f2fe') }}>
+                  💧%{g.yagmur}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={hs.altBilgi}>
+          {guncel && `Son güncelleme ${String(guncel.getHours()).padStart(2, '0')}:${String(guncel.getMinutes()).padStart(2, '0')}`} · {YENILEME_DK} dakikada bir otomatik yenilenir
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const hs = {
+  ust: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' },
+  konum: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 15, fontWeight: 700, textShadow: '0 1px 4px rgba(0,0,0,.25)' },
+  yenileBtn: { border: 'none', background: 'rgba(255,255,255,.2)', color: '#fff', borderRadius: 20, width: 28, height: 28,
+    cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
+  anlik: { display: 'flex', alignItems: 'center', gap: 12, marginTop: 6 },
+  buyukDerece: { fontSize: 64, fontWeight: 900, lineHeight: 1, letterSpacing: -2, textShadow: '0 4px 14px rgba(0,0,0,.2)' },
+  durum: { fontSize: 16, fontWeight: 700, opacity: 0.95, marginTop: 2 },
+  detaySatir: { display: 'flex', flexWrap: 'wrap', gap: '4px 14px', fontSize: 13, marginTop: 10, opacity: 0.95 },
+  ozet: { padding: '12px 14px', minWidth: 200, flex: '0 1 280px' },
+  ozetBaslik: { fontSize: 13, fontWeight: 700, opacity: 0.9 },
+  ozetDerece: { margin: '2px 0 6px' },
+  ozetDetay: { display: 'flex', flexWrap: 'wrap', gap: '4px 12px', fontSize: 12.5 },
+  bolumBaslik: { fontSize: 12.5, fontWeight: 800, padding: '0 14px 6px', opacity: 0.95, letterSpacing: 0.3 },
+  saatKol: { width: SAAT_GENISLIK, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, paddingTop: 4, borderRadius: 12 },
+  saatSimdi: { background: 'rgba(255,255,255,.22)' },
+  saatEtiket: { fontSize: 12, fontWeight: 700, opacity: 0.95 },
+  saatYagis: { fontSize: 11, fontWeight: 700, color: '#e0f2fe' },
+  saatRuzgar: { fontSize: 10.5, opacity: 0.8 },
+  gunBtn: { flex: '1 0 78px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '10px 6px',
+    borderRadius: 16, color: '#fff', cursor: 'pointer', border: '1px solid rgba(255,255,255,.28)' },
+  gunBtnAktif: { background: '#fff', color: '#0b1730', boxShadow: '0 8px 20px rgba(0,0,0,.18)', border: '1px solid #fff', transform: 'translateY(-2px)' },
+  aralik: { position: 'relative', width: '80%', height: 5, borderRadius: 3, overflow: 'hidden', margin: '2px 0' },
+  altBilgi: { fontSize: 11, opacity: 0.8, marginTop: 10, textAlign: 'right' },
+  tekrarBtn: { marginTop: 10, border: 'none', background: '#fff', color: '#1d4ed8', fontWeight: 700, borderRadius: 12,
+    padding: '9px 16px', cursor: 'pointer' },
 };
