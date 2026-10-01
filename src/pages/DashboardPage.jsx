@@ -4,6 +4,7 @@ import { FIRMA } from '../firma';
 
 const AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 const KATEGORI_IKON = { Havuz: '🏊', Kuyu: '💧', Hidrofor: '🔵', Sulama: '🌱', Tesisat: '🔧', Elektrik: '⚡' };
+const GUNLER = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
 const HIZLI_ANAHTAR = 'alkaHizliIslemler1';
 
 const yerel = (d) =>
@@ -93,6 +94,7 @@ export default function DashboardPage({ onNavigate }) {
   const [tamamlanan, setTamamlanan] = useState(0);
   const [musteriSayi, setMusteriSayi] = useState(0);
   const [hava, setHava] = useState(null);
+  const [tahmin, setTahmin] = useState([]);
   const [hizli, setHizli] = useState(hizliOku);
   const [duzenle, setDuzenle] = useState(false);
 
@@ -117,9 +119,26 @@ export default function DashboardPage({ onNavigate }) {
 
     const enlem = FIRMA.enlem || 38.3236;
     const boylam = FIRMA.boylam || 26.3058;
-    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${enlem}&longitude=${boylam}&current=temperature_2m,weather_code&timezone=auto`)
+    fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${enlem}&longitude=${boylam}` +
+      '&current=temperature_2m,weather_code' +
+      '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max' +
+      '&forecast_days=7&timezone=Europe%2FIstanbul'
+    )
       .then((r) => r.json())
-      .then((d) => d?.current && setHava({ derece: Math.round(d.current.temperature_2m), ...havaBilgi(d.current.weather_code) }))
+      .then((d) => {
+        if (d?.current) setHava({ derece: Math.round(d.current.temperature_2m), ...havaBilgi(d.current.weather_code) });
+        if (d?.daily?.time) {
+          setTahmin(d.daily.time.map((t, i) => ({
+            tarih: t,
+            ...havaBilgi(d.daily.weather_code[i]),
+            max: Math.round(d.daily.temperature_2m_max[i]),
+            min: Math.round(d.daily.temperature_2m_min[i]),
+            yagmur: d.daily.precipitation_probability_max?.[i] ?? null,
+            ruzgar: Math.round(d.daily.wind_speed_10m_max?.[i] ?? 0),
+          })));
+        }
+      })
       .catch(() => {});
   }, []);
 
@@ -171,6 +190,27 @@ export default function DashboardPage({ onNavigate }) {
               <div style={s.havaDerece}>{hava.derece}°C</div>
               <div style={s.havaSehir}>{FIRMA.sehir || 'Çeşme'}</div>
             </div>
+          </div>
+        )}
+        {tahmin.length > 0 && (
+          <div style={s.tahminSerit}>
+            {tahmin.map((g, i) => {
+              const d = new Date(g.tarih + 'T00:00:00');
+              const uyari = (g.yagmur ?? 0) >= 50 || g.ruzgar >= 40;
+              return (
+                <div key={g.tarih} style={{ ...s.tahminGun, ...(i === 0 ? s.tahminBugun : {}) }}
+                  title={`${g.ad} · Yağış %${g.yagmur ?? 0} · Rüzgâr ${g.ruzgar} km/sa`}>
+                  <div style={s.tahminAd}>{i === 0 ? 'Bugün' : GUNLER[d.getDay()]}</div>
+                  <div style={{ fontSize: 22, lineHeight: 1.1 }}>{g.ikon}</div>
+                  <div style={s.tahminDerece}>
+                    <b>{g.max}°</b> <span style={{ color: '#64748b' }}>{g.min}°</span>
+                  </div>
+                  <div style={{ ...s.tahminEk, color: uyari ? '#dc2626' : '#2563eb' }}>
+                    {(g.yagmur ?? 0) >= 20 ? `💧%${g.yagmur}` : `💨${g.ruzgar}`}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </section>
@@ -278,6 +318,19 @@ const s = {
     background: 'rgba(15,23,42,0.72)', color: '#fff', borderRadius: 26, padding: '8px 16px 8px 12px',
     border: '1.5px solid rgba(255,255,255,0.7)', backdropFilter: 'blur(6px)',
   },
+  tahminSerit: {
+    position: 'relative', display: 'flex', gap: 6, overflowX: 'auto', margin: '0 12px 12px',
+    padding: 6, borderRadius: 16, background: 'rgba(255,255,255,0.82)', backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)', boxShadow: '0 4px 14px rgba(15,45,74,0.12)', scrollbarWidth: 'none',
+  },
+  tahminGun: {
+    flex: '1 0 54px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+    padding: '6px 2px', borderRadius: 12,
+  },
+  tahminBugun: { background: '#dbeafe' },
+  tahminAd: { fontSize: 12, fontWeight: 700, color: '#334155' },
+  tahminDerece: { fontSize: 12.5, color: '#0b1730', whiteSpace: 'nowrap' },
+  tahminEk: { fontSize: 10.5, fontWeight: 700, whiteSpace: 'nowrap' },
   havaDerece: { fontSize: 18, fontWeight: 800, lineHeight: 1.1 },
   havaSehir: { fontSize: 12, opacity: 0.9 },
   istIzgara: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, marginBottom: 14 },
