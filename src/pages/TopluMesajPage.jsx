@@ -8,90 +8,227 @@ const DIGER = '__diger__';
 const BAKIMLAR = [
   { grup: 'Hidrofor & Kuyu', ad: 'Hava küresi / genleşme tankı hava basıncı', periyot: '3 ayda bir',
     anahtar: ['hava küresi', 'ön şarj', 'hava basıncı', 'genleşme'],
-    aciklama: 'Hava küresi, su sisteminizin kalbi gibi çalışır: içindeki hava yastığı basıncı dengeler ve pompanın gereksiz yere çalışmasını önler. Bu hava zamanla azalır; azaldığında pompa her musluk açılışında devreye girip çıkar, motor, şalter ve kontaktörler hızla yıpranır ve pompa yanabilir. 3 ayda bir yapılan basit bir hava kontrolü, pahalı bir pompa arızasının önüne geçer.' },
+    giris: "Evinizdeki su konforunun ve kuyu-havuz su sistemlerinizin \"kalbi\" aslında görünmeyen bir detayda saklıdır: Genleşme (hidrofor) tankları. İçlerindeki hava yastığı su basıncını dengeler ve pompanın gereksiz yere çalışmasını önler. Sisteminizin kusursuz ve uzun ömürlü çalışması için bu tankların hava basıncının *3 ayda bir* kontrol edilip tazelenmesi hayati önem taşır.",
+    riskler: [
+      ["Sürekli \"dur-kalk\" ve sargı yanması", "Tanktaki hava azaldığında sistem yastıklama yapamaz; her musluk açılışında motor anlık olarak devreye girip çıkar. Bu durum motor sargılarını yakar, elektrik faturanızı yükseltir."],
+      ["Membran (iç lastik) patlaması", "Hava yastığı kalmayan tankın membranı sürekli zorlanarak kısa sürede yırtılır. Tank tamamen suyla dolar ve işlevini yitirir."],
+      ["Zincirleme arızalar", "Dengesiz su basıncı vanalarınızı, armatürlerinizi ve pompanızı yorar; sizi bir gün susuz ve yüksek tamir masraflarıyla baş başa bırakır."],
+    ] },
   { grup: 'Hidrofor & Kuyu', ad: 'Basınç şalteri ayarı', periyot: '6 ayda bir',
     anahtar: ['basınç şalteri', 'şalter'],
-    aciklama: 'Basınç şalteri, pompanın ne zaman çalışıp duracağına karar verir. Ayarı kaydığında ya da kontakları yıprandığında evde su basıncı düşer veya pompa gereksiz yere çalışır. Düzenli ayar ve kontrol, hem konforunuzu hem de pompanızın ömrünü korur.' },
+    giris: "Basınç şalteri, su sisteminizin \"beyni\"dir: pompanın ne zaman çalışıp ne zaman duracağına o karar verir. Zamanla ayarı kayar, kontakları yıpranır. Evinizde her zaman dengeli ve güçlü su basıncı olması için şalterin *6 ayda bir* kontrol edilip ayarlanması gerekir.",
+    riskler: [
+      ["Düşük ve dengesiz basınç", "Ayarı kayan şalter pompayı geç devreye sokar; duşta ve muslukta su bir güçlü bir zayıf akar, konforunuz bozulur."],
+      ["Durmayan pompa", "Şalter doğru basınçta kesmezse pompa durmadan çalışır; motor aşırı ısınır, elektrik tüketimi katlanır."],
+      ["Kontak yanması ve susuz kalma", "Yıpranan kontaklar ark yaparak yanar ve pompa hiç çalışmaz hale gelir. Arıza çoğu zaman en ihtiyaç duyduğunuz anda ortaya çıkar."],
+    ] },
   { grup: 'Hidrofor & Kuyu', ad: 'Motor akım (amper) ölçümü', periyot: '6 ayda bir',
     anahtar: ['amper', 'akım ölçüm'],
-    aciklama: 'Motorun çektiği akım, sağlığının en net göstergesidir. Akım yükselmeye başladıysa motor zorlanıyor, aşınma ya da tıkanma var demektir. Düzenli ölçümle arızayı pompa yanmadan görür, planlı ve daha ucuz bir müdahaleyle çözeriz.' },
+    giris: "Bir motorun çektiği akım, tıpkı insanın nabzı gibi sağlığının en net göstergesidir. Akım yükselmeye başladıysa motor zorlanıyor, içeride aşınma ya da tıkanma başlamış demektir. *6 ayda bir* yapılan amper ölçümüyle sorunu motor yanmadan önce görürüz.",
+    riskler: [
+      ["Fark edilmeden ilerleyen zorlanma", "Aşınmış rulman veya kum yüzünden zorlanan motor dışarıdan normal çalışıyor gibi görünür ama her gün biraz daha yıpranır."],
+      ["Ani motor yanması", "Yüksek akımla çalışmaya devam eden motorun sargıları ısınır ve bir gün aniden yanar; motor sarımı veya değişimi gerekir."],
+      ["Plansız ve pahalı müdahale", "Erken fark edilen sorun basit bir bakımla çözülürken, yanan motor acil servis, parça ve işçilik masrafı demektir."],
+    ] },
   { grup: 'Hidrofor & Kuyu', ad: 'Motor ve kablo izolasyon ölçümü', periyot: 'yılda bir',
     anahtar: ['izolasyon', 'megger'],
-    aciklama: 'Kuyu motoru ve kablosu sürekli suyla temas halindedir. İzolasyon zayıfladığında kaçak akım, sigorta atması ve motor sargısının yanması riski doğar. Yıllık izolasyon ölçümü hem güvenliğiniz hem de motorunuzun ömrü için önemlidir.' },
+    giris: "Kuyu motorunuz ve kablosu yıl boyu suyun içinde, gözden uzakta çalışır. Zamanla kablo ve ek yerlerindeki izolasyon zayıflar. Hem güvenliğiniz hem de motorunuzun ömrü için izolasyonun *yılda bir* ölçülmesi gerekir.",
+    riskler: [
+      ["Kaçak akım ve can güvenliği", "İzolasyonu zayıflayan kablodan suya akım kaçar; bu durum su ve elektriğin bir arada olduğu sistemlerde ciddi bir güvenlik riskidir."],
+      ["Sürekli atan sigortalar", "Kaçak akım rölesi ve sigortalar sık sık atar, sistem sebepsiz yere durur ve evde su kesilir."],
+      ["Motor sargısının yanması", "Nem alan sargılar kısa devre yaparak yanar. Bu noktada motorun kuyudan çıkarılması ve sarılması gibi yüksek maliyetli işlemler kaçınılmaz olur."],
+    ] },
   { grup: 'Hidrofor & Kuyu', ad: 'Kontaktör ve termik röle kontrolü', periyot: '6 ayda bir',
     anahtar: ['kontaktör', 'termik', 'pano'],
-    aciklama: 'Kontaktör ve termik röle, motoru elektrik tarafında koruyan parçalardır. Gevşeyen bağlantılar ısınmaya, yanlış ayarlanmış termik ise motorun korumasız kalmasına yol açar. Düzenli kontrol, pano kaynaklı arızaları ve yangın riskini azaltır.' },
+    giris: "Elektrik panonuzdaki kontaktör ve termik röle, motorunuzun \"koruma kalkanı\"dır. Motoru aşırı akıma karşı korur, güvenli şekilde açıp kapatır. Bağlantıların gevşememesi ve korumanın doğru çalışması için *6 ayda bir* kontrol edilmeleri gerekir.",
+    riskler: [
+      ["Gevşek bağlantı ve ısınma", "Titreşimle gevşeyen klemensler ısınır, kararır ve erir; panoda koku ve duman başlar."],
+      ["Korumasız kalan motor", "Yanlış ayarlı veya arızalı termik röle, motor zorlandığında devreyi kesmez ve motor kendini koruyamadan yanar."],
+      ["Yangın riski", "Isınan pano parçaları yangına kadar varan tehlikeli sonuçlar doğurabilir. Düzenli kontrol bu riski en aza indirir."],
+    ] },
   { grup: 'Hidrofor & Kuyu', ad: 'Kuyu su seviyesi ölçümü', periyot: '6 ayda bir (özellikle yaz öncesi)',
     anahtar: ['seviye', 'statik'],
-    aciklama: 'Yaz aylarında kuyulardaki su seviyesi düşer. Pompa suyun üstünde kalıp kuru çalışırsa kısa sürede yanar. Seviye ölçümüyle pompanın doğru derinlikte olduğunu kontrol eder, gerekirse kuru çalışma koruması öneririz.' },
+    giris: "Kuyunuzdaki su seviyesi mevsimden mevsime değişir; özellikle yaz aylarında belirgin şekilde düşer. Pompanın her zaman suyun içinde, doğru derinlikte çalıştığından emin olmak için seviyenin *6 ayda bir*, özellikle yaz öncesinde ölçülmesi gerekir.",
+    riskler: [
+      ["Kuru çalışma", "Su seviyesi pompanın altına indiğinde pompa susuz çalışır. Soğutulamayan motor dakikalar içinde ısınır."],
+      ["Pompanın yanması", "Kuru çalışmaya devam eden dalgıç pompa kısa sürede yanar; kuyudan çıkarma ve değişim masrafı doğar."],
+      ["Yazın ortasında susuz kalma", "Sorun genellikle suya en çok ihtiyaç duyduğunuz sıcak günlerde ortaya çıkar; bahçe, havuz ve ev aynı anda susuz kalır."],
+    ] },
   { grup: 'Hidrofor & Kuyu', ad: 'Kuyu pompası genel kontrolü', periyot: 'yılda bir',
     anahtar: ['pompa genel', 'dalgıç', 'kuyu pompası', 'kuyu kontrol'],
-    aciklama: 'Dalgıç pompa suyun altında, gözden uzakta çalıştığı için sorunları dışarıdan fark edilmez. Yıllık kontrolde basınç, debi ve çalışma durumu ölçülerek aşınma ve kum kaynaklı sorunlar erkenden yakalanır; arıza büyümeden müdahale etmek, pompanın kuyudan çıkarılma masrafını da önler.' },
+    giris: "Dalgıç pompanız suyun metrelerce altında, hiç görmediğiniz bir yerde çalışır; bu yüzden sorunlar dışarıdan fark edilmez. Basınç, debi ve çalışma değerlerinin *yılda bir* kontrol edilmesi, arızayı büyümeden yakalamanın tek yoludur.",
+    riskler: [
+      ["Kum ve aşınma", "Kuyudan gelen kum pompa çarklarını zamanla aşındırır; pompa çalışır ama suyu basamaz hale gelir."],
+      ["Verimsiz çalışma ve yüksek fatura", "Aşınmış pompa aynı suyu çıkarmak için daha uzun çalışır ve daha fazla elektrik harcar."],
+      ["Kuyudan çıkarma masrafı", "Arıza büyüdüğünde pompanın vinçle kuyudan çıkarılması gerekir; bu, bakım maliyetinin çok üstünde bir masraftır."],
+    ] },
   { grup: 'Hidrofor & Kuyu', ad: 'Su debisi ölçümü', periyot: 'yılda bir',
     anahtar: ['debi'],
-    aciklama: 'Kuyunuzdan gelen su miktarı zamanla değişebilir. Debi ölçümü, kuyunun verimini ve pompanın doğru seçilip seçilmediğini gösterir; düşüş varsa tıkanma veya aşınmayı erkenden fark ederiz.' },
-
+    giris: "Kuyunuzun verdiği su miktarı yıllar içinde değişebilir. Debi ölçümü, kuyunuzun verimini ve pompanızın kuyuya uygun olup olmadığını gösteren en önemli veridir. Bu ölçümün *yılda bir* yapılması, kuyunuzun sağlığını takip etmemizi sağlar.",
+    riskler: [
+      ["Fark edilmeyen verim kaybı", "Tıkanan filtre borusu veya azalan kuyu suyu yavaş yavaş debiyi düşürür; fark ettiğinizde sorun büyümüş olur."],
+      ["Pompa ile kuyu uyumsuzluğu", "Kuyunun verdiğinden fazla su çeken pompa kuyuyu boşaltır, kuru çalışır ve yıpranır."],
+      ["Ani su yetersizliği", "Havuz doldurma veya bahçe sulama gibi yoğun kullanımda su birden kesilir ve sistem durur."],
+    ] },
   { grup: 'Havuz', ad: 'Havuz periyodik bakım', periyot: 'ayda bir (sezonda daha sık)',
     anahtar: ['periyodik bakım', 'havuz bakım'],
-    aciklama: 'Düzenli bakımda havuz suyunun kimyasal dengesi ayarlanır, dip ve yüzey temizliği yapılır, filtre ve pompa kontrol edilir. Böylece su berrak ve sağlıklı kalır, yosun ve bulanıklık oluşmadan önlenir.' },
+    giris: "Havuzunuzun berrak, sağlıklı ve davetkâr kalmasının sırrı düzenli bakımdır. Su kimyası, dip ve yüzey temizliği, filtre ve pompa kontrolü bir bütündür. Bu bakımın *ayda bir, sezonda daha sık* yapılması gerekir.",
+    riskler: [
+      ["Yosun ve bulanıklık", "Dengesi bozulan su birkaç gün içinde yeşillenir; temizlemek için çok daha fazla kimyasal, zaman ve masraf gerekir."],
+      ["Sağlık riski", "Yeterince dezenfekte edilmeyen havuz suyu bakteri barındırır; göz, cilt ve kulak enfeksiyonlarına yol açabilir."],
+      ["Ekipman ve kaplama hasarı", "Dengesiz su; pompa, filtre ve merdivenleri aşındırır, kaplamada kalıcı lekeler bırakır."],
+    ] },
   { grup: 'Havuz', ad: 'Su analizi (pH / klor)', periyot: 'ayda bir',
     anahtar: ['su analizi', 'ph'],
-    aciklama: 'Doğru pH ve klor seviyesi hem sağlığınız hem de havuzunuz için önemlidir. Dengesiz su göz ve cilt tahrişine, kaplamada lekelere ve ekipmanlarda korozyona yol açar.' },
+    giris: "Havuz suyunun pH ve klor dengesi, gözle görülmeyen ama her şeyi belirleyen bir ayardır. Doğru denge hem sizin sağlığınızı hem de havuzunuzu korur. Analizin *ayda bir* yapılması, suyun her zaman güvenli kalmasını sağlar.",
+    riskler: [
+      ["Göz ve cilt tahrişi", "Yüksek veya düşük pH; gözlerde yanma, ciltte kuruluk ve kaşıntıya neden olur."],
+      ["Etkisiz klor", "pH dengesi bozulduğunda klor işe yaramaz hale gelir; ne kadar kimyasal atılırsa atılsın su temizlenmez."],
+      ["Korozyon ve kireç", "Dengesiz su metal aksamları paslandırır, ısı pompası ve tuz hücresinde kireçlenme yapar, kaplamayı yıpratır."],
+    ] },
   { grup: 'Havuz', ad: 'Filtre ters yıkama', periyot: 'ayda bir',
     anahtar: ['ters yıkama', 'backwash'],
-    aciklama: 'Filtre, havuz suyundaki kiri tutar ve zamanla dolar. Ters yıkama yapılmazsa suyun temizlenmesi zayıflar, pompa zorlanır ve elektrik tüketimi artar.' },
+    giris: "Filtre, havuzunuzun \"böbreği\"dir; sudaki tüm kiri ve partikülleri tutar. Zamanla dolar ve temizlenmesi gerekir. Filtrenin *ayda bir* ters yıkanması, suyun berrak kalması için şarttır.",
+    riskler: [
+      ["Bulanık su", "Dolu filtre kiri tutamaz; su bulanıklaşır ve kimyasal tüketimi artar."],
+      ["Zorlanan pompa", "Tıkalı filtre pompanın suyu basmasını zorlaştırır; motor ısınır, ömrü kısalır."],
+      ["Artan elektrik faturası", "Verimsiz çalışan sistem suyu temizlemek için çok daha uzun süre çalışmak zorunda kalır."],
+    ] },
   { grup: 'Havuz', ad: 'Filtre kumu değişimi', periyot: '2 yılda bir',
     anahtar: ['filtre kumu', 'kum değişimi', 'medya değişimi'],
-    aciklama: 'Filtre kumu zamanla aşınıp yuvarlaklaşır ve kiri tutma özelliğini kaybeder. Kum değişmezse kimyasal ne kadar kullanılsa da su bulanık kalır. Değişim, filtrenin ilk günkü performansına dönmesini sağlar.' },
+    giris: "Filtrenizdeki kum, binlerce litre suyu süzerken zamanla aşınır, yuvarlaklaşır ve kir tutma özelliğini kaybeder. Filtrenin ilk günkü performansına dönmesi için kumun *2 yılda bir* değiştirilmesi gerekir.",
+    riskler: [
+      ["Kimyasala rağmen bulanık su", "Eskiyen kum kiri geçirir; ne kadar kimyasal kullanılırsa kullanılsın su berraklaşmaz."],
+      ["Kanallaşma ve bakteri", "Topaklanan kumun içinde su kanallar açar ve filtrelenmeden geçer; kumun içinde bakteri yuvalanır."],
+      ["Boşa giden kimyasal ve zaman", "Sorunu kimyasalla çözmeye çalışmak her ay daha fazla masraf demektir; kök neden ise filtre kumudur."],
+    ] },
   { grup: 'Havuz', ad: 'Pompa ön filtre sepeti temizliği', periyot: 'ayda bir',
     anahtar: ['ön filtre', 'sepet'],
-    aciklama: 'Ön filtre sepeti yaprak ve kiri pompaya girmeden tutar. Tıkandığında pompa hava yapar, susuz çalışır ve salmastrası zarar görür.' },
+    giris: "Ön filtre sepeti; yaprak, saç ve kirleri pompaya girmeden yakalayan ilk savunma hattıdır. Özellikle rüzgârlı ve yapraklı dönemlerde hızla dolar. Sepetin *ayda bir* temizlenmesi pompanızı korur.",
+    riskler: [
+      ["Pompanın hava yapması", "Tıkanan sepet su akışını keser; pompa hava emer ve verimi düşer."],
+      ["Kuru çalışma ve salmastra hasarı", "Susuz kalan pompa ısınır; salmastrası bozulur ve su kaçırmaya başlar."],
+      ["Motor arızası", "Uzun süre zorlanan motor sonunda yanar; basit bir temizlikle önlenebilecek bir arıza pahalı bir değişime dönüşür."],
+    ] },
   { grup: 'Havuz', ad: 'Havuz motoru kontrolü', periyot: 'yılda bir',
     anahtar: ['havuz motoru', 'salmastra', 'rulman'],
-    aciklama: 'Havuz motoru sezon boyunca her gün saatlerce çalışır. Salmastra sızıntısı ve rulman sesi erken fark edilmezse motor yanabilir. Yıllık kontrol, sezon ortasında havuzsuz kalmanızı önler.' },
+    giris: "Havuz motorunuz sezon boyunca her gün saatlerce çalışan, sistemin \"kalbi\"dir. Salmastra, rulman ve elektrik bağlantılarının *yılda bir* kontrol edilmesi, sezon ortasında havuzsuz kalmanızı önler.",
+    riskler: [
+      ["Salmastra sızıntısı", "Fark edilmeyen küçük bir su kaçağı motorun içine ilerler ve sargılara ulaşır."],
+      ["Rulman sesi ve kilitlenme", "Aşınan rulmanlar önce ses yapar, sonra motoru kilitler; motor tamamen durur."],
+      ["Sezon ortasında havuzsuz kalma", "Arıza genellikle yazın en yoğun döneminde çıkar; parça beklerken havuz suyu birkaç günde bozulur."],
+    ] },
   { grup: 'Havuz', ad: 'Isı pompası bakımı', periyot: 'yılda bir',
     anahtar: ['ısı pompası', 'evaporatör', 'lamel', 'gaz basıncı'],
-    aciklama: 'Isı pompasının lamelleri toz ve tuzla kaplandıkça ısıtma verimi düşer, elektrik faturası artar. Temizlik ve gaz basıncı kontrolüyle cihaz daha az enerjiyle daha hızlı ısıtır.' },
+    giris: "Isı pompanız, havuzunuzun sezonunu uzatan en değerli cihazlardan biridir. Ancak lamelleri toz, polen ve deniz havasının tuzuyla kaplandıkça verimi düşer. Temizlik ve gaz basıncı kontrolünün *yılda bir* yapılması gerekir.",
+    riskler: [
+      ["Düşen ısıtma verimi", "Kirli lameller havadaki ısıyı alamaz; havuz geç ısınır veya istenen sıcaklığa hiç ulaşmaz."],
+      ["Yükselen elektrik faturası", "Verimsiz çalışan cihaz aynı ısıyı üretmek için çok daha uzun çalışır."],
+      ["Kompresör arızası", "Zorlanan kompresör ve tuz kaynaklı korozyon, cihazın en pahalı parçasının arızalanmasına yol açabilir."],
+    ] },
   { grup: 'Havuz', ad: 'Tuz klor hücresi temizliği', periyot: '3 ayda bir',
     anahtar: ['hücre', 'tuz'],
-    aciklama: 'Tuz klor jeneratörünün hücresi zamanla kireç tutar ve klor üretimi düşer. Temizlik yapılmazsa hücre ömrü kısalır; hücre değişimi ise yüksek maliyetlidir.' },
-
+    giris: "Tuz klor jeneratörünüz, havuzunuzu kimyasal taşıma derdi olmadan dezenfekte eden akıllı bir sistemdir. Ancak hücresi zamanla kireç tutar. Hücrenin *3 ayda bir* temizlenmesi, klor üretiminin düzenli devam etmesini sağlar.",
+    riskler: [
+      ["Klor üretiminin düşmesi", "Kireçlenen hücre yeterli klor üretemez; su yeşillenir ve bulanıklaşır."],
+      ["Hücre ömrünün kısalması", "Kireçli hücre daha fazla zorlanır; plakaları erken yıpranır."],
+      ["Yüksek değişim maliyeti", "Tuz klor hücresi pahalı bir parçadır; basit bir temizlik, erken değişim masrafını önler."],
+    ] },
   { grup: 'Sulama', ad: 'Sulama sezon açılışı', periyot: 'her yıl Nisan',
     anahtar: ['sulama sezon açılış', 'sulamasını açma'],
-    aciklama: 'Kış sonrası sulama hatlarında tıkanma, kırık başlık ve kaçaklar olabilir. Sezon başında sistemi kontrol edip programı ayarlayarak bahçenizin ilk sıcaklarda susuz kalmasını önleriz.' },
+    giris: "Kış boyunca kullanılmayan sulama sisteminizde tıkanmalar, kırık başlıklar ve gizli kaçaklar oluşabilir. Bahçenizin ilk sıcaklarda susuz kalmaması için sistemin *her yıl Nisan ayında* kontrol edilip programının ayarlanması gerekir.",
+    riskler: [
+      ["Kuruyan bitkiler", "Çalışmayan veya eksik sulayan hatlar yüzünden çim ve bitkiler ilk sıcak haftada sararır."],
+      ["Gizli su kaçakları", "Toprak altındaki kırık borular fark edilmeden su kaçırır; su faturası ve kuyu tüketimi artar."],
+      ["Pompaya binen yük", "Kaçaklı hatta basınç tutmadığı için pompa sürekli çalışır ve yıpranır."],
+    ] },
   { grup: 'Sulama', ad: 'Sulama sezon kapanışı ve boşaltma', periyot: 'her yıl Ekim',
     anahtar: ['sulama sezon kapan', 'boşaltma', 'sulamayı kapatma'],
-    aciklama: 'Kışın hatlarda kalan su donarak boruları, vanaları ve pompayı çatlatabilir. Sezon sonunda sistemi boşaltıp kapatmak, baharda sürpriz masrafları önler.' },
+    giris: "Sulama hatlarında kalan su, kışın donduğunda genleşir ve sistemi içeriden çatlatır. Baharda sürpriz masraflarla karşılaşmamak için sistemin *her yıl Ekim ayında* boşaltılıp kapatılması gerekir.",
+    riskler: [
+      ["Çatlayan borular ve vanalar", "Donan su boruları, vanaları ve bağlantıları çatlatır; tüm hattın kazılması gerekebilir."],
+      ["Pompa gövdesinin kırılması", "İçinde su kalan pompa gövdesi dona dayanamaz ve kırılır."],
+      ["Baharda büyük masraf", "Kışın oluşan hasar ancak bahar açılışında fark edilir; onarım hem masraflı hem zaman alıcıdır."],
+    ] },
   { grup: 'Sulama', ad: 'Sulama filtresi ve damla uç temizliği', periyot: '3 ayda bir',
     anahtar: ['sulama filtre', 'damla', 'nozul', 'hat yıkama'],
-    aciklama: 'Tıkanan filtre ve damlatıcılar bitkilerin eşit su almasını engeller; bazı bölgeler kururken bazıları fazla su alır. Düzenli temizlik hem bahçenizi hem de suyunuzu korur.' },
-
+    giris: "Damla sulama ve fıskiye sistemleri, suyu doğru miktarda doğru yere ulaştırmak için küçük ve hassas uçlar kullanır. Kireç ve tortu bu uçları kolayca tıkar. Filtre ve uçların *3 ayda bir* temizlenmesi gerekir.",
+    riskler: [
+      ["Eşit olmayan sulama", "Tıkanan uçlar yüzünden bahçenin bazı bölgeleri kururken bazıları fazla su alır."],
+      ["Kuruyan bitkiler", "Emek verdiğiniz bitkiler, sistem çalışıyor görünse de susuz kalır."],
+      ["Boşa giden su ve emek", "Tıkalı sistem daha uzun çalıştırılır; hem su hem de elektrik israf edilir."],
+    ] },
   { grup: 'Havuz', ad: 'Havuz sezon açılışı', periyot: 'her yıl Mayıs',
     anahtar: ['sezon açılış', 'yaz öncesi', 'sezon öncesi'],
-    aciklama: 'Kış boyunca bekleyen havuzda su dengesi bozulur, ekipmanlar uzun süre çalışmamıştır. Sezon açılışında temizlik, kimyasal ayar ve tüm ekipman kontrolüyle havuzunuzu yaza hazır hale getiririz.' },
+    giris: "Kış boyunca bekleyen havuzunuzda su dengesi bozulur, ekipmanlar aylarca çalışmamıştır. Yaz sezonunu sorunsuz geçirmeniz için havuzun *her yıl Mayıs ayında* temizlik, kimyasal ayar ve tam ekipman kontrolüyle açılması gerekir.",
+    riskler: [
+      ["Yeşil ve bulanık başlangıç", "Hazırlıksız açılan havuzda yosun hızla yayılır; temizlenmesi günler sürer."],
+      ["Uzun beklemeden kaynaklanan arızalar", "Aylarca çalışmayan pompa, filtre ve ısı pompasında sızıntı ve sıkışmalar ortaya çıkar."],
+      ["Yazın ilk günlerinde havuzsuz kalma", "Sorunlar ilk sıcak günlerde fark edildiğinde servis yoğunluğu nedeniyle beklemek zorunda kalabilirsiniz."],
+    ] },
   { grup: 'Havuz', ad: 'Havuz sezon kapanışı', periyot: 'her yıl Kasım',
     anahtar: ['sezon kapanış', 'kapatma', 'koruma modu'],
-    aciklama: 'Doğru yapılmayan kapanış, kışın donma ve yosun nedeniyle bahar aylarında pahalı onarımlara yol açar. Kapanışta su seviyesi, kimyasallar ve ekipmanlar kışa uygun şekilde hazırlanır.' },
-
+    giris: "Doğru yapılmayan bir kapanış, havuzunuzu kışın dona ve yosuna karşı savunmasız bırakır. Baharda pahalı onarımlarla karşılaşmamak için havuzun *her yıl Kasım ayında* uygun su seviyesi, kimyasal ve ekipman hazırlığıyla kapatılması gerekir.",
+    riskler: [
+      ["Donma hasarı", "Hatlarda ve ekipmanlarda kalan su donarak boru, pompa ve filtreyi çatlatabilir."],
+      ["Baharda yosun ve leke", "Kimyasal koruması yapılmayan havuz kış boyunca yosun tutar; kaplamada kalıcı lekeler oluşur."],
+      ["Pahalı bahar açılışı", "Korunmayan havuzun açılışı çok daha fazla temizlik, kimyasal ve onarım gerektirir."],
+    ] },
   { grup: 'Genel', ad: 'Kış (don) kontrolü', periyot: 'her yıl kış öncesi',
     anahtar: ['kış', 'don'],
-    aciklama: 'Don olan gecelerde açıktaki borular, pompa gövdeleri ve hidrofor tankları çatlayabilir. Kış öncesi yalıtım ve kontrolle bu hasarları önleriz.' },
+    giris: "Çeşme'nin kış geceleri sanıldığından soğuk olabilir. Açıkta kalan borular, pompa gövdeleri ve hidrofor tankları tek bir don gecesinde zarar görebilir. Bu kontrolün *her yıl kış öncesinde* yapılması gerekir.",
+    riskler: [
+      ["Patlayan borular", "Donan su boruları ve bağlantıları çatlatır; çözüldüğünde ev ve bahçede su baskını yaşanabilir."],
+      ["Kırılan pompa ve tanklar", "İçinde su kalan pompa gövdesi ve hidrofor tankı dona dayanamaz ve kırılır."],
+      ["Yokluğunuzda büyüyen hasar", "Evde değilken oluşan hasar günlerce fark edilmez; su kaybı ve onarım masrafı katlanır."],
+    ] },
   { grup: 'Genel', ad: 'Su deposu temizliği', periyot: 'yılda bir',
     anahtar: ['depo', 'dezenfeksiyon'],
-    aciklama: 'Depolarda zamanla tortu birikir ve bakteri üreyebilir. Yıllık temizlik ve dezenfeksiyon, evinize gelen suyun temiz ve sağlıklı olmasını sağlar.' },
+    giris: "Su deposu, evinize gelen tüm suyun beklediği yerdir. Zamanla dibinde tortu birikir ve bakteri üreyebilir. Ailenizin sağlığı için deponun *yılda bir* temizlenip dezenfekte edilmesi gerekir.",
+    riskler: [
+      ["Sağlık riski", "Tortu ve biyofilm içinde üreyen bakteriler suya karışır; bu suyla yıkanmak ve temizlik yapmak sağlık sorunlarına yol açabilir."],
+      ["Kötü koku ve tat", "Bakımsız depodaki su bulanıklaşır, kötü koku ve tat yapar."],
+      ["Tıkanan tesisat ve cihazlar", "Depodan gelen tortu armatürleri, filtreleri ve şofben-termosifon gibi cihazları tıkar."],
+    ] },
   { grup: 'Genel', ad: 'Termosifon anot kontrolü', periyot: 'yılda bir',
     anahtar: ['anot', 'termosifon', 'emniyet ventili', 'kireç'],
-    aciklama: 'Termosifonun içindeki magnezyum anot, tankın paslanmasını önlemek için kendini feda eder. Anot bittiğinde tank delinir; zamanında değişim cihazın ömrünü yıllarca uzatır.' },
+    giris: "Termosifonunuzun içindeki magnezyum anot, tankın paslanmaması için kendini feda eden küçük bir parçadır. Anot tükendiğinde korozyon doğrudan tankı aşındırmaya başlar. Anotun *yılda bir* kontrol edilmesi cihazınızın ömrünü yıllarca uzatır.",
+    riskler: [
+      ["Tankın delinmesi", "Anotu biten tank içten paslanır ve sonunda delinir; cihazın tamamen değişmesi gerekir."],
+      ["Su kaçağı ve hasar", "Delinen tanktan sızan su bulunduğu alana, dolaplara ve duvarlara zarar verir."],
+      ["Kireç ve verim kaybı", "Biriken kireç rezistansın ısıtma verimini düşürür, elektrik tüketimini artırır."],
+    ] },
   { grup: 'Genel', ad: 'Su arıtma filtre değişimi', periyot: '6 ayda bir',
     anahtar: ['kartuş', 'membran', 'arıtma'],
-    aciklama: 'Süresi dolan filtreler kiri tutamaz, hatta biriktirdiği kiri suya geri verebilir. Zamanında değişim, içtiğiniz suyun kalitesini korur.' },
+    giris: "Arıtma cihazınızın filtreleri, içtiğiniz suyun kalitesini belirleyen en önemli parçalardır. Süresi dolan filtre kiri tutamaz, hatta biriktirdiğini suya geri verebilir. Filtrelerin *6 ayda bir* değiştirilmesi gerekir.",
+    riskler: [
+      ["Sağlıksız içme suyu", "Dolan filtrede bakteri ürer; arıtılmış sandığınız su aslında daha kirli hale gelebilir."],
+      ["Membran hasarı", "Ön filtreleri değişmeyen cihazın pahalı membranı kısa sürede tıkanır ve bozulur."],
+      ["Düşen su miktarı ve tat bozulması", "Tıkalı filtreler su akışını yavaşlatır; suyun tadı ve kokusu bozulur."],
+    ] },
   { grup: 'Genel', ad: 'Kaçak akım ve topraklama testi', periyot: 'yılda bir',
     anahtar: ['kaçak akım', 'topraklama'],
-    aciklama: 'Kaçak akım rölesi ve topraklama, su ile elektriğin bir arada olduğu havuz ve kuyu sistemlerinde hayati güvenlik önlemleridir. Yıllık test, sizi ve ailenizi elektrik çarpmasına karşı korur.' },
+    giris: "Havuz ve kuyu sistemlerinde su ve elektrik her gün yan yana çalışır. Kaçak akım rölesi ve topraklama, sizi ve ailenizi elektrik çarpmasına karşı koruyan görünmez güvenlik kalkanıdır. Bu sistemlerin *yılda bir* test edilmesi gerekir.",
+    riskler: [
+      ["Çalışmayan koruma", "Test edilmeyen kaçak akım rölesi arızalı olabilir ve tehlike anında devreyi kesmez."],
+      ["Can güvenliği riski", "Zayıflayan topraklama, havuz merdiveni veya pompa gövdesi gibi metal yüzeylerde elektrik kaçağına yol açabilir."],
+      ["Cihaz arızaları", "Topraklaması bozuk sistemde elektronik kartlar ve motorlar daha kolay arızalanır."],
+    ] },
 ];
 
 const GRUPLAR = ['Hidrofor & Kuyu', 'Havuz', 'Sulama', 'Genel'];
-const GENEL_ACIKLAMA = 'Düzenli bakım, arızaları büyümeden fark etmemizi sağlar ve cihazlarınızın ömrünü uzatır.';
+const GENEL_ACIKLAMA =
+  'Evinizdeki havuz, kuyu ve su sistemleri her gün sessizce çalışır; sorunlar ise çoğu zaman en ihtiyaç duyduğunuz anda ortaya çıkar. Düzenli bakım, arızaları büyümeden fark etmemizi sağlar.\n\n' +
+  '⚠️ *Bakım ihmal edilirse neler olur?*\n\n' +
+  '• *Fark edilmeyen yıpranma:* Küçük aşınmalar ve kaçaklar zamanla büyür, cihazlar verimsiz çalışır.\n' +
+  '• *Ani arızalar:* Pompa, motor ve tesisat genellikle en yoğun kullanım döneminde arızalanır.\n' +
+  '• *Yüksek masraflar:* Basit bir bakımla önlenebilecek sorunlar, pahalı tamir ve parça değişimlerine dönüşür.';
+
+function bakimAciklama(b) {
+  if (!b) return GENEL_ACIKLAMA;
+  const maddeler = b.riskler.map(([bas, metin]) => `• *${bas}:* ${metin}`).join('\n');
+  return `${b.giris}\n\n⚠️ *Bu bakım ihmal edilirse neler olur?*\n\n${maddeler}`;
+}
 
 function bakimBul(konu) {
   if (!konu) return null;
@@ -101,23 +238,63 @@ function bakimBul(konu) {
   return BAKIMLAR.find((b) => b.anahtar.some((a) => k.includes(a))) || null;
 }
 
+const IMZA = 'Konforunuz ve güvenliğiniz emin ellerde.\n\n*ALKA Mekanik ve Havuz Sistemleri*\nVolkan Gülcemal · 0533 371 39 35';
+
+const TAKIP_PARAGRAF =
+  '✅ *Artık bu takibi biz yapıyoruz!*\n' +
+  'Sizi teknik detaylarla ya da "acaba bakım zamanı geçti mi?" endişesiyle yormuyoruz. Çeşme bölgesinde bir ilki gerçekleştirerek tüm periyodik takip sürecini üstümüze alıyoruz. Zamanı geldiğinde sisteminizi biz takip ediyor, bütçenizi ve konforunuzu korumak için gerekli müdahaleyi vaktinde yapıyoruz.';
+
 const BILGI_SABLON =
-  'Merhaba {ad},\n\n🔧 *{bakim}* zamanınız yaklaşıyor.\n\n{aciklama}\n\n📅 Önerilen sıklık: {periyot}\n\nRandevu için bu mesajı yanıtlamanız yeterli.\n\nALKA Havuz · 0533 371 39 35';
+  'Değerli Müşterimiz {ad},\n\n' +
+  '🔧 *{bakim}* zamanınız yaklaşıyor.\n\n' +
+  '{aciklama}\n\n' +
+  TAKIP_PARAGRAF + '\n\n' +
+  'Cihazlarınızı korumak ve sürpriz arızalara kapıyı kapatmak için randevu oluşturmak üzere bu mesajı yanıtlamanız yeterli.\n\n' +
+  IMZA;
 
 const SABLONLAR = [
-  { ad: 'Bakım hatırlatması (bilgilendirici)', metin: BILGI_SABLON },
-  { ad: 'Kısa bakım hatırlatması', metin:
-    'Merhaba {ad}, {bakim} zamanınız yaklaşıyor. Uygun olduğunuz bir gün için bu mesajı yanıtlamanız yeterli.\n\nALKA Havuz · 0533 371 39 35' },
-  { ad: 'Sezon açılışı', metin:
-    'Merhaba {ad}, yaz sezonu yaklaşıyor ☀️ Havuzunuzun sezon açılışı ve genel bakımı için randevu oluşturmak ister misiniz? Bu mesajı yanıtlamanız yeterli.\n\nALKA Havuz · 0533 371 39 35' },
-  { ad: 'Kış öncesi kontrol', metin:
-    'Merhaba {ad}, soğuklar yaklaşıyor ❄️ Kuyu pompası, hidrofor ve sulama hatlarınızın dona karşı kontrolü için randevu oluşturabiliriz.\n\nALKA Havuz · 0533 371 39 35' },
-  { ad: 'Geliş tarihi sorma', metin:
-    "Merhaba {ad}, Çeşme'ye ne zaman geleceğinizi bize bildirirseniz, siz gelmeden havuzunuzu ve sistemlerinizi hazırlayalım 🏡\n\nALKA Havuz · 0533 371 39 35" },
-  { ad: 'Kampanya / indirim', metin:
-    'Merhaba {ad}, bu aya özel {bakim} hizmetimizde indirim fırsatı var! Detaylar için bu mesajı yanıtlayabilirsiniz.\n\nALKA Havuz · 0533 371 39 35' },
-  { ad: 'Bayram tebriği', metin:
-    'Merhaba {ad}, bayramınızı en içten dileklerimizle kutlar, sağlıklı ve mutlu günler dileriz.\n\nALKA Havuz · Volkan Gülcemal' },
+  { ad: 'Bakım hatırlatması (detaylı)',
+    bilgi: 'Seçilen bakımın neden önemli olduğunu ve ihmal edilirse oluşacak arızaları anlatan detaylı mesaj. Her bakım türü için açıklama otomatik değişir.',
+    metin: BILGI_SABLON },
+  { ad: 'Kısa bakım hatırlatması',
+    bilgi: 'Bakımı yaklaşan müşteriye kısa ve net hatırlatma. Detaylı mesajı daha önce almış müşteriler için uygundur.',
+    metin:
+      'Değerli Müşterimiz {ad},\n\n🔧 *{bakim}* zamanınız geldi. Önerilen sıklık: {periyot}.\n\n' +
+      'Sisteminizin aksamadan çalışması için uygun olduğunuz bir günü bu mesajı yanıtlayarak bize bildirebilirsiniz.\n\n' + IMZA },
+  { ad: 'Sezon açılışı',
+    bilgi: 'Yaz öncesi havuz sezon açılışı daveti. Nisan–Mayıs aylarında gönderilmesi önerilir.',
+    metin:
+      'Değerli Müşterimiz {ad},\n\nYaz sezonu yaklaşıyor ☀️ Kış boyunca bekleyen havuzunuzda su dengesi bozulmuş, pompa, filtre ve ısı pompası aylarca çalışmamış olabilir.\n\n' +
+      '⚠️ *Hazırlıksız açılan havuzda neler olur?*\n\n' +
+      '• *Yosun ve bulanıklık:* Su hızla yeşillenir, temizlenmesi günler sürer.\n' +
+      '• *Uzun beklemeden kaynaklanan arızalar:* Sıkışan pompa, sızdıran contalar ve çalışmayan ısı pompası ilk sıcak günlerde ortaya çıkar.\n' +
+      '• *Servis yoğunluğu:* Sezon başında herkes aynı anda servis istediği için beklemek zorunda kalabilirsiniz.\n\n' +
+      'Havuzunuzu siz gelmeden temizleyip, kimyasal dengesini ayarlayıp tüm ekipmanlarıyla yaza hazır hale getirelim. Erken randevu için bu mesajı yanıtlamanız yeterli.\n\n' + IMZA },
+  { ad: 'Kış öncesi kontrol',
+    bilgi: 'Don riskine karşı kuyu, hidrofor, sulama ve açıktaki tesisat kontrolü. Ekim–Kasım aylarında gönderilmesi önerilir.',
+    metin:
+      'Değerli Müşterimiz {ad},\n\nSoğuklar yaklaşıyor ❄️ Çeşme\'nin kış geceleri sanıldığından soğuk olabilir; tek bir don gecesi bile açıktaki sistemlere zarar verebilir.\n\n' +
+      '⚠️ *Kış hazırlığı yapılmazsa neler olur?*\n\n' +
+      '• *Patlayan borular:* Hatlarda kalan su donarak boruları çatlatır; çözüldüğünde su baskını yaşanabilir.\n' +
+      '• *Kırılan pompa ve tanklar:* İçinde su kalan pompa gövdesi ve hidrofor tankı dona dayanamaz.\n' +
+      '• *Yokluğunuzda büyüyen hasar:* Evde değilken oluşan arıza günlerce fark edilmez, masraf katlanır.\n\n' +
+      'Kuyu pompası, hidrofor, sulama hatları ve açıktaki tesisatınızı kışa hazırlamak için bu mesajı yanıtlamanız yeterli.\n\n' + IMZA },
+  { ad: 'Geliş tarihi sorma',
+    bilgi: 'Yazlık müşterilere Çeşme\'ye ne zaman geleceklerini sorma. Gelmeden önce havuz ve sistemler hazırlanır.',
+    metin:
+      'Değerli Müşterimiz {ad},\n\nÇeşme\'ye ne zaman geleceğinizi bize bildirirseniz, siz gelmeden havuzunuzu, suyunuzu ve tüm sistemlerinizi hazırlayalım 🏡\n\n' +
+      'Kapıdan girdiğiniz anda berrak bir havuz, düzgün çalışan bir su sistemi ve hiçbir sürpriz olmadan tatilinize başlamanız için gerekli kontrolleri önceden yapıyoruz.\n\n' +
+      'Geliş tarihinizi bu mesajı yanıtlayarak paylaşmanız yeterli.\n\n' + IMZA },
+  { ad: 'Kampanya / indirim',
+    bilgi: 'Seçilen bakım için dönemsel indirim duyurusu. {bakim} alanı müşterinin bakımına göre değişir.',
+    metin:
+      'Değerli Müşterimiz {ad},\n\n🎁 Bu aya özel *{bakim}* hizmetimizde indirim fırsatı sunuyoruz!\n\n{aciklama}\n\n' +
+      'Kampanya sınırlı süre geçerlidir. Detaylar ve randevu için bu mesajı yanıtlamanız yeterli.\n\n' + IMZA },
+  { ad: 'Bayram tebriği',
+    bilgi: 'Bayramlarda müşterilere kutlama mesajı. Satış içermez, ilişkiyi güçlendirir.',
+    metin:
+      'Değerli Müşterimiz {ad},\n\nBayramınızı en içten dileklerimizle kutlar; sevdiklerinizle birlikte sağlıklı, huzurlu ve mutlu günler dileriz 🌸\n\n' +
+      '*ALKA Mekanik ve Havuz Sistemleri*\nVolkan Gülcemal' },
 ];
 
 const OZEL_FILTRELER = [
@@ -149,7 +326,7 @@ function kisisel(metin, ad, konu) {
   return metin
     .replace(/\{ad\}/g, ad || '')
     .replace(/\{bakim\}/g, konu || b?.ad || 'Periyodik bakım')
-    .replace(/\{aciklama\}/g, b?.aciklama || GENEL_ACIKLAMA)
+    .replace(/\{aciklama\}/g, bakimAciklama(b))
     .replace(/\{periyot\}/g, b?.periyot || 'düzenli aralıklarla');
 }
 
@@ -193,6 +370,7 @@ export default function TopluMesajPage() {
   const [ozel, setOzel] = useState('hepsi');
   const [baslik, setBaslik] = useState('Bakım hatırlatması (bilgilendirici)');
   const [metin, setMetin] = useState(BILGI_SABLON);
+  const [sablonAd, setSablonAd] = useState(SABLONLAR[0].ad);
   const [haric, setHaric] = useState([]);
   const [konular, setKonular] = useState({});
   const [elleEklenen, setElleEklenen] = useState([]);
@@ -260,6 +438,7 @@ export default function TopluMesajPage() {
     if (!sb) return;
     setMetin(sb.metin);
     setBaslik(sb.ad);
+    setSablonAd(sb.ad);
   }
 
   function haricDegistir(id) {
@@ -428,18 +607,23 @@ export default function TopluMesajPage() {
       <div style={s.kart}>
         <div style={s.bolum}>2. Mesaj</div>
         <label style={s.etiket}>Hazır şablon
-          <select style={s.input} value="" onChange={(e) => sablonSec(e.target.value)}>
-            <option value="">Şablon değiştir...</option>
+          <select style={s.input} value={sablonAd} onChange={(e) => sablonSec(e.target.value)}>
             {SABLONLAR.map((sb) => <option key={sb.ad} value={sb.ad}>{sb.ad}</option>)}
           </select>
         </label>
+        {SABLONLAR.find((x) => x.ad === sablonAd)?.bilgi && (
+          <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1e3a5f', borderRadius: 10,
+            padding: '10px 12px', fontSize: 13, lineHeight: 1.5, marginTop: 8 }}>
+            ℹ️ {SABLONLAR.find((x) => x.ad === sablonAd).bilgi}
+          </div>
+        )}
         <label style={{ ...s.etiket, marginTop: 12 }}>Mesaj metni
-          <textarea style={{ ...s.input, minHeight: 170, fontFamily: 'inherit', lineHeight: 1.5 }} value={metin}
+          <textarea style={{ ...s.input, minHeight: 260, fontFamily: 'inherit', lineHeight: 1.5 }} value={metin}
             onChange={(e) => setMetin(e.target.value)} />
         </label>
         <div style={s.ipucu}>
           Otomatik dolan alanlar: <b>{'{ad}'}</b> müşterinin adı · <b>{'{bakim}'}</b> bakım adı ·
-          <b> {'{aciklama}'}</b> o bakımın neden önemli olduğu · <b>{'{periyot}'}</b> önerilen sıklık
+          <b> {'{aciklama}'}</b> o bakımın neden önemli olduğu ve ihmal edilirse oluşacak arızalar · <b>{'{periyot}'}</b> önerilen sıklık
         </div>
         {metin && alicilar[0] && (
           <div style={{ marginTop: 12 }}>
