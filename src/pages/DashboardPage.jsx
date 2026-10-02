@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabase';
 import { FIRMA } from '../firma';
 import { Ikon as SIkon, IkonKutu } from '../ikonlar';
+import { bakimBul, kisisel, BILGI_SABLON, telefonWa } from './TopluMesajPage.jsx';
 
 const AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 const KATEGORI_IKON = { Havuz: '🏊', Kuyu: '💧', Hidrofor: '🔵', Sulama: '🌱', Tesisat: '🔧', Elektrik: '⚡' };
-const HIZLI_ANAHTAR = 'alkaHizliErisim4';
+const HIZLI_ANAHTAR = 'alkaHizliErisim5';
 
 const yerel = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -68,6 +69,7 @@ const SIMGE = {
 
 const TUM_HIZLI = [
   { id: 'musteriler', hedef: 'musteriler', ad: 'Müşteriler', ik: 'kisiler', renk: '#2563eb' },
+  { id: 'harita', hedef: 'harita', ad: 'Harita', ik: 'harita', renk: '#0284c7' },
   { id: 'takvim', hedef: 'takvim', ad: 'Takvim', ik: 'takvim', renk: '#7c3aed' },
   { id: 'raporlar', hedef: 'raporlar', ad: 'Raporlar', ik: 'grafik', renk: '#16a34a' },
   { id: 'ayarlar', hedef: 'ayarlar', ad: 'Ayarlar', ik: 'ayar', renk: '#475569' },
@@ -76,7 +78,7 @@ const TUM_HIZLI = [
   { id: 'toplumesaj', hedef: 'toplumesaj', ad: 'Toplu Mesaj', ik: 'hoparlor', renk: '#db2777' },
   { id: 'rehber', hedef: 'rehber', ad: 'Rehber', ik: 'rehber', renk: '#0891b2' },
 ];
-const VARSAYILAN_HIZLI = ['musteriler', 'takvim', 'raporlar', 'ayarlar'];
+const VARSAYILAN_HIZLI = ['musteriler', 'harita', 'raporlar', 'ayarlar'];
 
 function hizliOku() {
   try {
@@ -91,6 +93,8 @@ export default function DashboardPage({ onNavigate, ad }) {
   const [tamamlanan, setTamamlanan] = useState(0);
   const [musteriSayi, setMusteriSayi] = useState(0);
   const [hizli, setHizli] = useState(hizliOku);
+  const [sonMesajlar, setSonMesajlar] = useState([]);
+  const [gonderilen, setGonderilen] = useState([]);
   const [duzenle, setDuzenle] = useState(false);
 
   const git = (id) => onNavigate && onNavigate(id);
@@ -99,8 +103,11 @@ export default function DashboardPage({ onNavigate, ad }) {
     (async () => {
       const bugun = new Date();
       const ayBas = yerel(new Date(bugun.getFullYear(), bugun.getMonth(), 1));
+      const ucHafta = new Date(); ucHafta.setDate(ucHafta.getDate() - 21);
+      supabase.from('mesaj_kayitlari').select('customer_id, baslik, created_at').gte('created_at', ucHafta.toISOString())
+        .then((r) => setSonMesajlar(r.data || []));
       const [k, t, m] = await Promise.all([
-        supabase.from('maintenance_rules').select('*, equipment(category, equipment_type, customers(name, address))'),
+        supabase.from('maintenance_rules').select('*, equipment(category, equipment_type, customers(id, name, phone, address))'),
         supabase.from('work_orders').select('id', { count: 'exact', head: true }).eq('status', 'tamamlandi').gte('completed_date', ayBas),
         supabase.from('customers').select('id', { count: 'exact', head: true }),
       ]);
@@ -132,6 +139,33 @@ export default function DashboardPage({ onNavigate, ad }) {
   const gorunenHizli = duzenle ? TUM_HIZLI : hizli.map((id) => TUM_HIZLI.find((h) => h.id === id)).filter(Boolean);
   const genis = typeof window !== 'undefined' && window.innerWidth >= 900;
 
+  const mesajAdaylari = kurallar
+    .map((k) => ({ k, g: kalanGun(k.next_due_date), m: k.equipment?.customers }))
+    .filter(({ k, g, m }) => {
+      if (!m?.phone || g > 7 || g < -60 || gonderilen.includes(k.id)) return false;
+      const bakimAd = bakimBul(k.rule_name)?.ad || k.rule_name;
+      return !sonMesajlar.some((x) => x.customer_id === m.id && (String(x.baslik || '').includes(bakimAd) || (Date.now() - new Date(x.created_at)) < 7 * 86400000));
+    })
+    .sort((a, b) => a.g - b.g);
+
+  async function hatirlatmaGonder({ k, m }) {
+    const bakimAd = bakimBul(k.rule_name)?.ad || k.rule_name;
+    const mesaj = kisisel(BILGI_SABLON, m.name, bakimAd);
+    const numara = telefonWa(m.phone);
+    if (!numara) return;
+    window.open(`https://wa.me/${numara}?text=${encodeURIComponent(mesaj)}`, '_blank');
+    setGonderilen((l) => [...l, k.id]);
+    await supabase.from('mesaj_kayitlari').insert([{
+      customer_id: m.id, kanal: 'whatsapp', tur: 'bilgilendirme', baslik: `Bakım hatırlatması · ${bakimAd}`, mesaj, gonderen: ad || '',
+    }]);
+  }
+
+  function uyariAksiyon(hedef) {
+    if (hedef === 'harita') { git('harita'); return; }
+    sessionStorage.setItem('alkaSablon', hedef);
+    git('toplumesaj');
+  }
+
   function aramaGit(q) {
     sessionStorage.setItem('alkaArama', q);
     git('musteriler');
@@ -140,7 +174,7 @@ export default function DashboardPage({ onNavigate, ad }) {
   return (
     <div style={s.sayfa}>
 
-      <HavaKarti onAra={aramaGit} ustuneBin />
+      <HavaKarti onAra={aramaGit} ustuneBin onUyari={uyariAksiyon} />
 
       {/* Ana işlemler */}
       <div style={s.anaIzgara}>
@@ -163,6 +197,46 @@ export default function DashboardPage({ onNavigate, ad }) {
           </button>
         ))}
       </div>
+
+      {/* Bugün mesaj atılacaklar */}
+      <section style={s.kutu}>
+        <div style={s.kutuUst}>
+          <h2 style={s.kutuBaslik}>
+            Mesaj atılacaklar
+            {mesajAdaylari.length > 0 && <span style={s.sayiRozet}>{mesajAdaylari.length}</span>}
+          </h2>
+          <button style={s.linkBtn} onClick={() => git('toplumesaj')}>Toplu Mesaj <SIkon ad="sag" boyut={16} renk="#2563eb" kalin={2.4} /></button>
+        </div>
+        {mesajAdaylari.length === 0 ? (
+          <div style={s.bosKutu}>
+            <IkonKutu ad="tik" renk="#16a34a" boyut={44} yaricap={14} />
+            <div>
+              <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 14.5 }}>Bekleyen hatırlatma yok</div>
+              <div style={{ color: '#64748b', fontSize: 13, marginTop: 2 }}>Bakımı 7 gün içinde gelen müşteriler burada listelenir.</div>
+            </div>
+          </div>
+        ) : (
+          mesajAdaylari.slice(0, 6).map((x, i) => {
+            const kat = KATEGORI_IK[x.k.equipment?.category] || KATEGORI_IK.varsayilan;
+            const ky = kalanYazi(x.g);
+            return (
+              <div key={x.k.id} style={{ ...s.mesajSatir, ...(i === 0 ? { borderTop: 'none' } : {}) }}>
+                <IkonKutu ad={kat.ik} renk={kat.renk} boyut={40} yaricap={12} />
+                <div style={s.bakimOrta}>
+                  <div style={s.bakimAd}>{x.m.name}</div>
+                  <div style={s.bakimKural}>{x.k.rule_name} · <span style={{ color: ky.renk, fontWeight: 700 }}>{ky.yazi}</span></div>
+                </div>
+                <button style={s.waBtn} onClick={() => hatirlatmaGonder(x)}>
+                  <SIkon ad="gonder" boyut={15} renk="#fff" kalin={2.2} /> Gönder
+                </button>
+              </div>
+            );
+          })
+        )}
+        {mesajAdaylari.length > 6 && (
+          <button style={{ ...s.linkBtn, margin: '4px auto 6px' }} onClick={() => git('toplumesaj')}>+{mesajAdaylari.length - 6} kişi daha · Toplu Mesaj'da gönder</button>
+        )}
+      </section>
 
       {/* Yaklaşan Bakımlar */}
       <section style={s.kutu}>
@@ -353,6 +427,13 @@ const s = {
     cursor: 'pointer', minWidth: 0, fontFamily: 'inherit',
   },
   bosKutu: { display: 'flex', alignItems: 'center', gap: 12, padding: '6px 4px 2px' },
+  sayiRozet: { marginLeft: 8, background: '#dc2626', color: '#fff', fontSize: 11.5, fontWeight: 800, borderRadius: 10, padding: '2px 7px', verticalAlign: 2 },
+  mesajSatir: { display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderTop: '1px solid #f1f4f8' },
+  waBtn: {
+    display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, border: 'none', borderRadius: 11, padding: '9px 12px',
+    background: 'linear-gradient(145deg,#22c55e,#16a34a)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer',
+    boxShadow: '0 4px 10px rgba(22,163,74,.3)', fontFamily: 'inherit',
+  },
   istUst: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   selam: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', margin: '2px 2px 12px' },
   selamYazi: { fontSize: 20, fontWeight: 800, color: '#0b1730', letterSpacing: -0.3 },
@@ -547,7 +628,7 @@ function arkaPlan(tip, gece) {
   }
 }
 
-function HavaKarti({ onAra, ustuneBin }) {
+function HavaKarti({ onAra, ustuneBin, onUyari }) {
   const [aramaYazi, setAramaYazi] = useState('');
   const [veri, setVeri] = useState(null);
   const [hata, setHata] = useState(false);
@@ -614,7 +695,10 @@ function HavaKarti({ onAra, ustuneBin }) {
     </div>
   );
 
-  if (!acik) return <div style={{ marginBottom: 12 }}><style>{HAVA_CSS}</style>{aramaKarti}</div>;
+  const uyarilar = veri ? havaUyarilari(veri) : [];
+  const uyariAlani = uyarilar.length > 0 && <HavaUyari liste={uyarilar} onUyari={onUyari} />;
+
+  if (!acik) return <div style={{ marginBottom: 12 }}><style>{HAVA_CSS}</style>{aramaKarti}{uyariAlani}</div>;
 
  if (!veri) {
     return (
@@ -711,6 +795,7 @@ function HavaKarti({ onAra, ustuneBin }) {
   return (
     <>
     {aramaKarti}
+    {uyariAlani}
     <div style={{ height: 12 }} />
     <section className="hv-kart" style={{ background: arkaPlan(anlikTip, anlikGece) }}>
       <style>{HAVA_CSS}</style>
@@ -834,7 +919,57 @@ function HavaKarti({ onAra, ustuneBin }) {
   );
 }
 
+function havaUyarilari(veri) {
+  const d = veri.daily;
+  const sonuc = [];
+  const gunAdi = (i) => (i === 0 ? 'bugün' : i === 1 ? 'yarın' : GUN_TAM[new Date(d.time[i] + 'T00:00:00').getDay()]);
+  const ay = new Date().getMonth();
+  const ilk = (sart, n = 4) => { for (let i = 0; i < Math.min(n, d.time.length); i++) if (sart(i)) return i; return -1; };
+
+  let i = ilk((x) => d.temperature_2m_min[x] <= 2, 5);
+  if (i >= 0) sonuc.push({ id: 'don', ik: 'kar', renk: '#2563eb', baslik: `Don riski: ${gunAdi(i)} gece ${Math.round(d.temperature_2m_min[i])}°`,
+    metin: 'Açıktaki borular, hidrofor tankı ve sulama hatları donabilir. Kış kontrolü için müşterilere haber ver.', aksiyon: 'Kış kontrolü mesajı', hedef: 'Kış öncesi kontrol' });
+  else {
+    i = ilk((x) => d.temperature_2m_min[x] <= 7, 7);
+    if (i >= 0 && (ay >= 9 || ay <= 2)) sonuc.push({ id: 'soguk', ik: 'kar', renk: '#0284c7', baslik: `Soğuklar başlıyor: ${gunAdi(i)} ${Math.round(d.temperature_2m_min[i])}°`,
+      metin: 'Sulama sistemlerinin boşaltılıp kapatılma zamanı. Müşterilere hatırlatma gönderebilirsin.', aksiyon: 'Sulama kapanış mesajı', hedef: 'Sulama sezon kapanışı ve boşaltma' });
+  }
+  i = ilk((x) => (d.wind_speed_10m_max?.[x] ?? 0) >= 45);
+  if (i >= 0) sonuc.push({ id: 'ruzgar', ik: 'ruzgar', renk: '#7c3aed', baslik: `Kuvvetli rüzgâr: ${gunAdi(i)} ${Math.round(d.wind_speed_10m_max[i])} km/sa`,
+    metin: 'Havuzlara yaprak ve toz dolar, ön filtre sepetleri tıkanabilir.', aksiyon: 'Filtre sepeti mesajı', hedef: 'Pompa ön filtre sepeti temizliği' });
+  i = ilk((x) => d.temperature_2m_max[x] >= 33);
+  if (i >= 0) sonuc.push({ id: 'sicak', ik: 'gunes', renk: '#ea580c', baslik: `Sıcak hava: ${gunAdi(i)} ${Math.round(d.temperature_2m_max[i])}°`,
+    metin: 'Havuzlarda klor tüketimi ve yosun riski artar. Su analizi zamanı.', aksiyon: 'Su analizi mesajı', hedef: 'Su analizi (pH / klor)' });
+  i = ilk((x) => (d.precipitation_probability_max?.[x] ?? 0) >= 70, 3);
+  if (i >= 0) sonuc.push({ id: 'yagmur', ik: 'yagmur', renk: '#475569', baslik: `Yağış bekleniyor: ${gunAdi(i)} %${d.precipitation_probability_max[i]}`,
+    metin: 'Dış saha işlerini buna göre planla.', aksiyon: 'Rotayı aç', hedef: 'harita' });
+  return sonuc.slice(0, 3);
+}
+
+function HavaUyari({ liste, onUyari }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
+      {liste.map((u) => (
+        <div key={u.id} style={{ ...hs.uyari, borderLeft: `4px solid ${u.renk}` }}>
+          <IkonKutu ad={u.ik} renk={u.renk} boyut={38} yaricap={11} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: '#0b1730' }}>{u.baslik}</div>
+            <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 2, lineHeight: 1.4 }}>{u.metin}</div>
+            {onUyari && (
+              <button style={{ ...hs.uyariBtn, color: u.renk, background: `${u.renk}14` }} onClick={() => onUyari(u.hedef)}>
+                {u.aksiyon} <SIkon ad="sag" boyut={14} kalin={2.4} />
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const hs = {
+  uyari: { display: 'flex', alignItems: 'flex-start', gap: 10, background: '#fff', borderRadius: 16, padding: '10px 10px 10px 12px', boxShadow: '0 1px 2px rgba(16,24,40,.04), 0 6px 18px rgba(16,24,40,.06)', flexWrap: 'wrap' },
+  uyariBtn: { display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 8, border: 'none', borderRadius: 10, padding: '7px 10px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' },
   aramaKart: {
     position: 'relative', zIndex: 3, display: 'flex', alignItems: 'center', gap: 10, background: '#fff', borderRadius: 20,
     padding: '0 10px 0 16px', height: 66, boxShadow: '0 10px 28px rgba(15,45,74,0.16)',
