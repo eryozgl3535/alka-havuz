@@ -231,10 +231,13 @@ function AnaUygulama() {
           <div style={{ position: 'fixed', inset: 0, left: 260, zIndex: 0, background: arkaCss }} />
           <div style={{ position: 'relative', zIndex: 1 }}>
           {sayfa === 'anasayfa' ? (
-            <header style={{ ...s.masaHero, background: baslikZemin.replace('right center / cover', 'right 72% / cover') }}>
-              <div style={s.masaHeroIc}>
+            <div style={s.masaHeroSar}>
+              <header style={{ ...s.masaHero, background: baslikZemin.replace('right center / cover', 'right 62% / cover') }}>
                 <div style={s.masaHeroUst}>
-                  <span />
+                  <div style={s.masaLogoAlan}>
+                    <img src="/logo-alka.png" alt="ALKA" style={s.masaLogo} />
+                    <span style={s.masaLogoYazi}>{altBaslikYazi}</span>
+                  </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <button style={s.masaHeroZil} onClick={() => git('takvim')} title="Gecikmiş bakımlar">
                       <SIkon ad="zil" boyut={20} renk="#fff" />
@@ -245,8 +248,8 @@ function AnaUygulama() {
                 </div>
                 <div style={s.masaSelam}>{selamMetni()}, {String(ad).split(' ')[0]} 👋</div>
                 <div style={s.masaTarih}>{tarihMetni()}</div>
-              </div>
-            </header>
+              </header>
+            </div>
           ) : (
           <header style={s.ustCubuk}>
             <form onSubmit={aramaYap} style={s.aramaKutu}>
@@ -436,11 +439,14 @@ const s = {
     borderRadius: 10, padding: '8px 10px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
   },
   masaHero: {
-    position: 'relative', padding: '22px 32px 92px', borderRadius: '0 0 30px 30px', minHeight: 230,
-    boxShadow: '0 10px 30px rgba(6,40,72,0.25)', color: '#fff',
+    position: 'relative', padding: '24px 28px 80px', borderRadius: 28, minHeight: 300, boxSizing: 'border-box',
+    boxShadow: '0 14px 34px rgba(6,40,72,0.28)', color: '#fff', overflow: 'hidden',
   },
-  masaHeroIc: { maxWidth: 900, margin: '0 auto' },
-  masaHeroUst: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
+  masaHeroSar: { maxWidth: 928, margin: '0 auto', padding: '18px 14px 0', boxSizing: 'border-box' },
+  masaLogoAlan: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start' },
+  masaLogo: { height: 64, width: 'auto', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.4))' },
+  masaLogoYazi: { marginTop: 5, fontSize: 11, fontWeight: 800, letterSpacing: 2, color: '#e2e8f0', textShadow: '0 1px 4px rgba(0,0,0,.4)' },
+  masaHeroUst: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 },
   masaHeroArama: {
     flex: 1, maxWidth: 520, display: 'flex', alignItems: 'center', gap: 10, margin: 0, borderRadius: 14, padding: '0 16px',
     background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.25)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
@@ -450,7 +456,7 @@ const s = {
     position: 'relative', width: 46, height: 46, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(15,30,55,0.5)',
     display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, backdropFilter: 'blur(6px)',
   },
-  masaSelam: { marginTop: 96, fontSize: 32, fontWeight: 800, letterSpacing: -0.5, textShadow: '0 2px 10px rgba(0,0,0,.35)' },
+  masaSelam: { marginTop: 56, fontSize: 30, fontWeight: 800, letterSpacing: -0.5, textShadow: '0 2px 10px rgba(0,0,0,.35)' },
   masaTarih: { marginTop: 6, fontSize: 16, opacity: 0.88, fontWeight: 500, textShadow: '0 1px 6px rgba(0,0,0,.35)' },
   ustCubuk: {
     position: 'sticky', top: 0, zIndex: 15, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
