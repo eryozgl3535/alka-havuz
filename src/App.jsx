@@ -89,8 +89,9 @@ function AnaUygulama() {
   const tema = useTema();
   const [bR1, bR2] = baslikRenk(tema);
   const arkaCss = arkaPlanCss(tema);
-  const baslikZemin = tema.baslikFoto
-    ? `linear-gradient(90deg, rgba(5,20,40,.82) 0%, rgba(5,20,40,.45) 55%, rgba(5,20,40,.15) 100%), linear-gradient(180deg, rgba(5,20,40,.55) 0%, rgba(5,20,40,0) 35%), url(${tema.baslikFoto}) center / cover no-repeat`
+  const baslikFotoUrl = tema.baslikFoto === 'yok' ? null : (tema.baslikFoto || '/hero-alka.jpg');
+  const baslikZemin = baslikFotoUrl
+    ? `linear-gradient(90deg, rgba(5,20,40,.78) 0%, rgba(5,20,40,.42) 50%, rgba(5,20,40,.08) 100%), linear-gradient(180deg, rgba(5,20,40,.45) 0%, rgba(5,20,40,0) 30%, rgba(5,20,40,0) 70%, rgba(5,20,40,.35) 100%), url(${baslikFotoUrl}) right center / cover no-repeat, ${bR1}`
     : `radial-gradient(60% 55% at 85% 25%, rgba(255,214,140,0.18) 0%, transparent 70%),` +
       `radial-gradient(80% 60% at 70% 115%, rgba(56,189,248,0.55) 0%, transparent 65%),` +
       `radial-gradient(40% 30% at 10% 105%, rgba(14,165,233,0.35) 0%, transparent 70%),` +
