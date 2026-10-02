@@ -330,6 +330,9 @@ function kisisel(metin, ad, konu) {
     .replace(/\{periyot\}/g, b?.periyot || 'düzenli aralıklarla');
 }
 
+const AY_ADLARI = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+const trTarihUzun = (t) => { const d = new Date(t + 'T00:00:00'); return `${d.getDate()} ${AY_ADLARI[d.getMonth()]} ${d.getFullYear()}`; };
+
 const trSaat = (t) => new Date(t).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
 function enYakinBakim(m) {
@@ -434,6 +437,59 @@ function BakimSecici({ baslik, mevcut, onSec, onKapat }) {
   );
 }
 
+const DURUMLAR = [
+  { id: 'bekliyor', ad: 'Yanıt bekleniyor', ikon: '⏳', renk: '#92400e', zemin: '#fef3c7' },
+  { id: 'dondu', ad: 'Dönüş yaptı', ikon: '💬', renk: '#1e40af', zemin: '#dbeafe' },
+  { id: 'randevu', ad: 'Randevu alındı', ikon: '📅', renk: '#6d28d9', zemin: '#ede9fe' },
+  { id: 'basladi', ad: 'Bakım başladı', ikon: '🔧', renk: '#c2410c', zemin: '#ffedd5' },
+  { id: 'yapildi', ad: 'Bakım yapıldı', ikon: '✅', renk: '#166534', zemin: '#dcfce7' },
+  { id: 'istemiyor', ad: 'İlgilenmiyor', ikon: '✖️', renk: '#475569', zemin: '#f1f5f9' },
+];
+const TAKIP_SEKMELER = [
+  { id: 'bekleyen', ad: 'Bekleyen', durumlar: ['bekliyor'] },
+  { id: 'gorusulen', ad: 'Görüşülen', durumlar: ['dondu', 'randevu', 'basladi'] },
+  { id: 'tamam', ad: 'Tamamlanan', durumlar: ['yapildi', 'istemiyor'] },
+  { id: 'hepsi', ad: 'Tümü', durumlar: null },
+];
+const GRUP_KATEGORI = { 'Hidrofor & Kuyu': 'Hidrofor', Havuz: 'Havuz', Sulama: 'Sulama', Genel: 'Tesisat' };
+
+function kayitDurum(k) {
+  if (k.durum) return k.durum;
+  if (typeof k.tur === 'string' && k.tur.startsWith('durum:')) return k.tur.slice(6);
+  return 'bekliyor';
+}
+
+function kayitBakim(k) {
+  const parca = String(k.baslik || '').split(' · ');
+  const aday = parca[parca.length - 1];
+  return bakimBul(aday) ? bakimBul(aday).ad : (parca.length > 1 ? aday : '');
+}
+
+function periyotAy(b) {
+  const p = String(b?.periyot || '').toLocaleLowerCase('tr-TR');
+  let m = p.match(/(\d+)\s*yılda/);
+  if (m) return Number(m[1]) * 12;
+  m = p.match(/(\d+)\s*ayda/);
+  if (m) return Number(m[1]);
+  if (p.includes('yılda') || p.includes('her yıl')) return 12;
+  if (p.includes('ayda')) return 1;
+  return 12;
+}
+
+function ayEkle(tarihStr, ay) {
+  const d = new Date(tarihStr + 'T00:00:00');
+  d.setMonth(d.getMonth() + ay);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function bakimMetni(b) {
+  // {ad} müşteriye göre dolar, geri kalanı seçilen bakımın hazır metni
+  return BILGI_SABLON
+    .replace(/\{bakim\}/g, b.ad)
+    .replace(/\{aciklama\}/g, bakimAciklama(b))
+    .replace(/\{periyot\}/g, b.periyot);
+}
+
 const bosYeni = { ad: '', tel: '', adres: '', konu: '', konuDiger: '' };
 
 export default function TopluMesajPage() {
@@ -450,6 +506,11 @@ export default function TopluMesajPage() {
   const [baslik, setBaslik] = useState('Bakım hatırlatması (bilgilendirici)');
   const [metin, setMetin] = useState(BILGI_SABLON);
   const [sablonAd, setSablonAd] = useState(SABLONLAR[0].ad);
+  const [sablonBakim, setSablonBakim] = useState('');
+  const [takipSekme, setTakipSekme] = useState('bekleyen');
+  const [acikKayit, setAcikKayit] = useState(null);
+  const [takipMesaj, setTakipMesaj] = useState(null);
+  const [isleniyor, setIsleniyor] = useState(false);
   const [haric, setHaric] = useState([]);
   const [konular, setKonular] = useState({});
   const [secici, setSecici] = useState(null); // { id } tek müşteri, { toplu: true } hepsi
@@ -469,9 +530,9 @@ export default function TopluMesajPage() {
         .select('id, name, phone, address, equipment(category, maintenance_rules(rule_name, next_due_date, active)), gelisler(gelis_tarihi, durum)')
         .order('name', { ascending: true }),
       supabase.from('mesaj_kayitlari')
-        .select('*, customers(name)')
+        .select('*, customers(name, phone)')
         .order('created_at', { ascending: false })
-        .limit(15),
+        .limit(80),
       supabase.auth.getUser(),
     ]);
     if (m.error) setHata(m.error.message);
@@ -511,7 +572,7 @@ export default function TopluMesajPage() {
   const telefonsuz = eslesenler.filter((m) => !telefonWa(m.phone));
   const uygunlar = eslesenler.filter((m) => telefonWa(m.phone));
   const alicilar = uygunlar.filter((m) => !haric.includes(m.id));
-  const konuBul = (m) => (konular[m.id] !== undefined ? konular[m.id] : enYakinBakim(m));
+  const konuBul = (m) => (sablonBakim || (konular[m.id] !== undefined ? konular[m.id] : enYakinBakim(m)));
   const bakimsizSayi = alicilar.filter((m) => !konuBul(m)).length;
 
   function bakimSecildi(ad) {
@@ -526,11 +587,89 @@ export default function TopluMesajPage() {
   }
 
   function sablonSec(ad) {
+    const b = BAKIMLAR.find((x) => x.ad === ad);
+    if (b) {
+      setMetin(bakimMetni(b));
+      setBaslik('Bakım hatırlatması');
+      setSablonAd(b.ad);
+      setSablonBakim(b.ad);
+      return;
+    }
     const sb = SABLONLAR.find((x) => x.ad === ad);
     if (!sb) return;
     setMetin(sb.metin);
     setBaslik(sb.ad);
     setSablonAd(sb.ad);
+    setSablonBakim('');
+  }
+
+  async function durumYaz(k, durum) {
+    let { error } = await supabase.from('mesaj_kayitlari').update({ durum }).eq('id', k.id);
+    if (error) ({ error } = await supabase.from('mesaj_kayitlari').update({ tur: 'durum:' + durum }).eq('id', k.id));
+    if (error) throw new Error(error.message);
+    setKayitlar((liste) => liste.map((x) => (x.id === k.id ? { ...x, durum, tur: 'durum:' + durum } : x)));
+  }
+
+  async function durumDegis(k, durum) {
+    setTakipMesaj(null);
+    if (durum === 'yapildi') { await bakimYapildi(k); return; }
+    try {
+      await durumYaz(k, durum);
+      setAcikKayit(null);
+    } catch (e) {
+      setTakipMesaj({ tur: 'hata', yazi: 'Durum kaydedilemedi: ' + e.message });
+    }
+  }
+
+  async function bakimYapildi(k) {
+    const b = bakimBul(kayitBakim(k));
+    const ad = k.customers?.name || 'Müşteri';
+    if (!window.confirm(b
+      ? `${ad} için "${b.ad}" yapıldı olarak işaretlensin mi?\n\nSonraki bakım tarihi otomatik hesaplanacak (${b.periyot}).`
+      : `${ad} için bakım yapıldı olarak işaretlensin mi?`)) return;
+    setIsleniyor(true);
+    try {
+      let sonuc = '';
+      if (b && k.customer_id) {
+        const bugun = gunEkle(0);
+        const ay = periyotAy(b);
+        const sonraki = ayEkle(bugun, ay);
+        const { data: cihazlar, error: cHata } = await supabase.from('equipment')
+          .select('id, category, maintenance_rules(id, rule_name)').eq('customer_id', k.customer_id);
+        if (cHata) throw new Error(cHata.message);
+        let kural = null;
+        (cihazlar || []).forEach((c) => (c.maintenance_rules || []).forEach((r) => {
+          if (!kural && bakimBul(r.rule_name)?.ad === b.ad) kural = r;
+        }));
+        if (kural) {
+          const { error } = await supabase.from('maintenance_rules')
+            .update({ last_service_date: bugun, next_due_date: sonraki, active: true }).eq('id', kural.id);
+          if (error) throw new Error(error.message);
+        } else {
+          let cihaz = (cihazlar || []).find((c) => c.category === GRUP_KATEGORI[b.grup]) || (cihazlar || [])[0];
+          if (!cihaz) {
+            const { data: yeniC, error } = await supabase.from('equipment')
+              .insert([{ customer_id: k.customer_id, category: GRUP_KATEGORI[b.grup], equipment_type: b.grup }]).select().single();
+            if (error) throw new Error('Müşteriye cihaz eklenemedi (' + error.message + '). Müşteri kartından cihaz ekleyip tekrar deneyin.');
+            cihaz = yeniC;
+          }
+          const { error } = await supabase.from('maintenance_rules').insert([{
+            equipment_id: cihaz.id, rule_name: b.ad, period_months: ay, last_service_date: bugun, next_due_date: sonraki, active: true,
+          }]);
+          if (error) throw new Error(error.message);
+        }
+        const gun = Math.round((new Date(sonraki) - new Date(bugun)) / 86400000);
+        sonuc = ` Sonraki ${b.ad}: ${trTarihUzun(sonraki)} (${gun} gün sonra). Bakım takvimine işlendi.`;
+      } else {
+        sonuc = ' Bakım türü belirtilmediği için takvim sayacı güncellenmedi.';
+      }
+      await durumYaz(k, 'yapildi');
+      setAcikKayit(null);
+      setTakipMesaj({ tur: 'ok', yazi: `✅ ${ad}: bakım tamamlandı.${sonuc}` });
+    } catch (e) {
+      setTakipMesaj({ tur: 'hata', yazi: e.message });
+    }
+    setIsleniyor(false);
   }
 
   function haricDegistir(id) {
@@ -700,9 +839,23 @@ export default function TopluMesajPage() {
         <div style={s.bolum}>2. Mesaj</div>
         <label style={s.etiket}>Hazır şablon
           <select style={s.input} value={sablonAd} onChange={(e) => sablonSec(e.target.value)}>
-            {SABLONLAR.map((sb) => <option key={sb.ad} value={sb.ad}>{sb.ad}</option>)}
+            <optgroup label="📋 Genel mesajlar">
+              {SABLONLAR.map((sb) => <option key={sb.ad} value={sb.ad}>{sb.ad}</option>)}
+            </optgroup>
+            {GRUPLAR.map((g) => (
+              <optgroup key={g} label={`${GRUP_IKON[g]} ${g} bakım mesajları`}>
+                {BAKIMLAR.filter((b) => b.grup === g).map((b) => <option key={b.ad} value={b.ad}>{b.ad}</option>)}
+              </optgroup>
+            ))}
           </select>
         </label>
+        {sablonBakim && (
+          <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', borderRadius: 10,
+            padding: '10px 12px', fontSize: 13, lineHeight: 1.5, marginTop: 8 }}>
+            {GRUP_IKON[bakimBul(sablonBakim)?.grup]} <b>{sablonBakim}</b> mesajı seçili. Tüm alıcılara bu bakım için gönderilir;
+            mesajdaki isim her kişiye göre otomatik değişir. Metni aşağıdan düzenleyebilirsin.
+          </div>
+        )}
         {SABLONLAR.find((x) => x.ad === sablonAd)?.bilgi && (
           <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1e3a5f', borderRadius: 10,
             padding: '10px 12px', fontSize: 13, lineHeight: 1.5, marginTop: 8 }}>
@@ -774,7 +927,12 @@ export default function TopluMesajPage() {
           <div style={s.uyari}>📵 {telefonsuz.length} müşterinin telefonu kayıtlı olmadığı için listede yok.</div>
         )}
 
-        {uygunlar.length > 0 && (
+        {sablonBakim && uygunlar.length > 0 && (
+          <div style={{ ...s.topluBar, background: '#ecfdf5', borderColor: '#a7f3d0' }}>
+            <div style={{ fontSize: 13.5, color: '#065f46' }}>{GRUP_IKON[bakimBul(sablonBakim)?.grup]} Herkese <b>{sablonBakim}</b> mesajı gidecek.</div>
+          </div>
+        )}
+        {!sablonBakim && uygunlar.length > 0 && (
           <div style={s.topluBar}>
             <div style={{ flex: '1 1 200px', minWidth: 0 }}>
               <div style={{ fontWeight: 800, color: '#0f2d4a', fontSize: 14 }}>Bakım konusu</div>
@@ -798,7 +956,7 @@ export default function TopluMesajPage() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={s.aliciAd}>{m.name}{elleEklenen.includes(m.id) && <span style={s.yeniRozet}>elle eklendi</span>}</div>
                 <div style={{ ...s.soluk, fontSize: 13 }}>{m.phone}{m.address ? ` · ${m.address}` : ''}</div>
-                <button style={konu ? s.konuCip : s.konuCipBos} onClick={() => setSecici({ id: m.id, ad: m.name })} disabled={!dahil}>
+                {!sablonBakim && <button style={konu ? s.konuCip : s.konuCipBos} onClick={() => setSecici({ id: m.id, ad: m.name })} disabled={!dahil}>
                   {konu ? (
                     <>
                       <span style={{ fontSize: 16 }}>{GRUP_IKON[b?.grup] || '🔧'}</span>
@@ -815,7 +973,7 @@ export default function TopluMesajPage() {
                       <span>›</span>
                     </>
                   )}
-                </button>
+                </button>}
               </div>
             </div>
           );
@@ -824,17 +982,60 @@ export default function TopluMesajPage() {
       </div>
 
       <div style={s.kart}>
-        <div style={s.bolum}>🕘 Son gönderilen mesajlar</div>
-        {kayitlar.length === 0 ? (
-          <p style={s.soluk}>Henüz kayıt yok.</p>
-        ) : (
-          kayitlar.map((k) => (
-            <div key={k.id} style={s.kayitSatir}>
-              <span style={{ flex: 1 }}><b>{k.customers?.name || '-'}</b> · {k.baslik || 'Mesaj'}</span>
-              <span style={s.soluk}>{trSaat(k.created_at)}{k.gonderen ? ` · ${k.gonderen}` : ''}</span>
-            </div>
-          ))
+        <div style={s.bolum}>4. Yanıt takibi</div>
+        <p style={{ ...s.soluk, marginTop: -4, marginBottom: 12 }}>
+          Mesaj gönderdiğin müşterilerden dönüş gelince buradan işaretle. <b>✅ Bakım yapıldı</b> dediğinde o bakımın bir sonraki tarihi otomatik hesaplanıp takvime işlenir.
+        </p>
+        <div style={s.sekmeler}>
+          {TAKIP_SEKMELER.map((t) => {
+            const sayi = kayitlar.filter((k) => !t.durumlar || t.durumlar.includes(kayitDurum(k))).length;
+            return (
+              <button key={t.id} onClick={() => setTakipSekme(t.id)} style={{ ...s.sekme, ...(takipSekme === t.id ? s.sekmeAktif : {}) }}>
+                {t.ad} <span style={s.sekmeSayi}>{sayi}</span>
+              </button>
+            );
+          })}
+        </div>
+        {takipMesaj && (
+          <div style={{ ...(takipMesaj.tur === 'ok' ? s.takipOk : s.takipHata), marginBottom: 10 }}>{takipMesaj.yazi}</div>
         )}
+        {(() => {
+          const sekme = TAKIP_SEKMELER.find((t) => t.id === takipSekme);
+          const liste = kayitlar.filter((k) => !sekme.durumlar || sekme.durumlar.includes(kayitDurum(k)));
+          if (!liste.length) return <p style={s.soluk}>Bu bölümde kayıt yok.</p>;
+          return liste.map((k) => {
+            const d = DURUMLAR.find((x) => x.id === kayitDurum(k)) || DURUMLAR[0];
+            const bakim = kayitBakim(k);
+            const acik = acikKayit === k.id;
+            return (
+              <div key={k.id} style={s.takipSatir}>
+                <button style={s.takipUst} onClick={() => setAcikKayit(acik ? null : k.id)}>
+                  <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                    <div style={{ fontWeight: 700, color: '#0f2d4a', fontSize: 15 }}>{k.customers?.name || '-'}</div>
+                    <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 2 }}>
+                      {bakim ? `${GRUP_IKON[bakimBul(bakim)?.grup] || '🔧'} ${bakim}` : (k.baslik || 'Mesaj')} · {trSaat(k.created_at)}
+                    </div>
+                  </div>
+                  <span style={{ ...s.durumRozet, color: d.renk, background: d.zemin }}>{d.ikon} {d.ad}</span>
+                </button>
+                {acik && (
+                  <div style={s.durumIzgara}>
+                    {DURUMLAR.map((x) => (
+                      <button key={x.id} disabled={isleniyor} onClick={() => durumDegis(k, x.id)}
+                        style={{ ...s.durumBtn, color: x.renk, background: x.zemin, ...(x.id === d.id ? { boxShadow: `inset 0 0 0 2px ${x.renk}` } : {}),
+                          ...(x.id === 'yapildi' ? { gridColumn: '1 / -1', fontSize: 14.5, padding: '12px' } : {}) }}>
+                        {x.ikon} {x.id === 'yapildi' && bakim ? `${bakim} yapıldı` : x.ad}
+                      </button>
+                    ))}
+                    {k.customers?.phone && (
+                      <a href={`https://wa.me/${telefonWa(k.customers.phone)}`} target="_blank" rel="noreferrer" style={s.waLink}>WhatsApp'tan yaz</a>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          });
+        })()}
       </div>
       {secici && (
         <BakimSecici
@@ -870,6 +1071,18 @@ const s = {
   aliciSatir: { display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 0', borderTop: '1px solid #eef2f6' },
   aliciAd: { fontWeight: 700, color: '#0f2d4a' },
   yeniRozet: { marginLeft: 8, fontSize: 11, background: '#ede9fe', color: '#6d28d9', padding: '2px 8px', borderRadius: 10, fontWeight: 700 },
+  sekmeler: { display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 12, paddingBottom: 2 },
+  sekme: { flexShrink: 0, border: '1px solid #e2e8f0', background: '#fff', color: '#475569', borderRadius: 20, padding: '7px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  sekmeAktif: { background: '#0f2d4a', color: '#fff', borderColor: '#0f2d4a' },
+  sekmeSayi: { marginLeft: 4, opacity: 0.75, fontWeight: 600 },
+  takipSatir: { borderTop: '1px solid #eef2f6' },
+  takipUst: { display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '12px 0', border: 'none', background: 'none', cursor: 'pointer' },
+  durumRozet: { fontSize: 12, fontWeight: 700, borderRadius: 20, padding: '5px 10px', whiteSpace: 'nowrap', flexShrink: 0 },
+  durumIzgara: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '0 0 14px' },
+  durumBtn: { border: 'none', borderRadius: 12, padding: '10px 8px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer' },
+  waLink: { gridColumn: '1 / -1', textAlign: 'center', color: '#15803d', fontWeight: 700, fontSize: 13.5, padding: 8, textDecoration: 'none', border: '1px solid #bbf7d0', borderRadius: 12, background: '#f0fdf4' },
+  takipOk: { background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', borderRadius: 12, padding: 12, fontSize: 13.5, lineHeight: 1.5 },
+  takipHata: { background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: 12, padding: 12, fontSize: 13.5, lineHeight: 1.5 },
   topluBar: {
     display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', background: '#f0f6ff', border: '1px solid #cfe0fb',
     borderRadius: 12, padding: '10px 12px', margin: '8px 0 4px',
