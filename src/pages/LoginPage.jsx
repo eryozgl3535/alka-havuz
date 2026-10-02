@@ -28,10 +28,11 @@ export default function LoginPage() {
       <form onSubmit={girisYap} style={s.kart}>
         <div style={s.logoAlan}>
           <div style={s.logoCerceve}>
-            <img src="/logopng.jpg" alt="ALKA Havuz" style={s.logo} />
+            <img src="/logo-alka.png" alt="ALKA" style={s.logo} />
+            <div style={s.logoYazi}>MEKANİK VE HAVUZ SİSTEMLERİ</div>
           </div>
-          <h1 style={s.baslik}>ALKA Tesisat</h1>
-          <p style={s.altBaslik}>Operasyon Sistemi</p>
+          <h1 style={s.baslik}>Hoş geldiniz</h1>
+          <p style={s.altBaslik}>Operasyon sistemine giriş yapın</p>
         </div>
 
         <label style={s.etiket}>Kullanıcı adı</label>
@@ -66,7 +67,7 @@ export default function LoginPage() {
           {yukleniyor ? 'Giriş yapılıyor...' : 'Giriş Yap'}
         </button>
 
-        <div style={s.alt}>ALKA Havuz · 0533 371 39 35</div>
+        <div style={s.alt}>ALKA Mekanik ve Havuz Sistemleri<br />0533 371 39 35</div>
 
         <div style={s.imzaSatir}>
           <EraiImza boyut={15} />
@@ -88,11 +89,16 @@ const s = {
   },
   logoAlan: { display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 26 },
   logoCerceve: {
-    width: 230, height: 230, maxWidth: '70vw', maxHeight: '70vw', borderRadius: 28, overflow: 'hidden',
-    background: '#0b1a2e', boxShadow: '0 10px 30px rgba(15,45,74,0.35)',
+    width: '100%', maxWidth: 300, borderRadius: 24, overflow: 'hidden', boxSizing: 'border-box',
+    padding: '26px 22px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center',
+    background:
+      'radial-gradient(ellipse at 50% 130%, rgba(56,189,248,0.45) 0%, transparent 60%),' +
+      'linear-gradient(180deg,#0b2a4a 0%,#0a2440 55%,#063a63 100%)',
+    boxShadow: '0 12px 30px rgba(11,42,74,0.35)',
   },
-  logo: { width: '100%', height: '100%', objectFit: 'contain', display: 'block' },
-  baslik: { margin: '18px 0 2px', fontSize: 26, color: '#0f2d4a' },
+  logo: { width: '86%', height: 'auto', display: 'block', filter: 'drop-shadow(0 6px 14px rgba(0,0,0,0.35))' },
+  logoYazi: { marginTop: 12, color: '#e2e8f0', fontSize: 10.5, fontWeight: 800, letterSpacing: 1.5, textAlign: 'center', whiteSpace: 'nowrap' },
+  baslik: { margin: '20px 0 2px', fontSize: 24, color: '#0f2d4a' },
   altBaslik: { margin: 0, color: '#64748b', fontSize: 15 },
   etiket: { display: 'block', fontSize: 14, fontWeight: 600, color: '#334155', marginBottom: 6 },
   input: {
