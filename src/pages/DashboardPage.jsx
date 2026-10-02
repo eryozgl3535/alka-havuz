@@ -555,7 +555,7 @@ function HavaKarti({ onAra, ustuneBin }) {
   const [guncel, setGuncel] = useState(null);
   const [secili, setSecili] = useState(0);
   const [simdi, setSimdi] = useState(new Date());
-  const [acik, setAcik] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 900);
+  const [acik, setAcik] = useState(false);
   const saatRef = useRef(null);
 
   async function getir() {
