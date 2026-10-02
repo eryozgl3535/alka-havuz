@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabase';
 import { ARKA_PLANLAR, BASLIK_RENKLERI, useTema, temaKaydet, temaSifirla, arkaPlanCss, fotoKucult } from '../tema';
-import EraiImza from '../components/EraiImza.jsx';
 
 const YETKILI = ['Patron', 'Sistem Yöneticisi'];
 const ROLLER = ['Patron', 'Sistem Yöneticisi', 'Çalışan'];
@@ -341,10 +340,6 @@ export default function SettingsPage({ session }) {
         <div style={s.bilgiSatir}><span>Uygulama</span><b>ALKA Operasyon Sistemi</b></div>
         <div style={s.bilgiSatir}><span>Sürüm</span><b>1.0</b></div>
         <div style={s.bilgiSatir}><span>Firma</span><b>ALKA Mekanik ve Havuz Sistemleri · 0533 371 39 35</b></div>
-        <div style={{ ...s.bilgiSatir, alignItems: 'center' }}>
-          <span>Geliştirici</span>
-          <EraiImza boyut={14} />
-        </div>
         <button style={s.cikisBtn} onClick={cikisYap}>Çıkış Yap</button>
       </div>
     </div>
