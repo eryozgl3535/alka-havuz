@@ -621,6 +621,25 @@ export default function TopluMesajPage() {
     }
   }
 
+  async function kayitSil(k) {
+    if (!window.confirm(`${k.customers?.name || 'Bu'} kaydı listeden silinsin mi?`)) return;
+    const { error } = await supabase.from('mesaj_kayitlari').delete().eq('id', k.id);
+    if (error) { setTakipMesaj({ tur: 'hata', yazi: 'Silinemedi: ' + error.message }); return; }
+    setKayitlar((liste) => liste.filter((x) => x.id !== k.id));
+    setAcikKayit(null);
+  }
+
+  async function listeTemizle(liste, sekmeAd) {
+    if (!liste.length) return;
+    if (!window.confirm(`"${sekmeAd}" bölümündeki ${liste.length} kayıt silinsin mi? Bu işlem geri alınamaz.`)) return;
+    const idler = liste.map((k) => k.id);
+    const { error } = await supabase.from('mesaj_kayitlari').delete().in('id', idler);
+    if (error) { setTakipMesaj({ tur: 'hata', yazi: 'Silinemedi: ' + error.message }); return; }
+    setKayitlar((l) => l.filter((x) => !idler.includes(x.id)));
+    setAcikKayit(null);
+    setTakipMesaj({ tur: 'ok', yazi: `🗑 ${idler.length} kayıt silindi.` });
+  }
+
   async function bakimYapildi(k) {
     const b = bakimBul(kayitBakim(k));
     const ad = k.customers?.name || 'Müşteri';
@@ -1003,7 +1022,11 @@ export default function TopluMesajPage() {
           const sekme = TAKIP_SEKMELER.find((t) => t.id === takipSekme);
           const liste = kayitlar.filter((k) => !sekme.durumlar || sekme.durumlar.includes(kayitDurum(k)));
           if (!liste.length) return <p style={s.soluk}>Bu bölümde kayıt yok.</p>;
-          return liste.map((k) => {
+          return [
+            <div key="temizle" style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+              <button style={s.temizleBtn} onClick={() => listeTemizle(liste, sekme.ad)}>🗑 Bu listeyi temizle ({liste.length})</button>
+            </div>,
+            ...liste.map((k) => {
             const d = DURUMLAR.find((x) => x.id === kayitDurum(k)) || DURUMLAR[0];
             const bakim = kayitBakim(k);
             const acik = acikKayit === k.id;
@@ -1030,11 +1053,13 @@ export default function TopluMesajPage() {
                     {k.customers?.phone && (
                       <a href={`https://wa.me/${telefonWa(k.customers.phone)}`} target="_blank" rel="noreferrer" style={s.waLink}>WhatsApp'tan yaz</a>
                     )}
+                    <button style={s.silBtn} onClick={() => kayitSil(k)}>🗑 Kaydı sil</button>
                   </div>
                 )}
               </div>
             );
-          });
+          }),
+          ];
         })()}
       </div>
       {secici && (
@@ -1071,6 +1096,8 @@ const s = {
   aliciSatir: { display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 0', borderTop: '1px solid #eef2f6' },
   aliciAd: { fontWeight: 700, color: '#0f2d4a' },
   yeniRozet: { marginLeft: 8, fontSize: 11, background: '#ede9fe', color: '#6d28d9', padding: '2px 8px', borderRadius: 10, fontWeight: 700 },
+  temizleBtn: { border: '1px solid #fecaca', background: '#fef2f2', color: '#b91c1c', borderRadius: 10, padding: '7px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  silBtn: { gridColumn: '1 / -1', border: '1px solid #fecaca', background: '#fff', color: '#b91c1c', borderRadius: 12, padding: '10px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer' },
   sekmeler: { display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 12, paddingBottom: 2 },
   sekme: { flexShrink: 0, border: '1px solid #e2e8f0', background: '#fff', color: '#475569', borderRadius: 20, padding: '7px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
   sekmeAktif: { background: '#0f2d4a', color: '#fff', borderColor: '#0f2d4a' },
