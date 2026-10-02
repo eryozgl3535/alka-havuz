@@ -4,7 +4,7 @@ import { FIRMA } from '../firma';
 
 const AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 const KATEGORI_IKON = { Havuz: '🏊', Kuyu: '💧', Hidrofor: '🔵', Sulama: '🌱', Tesisat: '🔧', Elektrik: '⚡' };
-const HIZLI_ANAHTAR = 'alkaHizliIslemler2';
+const HIZLI_ANAHTAR = 'alkaHizliErisim3';
 
 const yerel = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -77,7 +77,7 @@ const TUM_HIZLI = [
   { id: 'toplumesaj', hedef: 'toplumesaj', ad: 'Toplu Mesaj', simge: 'mesaj', renk: '#0891b2', zemin: '#e6f6fa' },
   { id: 'rehber', hedef: 'rehber', ad: 'Rehberden Aktar', simge: 'rehber', renk: '#db2777', zemin: '#fdeef5' },
 ];
-const VARSAYILAN_HIZLI = ['yeniIs', 'yeniMusteri', 'gelisler', 'toplumesaj'];
+const VARSAYILAN_HIZLI = ['musteriler', 'takvim', 'raporlar', 'ayarlar'];
 
 function hizliOku() {
   try {
@@ -131,27 +131,49 @@ export default function DashboardPage({ onNavigate, ad }) {
   ];
 
   const gorunenHizli = duzenle ? TUM_HIZLI : hizli.map((id) => TUM_HIZLI.find((h) => h.id === id)).filter(Boolean);
+  const genis = typeof window !== 'undefined' && window.innerWidth >= 900;
+
+  function aramaGit(q) {
+    sessionStorage.setItem('alkaArama', q);
+    git('musteriler');
+  }
 
   return (
-    <div style={s.sayfa}>
-      <div style={s.selam}>
-        <div>
-          <div style={s.selamYazi}>{selamla()}{ad ? `, ${String(ad).split(' ')[0]}` : ''} 👋</div>
-          <div style={s.selamTarih}>{bugunYazi()}</div>
+    <div style={{ ...s.sayfa, ...(genis ? { paddingTop: 16 } : {}) }}>
+      {genis && (
+        <div style={s.selam}>
+          <div>
+            <div style={s.selamYazi}>{selamla()}{ad ? `, ${String(ad).split(' ')[0]}` : ''} 👋</div>
+            <div style={s.selamTarih}>{bugunYazi()}</div>
+          </div>
         </div>
-      </div>
+      )}
 
-      <HavaKarti />
+      <HavaKarti onAra={aramaGit} ustuneBin={!genis} />
+
+      {/* Ana işlemler */}
+      <div style={s.anaIzgara}>
+        {ANA_ISLEMLER.map((x) => (
+          <button key={x.ad} style={{ ...s.anaKutu, background: x.zemin }} onClick={() => git(x.hedef)}>
+            <span style={s.anaIkon}>{x.ikon}</span>
+            <span style={s.anaAlt}>
+              <span style={s.anaAd}>{x.ad}</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" style={{ flexShrink: 0 }}><path d="m9 6 6 6-6 6" fill="none" stroke="#fff" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </span>
+          </button>
+        ))}
+      </div>
 
       {/* Özet kartları */}
       <div style={s.istIzgara}>
         {istatistik.map((k) => (
           <button key={k.ad} style={{ ...s.istKart, background: k.zemin, borderColor: k.kenar }} onClick={() => git(k.hedef)}>
-            <div style={s.istUst}>
-              <div style={{ ...s.istIkon, background: k.ikonZemin }}>{SIMGE[k.simge](k.renk)}</div>
-              <div style={{ ...s.istSayi, color: k.sayi > 0 && k.ad === 'Gecikmiş Bakım' ? '#dc2626' : '#0b1730' }}>{k.sayi}</div>
+            <div style={{ ...s.istIkon, background: k.ikonZemin }}>{SIMGE[k.simge](k.renk)}</div>
+            <div style={{ ...s.istSayi, color: k.sayi > 0 && k.ad === 'Gecikmiş Bakım' ? '#dc2626' : '#0b1730' }}>{k.sayi}</div>
+            <div style={s.istAlt}>
+              <span style={s.istAd}>{{ 'Gecikmiş Bakım': 'Gecikmiş\nBakım', 'Yaklaşan Bakım': 'Yaklaşan\nBakım', 'Bu Ay Tamamlanan': 'Bu Ay\nTamamlanan', 'Toplam Müşteri': 'Toplam\nMüşteri' }[k.ad] || k.ad}</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" style={{ position: 'absolute', right: -4, bottom: 0 }}><path d="m9 6 6 6-6 6" fill="none" stroke={k.renk} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </div>
-            <div style={s.istAd}>{k.ad}</div>
           </button>
         ))}
       </div>
@@ -159,44 +181,49 @@ export default function DashboardPage({ onNavigate, ad }) {
       {/* Yaklaşan Bakımlar */}
       <section style={s.kutu}>
         <div style={s.kutuUst}>
-          <h2 style={s.kutuBaslik}>Yaklaşan Bakımlar</h2>
+          <h2 style={s.kutuBaslik}><span style={{ display: 'inline-flex', verticalAlign: '-5px', marginRight: 8 }}>{SIMGE.takvim('#1d6fe0')}</span>Yaklaşan Bakımlar</h2>
           <button style={s.linkBtn} onClick={() => git('takvim')}>Tümünü Gör {SIMGE.ok('#1d6fe0')}</button>
         </div>
         {liste.length === 0 && <div style={s.bos}>Takipte bakım yok. Müşteri kartından cihaz ve bakım ekleyebilirsin.</div>}
         {liste.map((k) => {
           const e = k.equipment || {};
           const m = e.customers || {};
-          const kalan = kalanYazi(kalanGun(k.next_due_date));
+          const g = kalanGun(k.next_due_date);
+          const kalan = kalanYazi(g);
+          const tema = g < 0 ? { r: '#dc2626', z: '#fee2e2' } : g <= 14 ? { r: '#ea7a0c', z: '#ffedd5' } : { r: '#1d6fe0', z: '#dbeafe' };
+          const konum = String(m.address || '').split(',')[0].trim();
           return (
             <button key={k.id} style={s.bakimSatir} onClick={() => git('takvim')}>
-              <div style={s.bakimResim}>
-                <span style={{ fontSize: 26 }}>{KATEGORI_IKON[e.category] || '🛠️'}</span>
+              <div style={{ ...s.bakimResim, background: KATEGORI_ZEMIN[e.category] || KATEGORI_ZEMIN.varsayilan }}>
+                <span style={{ fontSize: 28, filter: 'drop-shadow(0 2px 3px rgba(0,0,0,.25))' }}>{KATEGORI_IKON[e.category] || '🛠️'}</span>
               </div>
               <div style={s.bakimOrta}>
                 <div style={s.bakimAd}>{m.name || 'Müşteri'}</div>
-                <div style={s.bakimKonum}>
-                  {SIMGE.konum('#94a3b8')}
-                  <span style={s.tekSatir}>{m.address || k.rule_name}</span>
+                <div style={s.bakimKural}>{k.rule_name}</div>
+                <div style={s.bakimMeta}>
+                  {SIMGE.takvimKucuk('#94a3b8')}<span>{trTarih(k.next_due_date)}</span>
+                  {konum && <>{SIMGE.konum('#94a3b8')}<span style={s.tekSatir}>{konum}</span></>}
                 </div>
               </div>
-              <div style={s.bakimSag}>
-                <div style={s.bakimTarih}>{SIMGE.takvimKucuk('#94a3b8')}<span>{trTarih(k.next_due_date)}</span></div>
-                <div style={{ ...s.bakimKalan, color: kalan.renk }}>{kalan.yazi}</div>
+              <div style={{ ...s.kalanHap, color: tema.r, background: tema.z }}>
+                <svg width="15" height="15" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke={tema.r} strokeWidth="2.2" /><path d="M12 7v5l3 2" fill="none" stroke={tema.r} strokeWidth="2.2" strokeLinecap="round" /></svg>
+                {kalan.yazi}
               </div>
-              {SIMGE.ok('#334155')}
+              {SIMGE.ok('#64748b')}
             </button>
           );
         })}
       </section>
-      {/* Hızlı İşlemler */}
+
+      {/* Hızlı Erişim */}
       <section style={s.kutu}>
         <div style={s.kutuUst}>
-          <h2 style={s.kutuBaslik}>Hızlı İşlemler</h2>
+          <h2 style={s.kutuBaslik}><span style={{ marginRight: 8, color: '#1d6fe0' }}>⚡</span>Hızlı Erişim</h2>
           <button style={s.linkBtn} onClick={() => setDuzenle(!duzenle)}>
             {duzenle ? 'Bitti ✓' : <>Düzenle {SIMGE.kalem('#1d6fe0')}</>}
           </button>
         </div>
-        {duzenle && <div style={s.ipucu}>Ana sayfada görmek istediğin kutulara dokunarak seç.</div>}
+        {duzenle && <div style={s.ipucu}>Görmek istediğin kutulara dokunarak seç.</div>}
         <div style={s.hizliIzgara}>
           {gorunenHizli.map((h) => {
             const secili = hizli.includes(h.id);
@@ -214,10 +241,33 @@ export default function DashboardPage({ onNavigate, ad }) {
           })}
         </div>
       </section>
-
     </div>
   );
 }
+
+const beyazIkon = {
+  arti: <svg width="34" height="34" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#fff" /><path d="M12 7v10M7 12h10" stroke="#1d4ed8" strokeWidth="2.6" strokeLinecap="round" /></svg>,
+  kisi: <svg width="34" height="34" viewBox="0 0 24 24"><circle cx="10" cy="8" r="4" fill="#fff" /><path d="M2.5 20.5c.6-4.2 3.6-6.3 7.5-6.3 1.6 0 3 .3 4.2 1V20.5z" fill="#fff" /><path d="M18.5 12.5v7M15 16h7" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" /></svg>,
+  takvim: <svg width="32" height="32" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="3" fill="none" stroke="#fff" strokeWidth="2.2" /><path d="M3.5 10h17M8 3v4M16 3v4" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" /><circle cx="8.5" cy="14.5" r="1.3" fill="#fff" /><circle cx="12" cy="14.5" r="1.3" fill="#fff" /><circle cx="15.5" cy="14.5" r="1.3" fill="#fff" /></svg>,
+  mesaj: <svg width="32" height="32" viewBox="0 0 24 24"><path d="M4 3.5h16A1.5 1.5 0 0 1 21.5 5v10a1.5 1.5 0 0 1-1.5 1.5H10l-5 4v-4H4A1.5 1.5 0 0 1 2.5 15V5A1.5 1.5 0 0 1 4 3.5z" fill="#fff" /><path d="M7 8.5h10M7 12h6" stroke="#7c3aed" strokeWidth="2" strokeLinecap="round" /></svg>,
+};
+
+const ANA_ISLEMLER = [
+  { ad: 'Yeni İş Kaydı', hedef: 'isemirleri', ikon: beyazIkon.arti, zemin: 'linear-gradient(140deg,#3b82f6 0%,#1d4ed8 60%,#1e3a8a 100%)' },
+  { ad: 'Yeni Müşteri', hedef: 'musteriler', ikon: beyazIkon.kisi, zemin: 'linear-gradient(140deg,#14b8a6 0%,#0f8f72 60%,#065f46 100%)' },
+  { ad: 'Geliş Planı', hedef: 'gelisler', ikon: beyazIkon.takvim, zemin: 'linear-gradient(140deg,#fb923c 0%,#f97316 55%,#ea580c 100%)' },
+  { ad: 'Toplu Mesaj', hedef: 'toplumesaj', ikon: beyazIkon.mesaj, zemin: 'linear-gradient(140deg,#a78bfa 0%,#7c3aed 60%,#5b21b6 100%)' },
+];
+
+const KATEGORI_ZEMIN = {
+  Havuz: 'linear-gradient(160deg,#7dd3fc 0%,#0ea5e9 55%,#0369a1 100%)',
+  Kuyu: 'linear-gradient(160deg,#cbd5e1 0%,#94a3b8 60%,#64748b 100%)',
+  Hidrofor: 'linear-gradient(160deg,#bfdbfe 0%,#60a5fa 60%,#2563eb 100%)',
+  Sulama: 'linear-gradient(160deg,#bbf7d0 0%,#4ade80 60%,#16a34a 100%)',
+  Tesisat: 'linear-gradient(160deg,#fde68a 0%,#fbbf24 60%,#d97706 100%)',
+  Elektrik: 'linear-gradient(160deg,#fef08a 0%,#facc15 60%,#ca8a04 100%)',
+  varsayilan: 'linear-gradient(160deg,#e2e8f0 0%,#94a3b8 100%)',
+};
 
 function selamla() {
   const h = new Date().getHours();
@@ -277,23 +327,36 @@ const s = {
   tahminEk: { fontSize: 10.5, fontWeight: 700, whiteSpace: 'nowrap' },
   havaDerece: { fontSize: 18, fontWeight: 800, lineHeight: 1.1 },
   havaSehir: { fontSize: 12, opacity: 0.9 },
-  istIzgara: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(158px, 1fr))', gap: 10, marginBottom: 14 },
+  istIzgara: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8, marginBottom: 14 },
   istKart: {
-    display: 'flex', flexDirection: 'column', gap: 10, padding: '12px 14px', borderRadius: 18, border: '1px solid',
-    cursor: 'pointer', textAlign: 'left', minWidth: 0, boxShadow: kartGolge,
+    position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6, padding: '10px 10px 10px',
+    borderRadius: 18, border: '1px solid', cursor: 'pointer', textAlign: 'left', minWidth: 0, boxShadow: kartGolge,
   },
+  anaIzgara: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8, marginBottom: 12 },
+  anaKutu: {
+    display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', minHeight: 96,
+    padding: '12px 10px 10px', borderRadius: 18, border: 'none', cursor: 'pointer', textAlign: 'left', color: '#fff',
+    boxShadow: '0 6px 16px rgba(15,45,74,0.18)', minWidth: 0,
+  },
+  anaIkon: { display: 'flex' },
+  anaAlt: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', width: '100%', gap: 2, marginTop: 8 },
+  anaAd: { fontSize: 12.5, fontWeight: 800, lineHeight: 1.2, minWidth: 0, wordBreak: 'break-word' },
+  istAlt: { position: 'relative', width: '100%', paddingRight: 14, boxSizing: 'border-box' },
+  bakimKural: { fontSize: 13, color: '#64748b', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  bakimMeta: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 12.5, color: '#64748b', marginTop: 5, minWidth: 0, whiteSpace: 'nowrap' },
+  kalanHap: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 800, borderRadius: 20, padding: '5px 8px', whiteSpace: 'nowrap', flexShrink: 0 },
   istUst: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   selam: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', margin: '2px 2px 12px' },
   selamYazi: { fontSize: 20, fontWeight: 800, color: '#0b1730', letterSpacing: -0.3 },
   selamTarih: { fontSize: 13, color: '#64748b', marginTop: 2, fontWeight: 500 },
-  istIkon: { width: 38, height: 38, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  istSayi: { fontSize: 28, fontWeight: 900, lineHeight: 1, letterSpacing: -0.5 },
-  istAd: { fontSize: 12.5, color: '#475569', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
-  kutu: { background: '#fff', borderRadius: 18, padding: '14px 12px', marginBottom: 14, boxShadow: kartGolge },
+  istIkon: { width: 36, height: 36, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  istSayi: { fontSize: 24, fontWeight: 900, lineHeight: 1, marginTop: 4 },
+  istAd: { display: 'block', fontSize: 11.5, color: '#1e293b', fontWeight: 700, lineHeight: 1.2, whiteSpace: 'pre-line', letterSpacing: -0.2 },
+  kutu: { background: '#fff', borderRadius: 20, padding: '14px 12px', marginBottom: 14, boxShadow: kartGolge },
   kutuUst: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '0 4px' },
-  kutuBaslik: { margin: 0, fontSize: 17, fontWeight: 800, color: '#0b1730' },
+  kutuBaslik: { margin: 0, whiteSpace: 'nowrap', fontSize: 17, fontWeight: 800, color: '#0b1730' },
   linkBtn: {
-    display: 'flex', alignItems: 'center', gap: 6, border: 'none', background: 'transparent', color: '#1d6fe0',
+    display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', flexShrink: 0, border: 'none', background: 'transparent', color: '#1d6fe0',
     fontSize: 15, fontWeight: 600, cursor: 'pointer', padding: 4,
   },
   ipucu: { fontSize: 13, color: '#64748b', margin: '-4px 4px 10px' },
@@ -305,13 +368,10 @@ const s = {
   hizliAd: { fontSize: 12.5, fontWeight: 700, color: '#0b1730', textAlign: 'center', lineHeight: 1.2 },
   bos: { color: '#64748b', fontSize: 14, padding: '6px 4px 4px' },
   bakimSatir: {
-    display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '12px 2px', border: 'none',
+    display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '12px 2px', border: 'none',
     borderTop: '1px solid #eef2f7', background: 'transparent', cursor: 'pointer', textAlign: 'left',
   },
-  bakimResim: {
-    width: 64, height: 46, borderRadius: 12, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: 'linear-gradient(160deg,#9bd7f5,#3aa6e6 60%,#1f8fd1)', boxShadow: 'inset 0 -6px 12px rgba(255,255,255,0.25)',
-  },
+  bakimResim: { width: 56, height: 50, borderRadius: 14, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'inset 0 -8px 14px rgba(255,255,255,.25), 0 2px 6px rgba(15,45,74,.15)' },
   bakimOrta: { flex: 1, minWidth: 0 },
   bakimAd: { fontSize: 15, fontWeight: 800, color: '#0b1730', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   bakimKonum: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: '#64748b', marginTop: 3, minWidth: 0 },
@@ -479,7 +539,8 @@ function arkaPlan(tip, gece) {
   }
 }
 
-function HavaKarti() {
+function HavaKarti({ onAra, ustuneBin }) {
+  const [aramaYazi, setAramaYazi] = useState('');
   const [veri, setVeri] = useState(null);
   const [hata, setHata] = useState(false);
   const [yukleniyor, setYukleniyor] = useState(false);
@@ -523,8 +584,33 @@ function HavaKarti() {
 
   const sehir = FIRMA.sehir || 'Çeşme';
 
-  if (!veri) {
+  const aramaKarti = (
+    <div style={{ ...hs.aramaKart, ...(ustuneBin ? { marginTop: -36 } : {}) }}>
+      <form style={hs.aramaForm} onSubmit={(e) => { e.preventDefault(); if (aramaYazi.trim()) onAra && onAra(aramaYazi.trim()); }}>
+        <svg width="22" height="22" viewBox="0 0 24 24" style={{ flexShrink: 0 }}><circle cx="11" cy="11" r="7" fill="none" stroke="#334155" strokeWidth="2.2" /><path d="m20 20-3.6-3.6" stroke="#334155" strokeWidth="2.2" strokeLinecap="round" /></svg>
+        <input style={hs.aramaInput} value={aramaYazi} onChange={(e) => setAramaYazi(e.target.value)} placeholder="Müşteri ara..." enterKeyHint="search" />
+      </form>
+      <span style={hs.aramaAyrac} />
+      <button style={hs.havaCip} onClick={() => setAcik(!acik)} aria-label="Hava durumu">
+        {veri ? (
+          <>
+            <HavaIkon tip={havaTip(veri.current.weather_code)} gece={veri.current.is_day === 0} boyut={38} />
+            <span style={{ textAlign: 'left' }}>
+              <span style={{ display: 'block', fontSize: 20, fontWeight: 900, color: '#0b1730', lineHeight: 1 }}>{Math.round(veri.current.temperature_2m)}°</span>
+              <span style={{ display: 'block', fontSize: 11.5, color: '#475569', fontWeight: 600, marginTop: 2 }}>{sehir}</span>
+            </span>
+          </>
+        ) : <span style={{ fontSize: 12, color: '#94a3b8' }}>Hava…</span>}
+        <svg width="16" height="16" viewBox="0 0 24 24" style={{ transform: acik ? 'rotate(90deg)' : 'none', transition: 'transform .2s' }}><path d="m9 6 6 6-6 6" fill="none" stroke="#334155" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      </button>
+    </div>
+  );
+
+  if (!acik) return <div style={{ marginBottom: 12 }}><style>{HAVA_CSS}</style>{aramaKarti}</div>;
+
+ if (!veri) {
     return (
+      <>{aramaKarti}<div style={{ height: 12 }} />
       <section className="hv-kart" style={{ background: arkaPlan('azBulut', false) }}>
         <style>{HAVA_CSS}</style>
         <div className="hv-icerik">
@@ -542,6 +628,7 @@ function HavaKarti() {
           )}
         </div>
       </section>
+      </>
     );
   }
 
@@ -578,28 +665,6 @@ function HavaKarti() {
       </div>
   );
 
-  if (!acik) {
-    return (
-      <section className="hv-kart" style={{ background: arkaPlan(anlikTip, anlikGece), cursor: 'pointer' }} onClick={() => setAcik(true)}>
-        <style>{HAVA_CSS}</style>
-        {katman}
-        <div className="hv-icerik" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px' }}>
-          <HavaIkon tip={anlikTip} gece={anlikGece} boyut={46} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 30, fontWeight: 900, lineHeight: 1 }}>{Math.round(c.temperature_2m)}°</div>
-            <div style={{ fontSize: 12.5, opacity: 0.9, marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {TIP_AD[anlikTip][anlikGece ? 'gece' : 'gun']}
-            </div>
-          </div>
-          <div style={{ textAlign: 'right', flexShrink: 0 }}>
-            <div style={{ fontSize: 14 }}><b>{bugunGun.max}°</b> <span style={{ opacity: 0.75 }}>/ {bugunGun.min}°</span></div>
-            <div style={{ fontSize: 11.5, opacity: 0.85, marginTop: 3 }}>☔ %{bugunGun.yagmur} · 💨 {Math.round(c.wind_speed_10m)}</div>
-          </div>
-          <span style={hs.acKapa}>⌄</span>
-        </div>
-      </section>
-    );
-  }
 
   const simdiSaat = `${yerel(simdi)}T${String(simdi.getHours()).padStart(2, '0')}:00`;
   const saatler = veri.hourly.time
@@ -636,6 +701,9 @@ function HavaKarti() {
   };
 
   return (
+    <>
+    {aramaKarti}
+    <div style={{ height: 12 }} />
     <section className="hv-kart" style={{ background: arkaPlan(anlikTip, anlikGece) }}>
       <style>{HAVA_CSS}</style>
 
@@ -754,10 +822,19 @@ function HavaKarti() {
         </div>
       </div>
     </section>
+    </>
   );
 }
 
 const hs = {
+  aramaKart: {
+    position: 'relative', zIndex: 3, display: 'flex', alignItems: 'center', gap: 10, background: '#fff', borderRadius: 20,
+    padding: '0 10px 0 16px', height: 66, boxShadow: '0 10px 28px rgba(15,45,74,0.16)',
+  },
+  aramaForm: { flex: 1, display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, margin: 0 },
+  aramaInput: { flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontSize: 16, color: '#0f172a' },
+  aramaAyrac: { width: 1, height: 36, background: '#e2e8f0', flexShrink: 0 },
+  havaCip: { display: 'flex', alignItems: 'center', gap: 6, border: 'none', background: 'none', padding: '4px 2px', cursor: 'pointer', flexShrink: 0 },
   acKapa: { width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,.16)', display: 'flex', alignItems: 'center',
     justifyContent: 'center', fontSize: 16, flexShrink: 0, lineHeight: 1, paddingBottom: 4, boxSizing: 'border-box' },
   ust: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
