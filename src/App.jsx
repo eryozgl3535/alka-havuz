@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from './supabase';
 import { FIRMA } from './firma';
+import { useTema, arkaPlanCss, baslikRenk } from './tema';
 import LoginPage from './pages/LoginPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import CustomersPage from './pages/CustomersPage.jsx';
@@ -85,6 +86,9 @@ function AnaUygulama() {
   const [genis, setGenis] = useState(window.innerWidth >= 900);
   const [menuAcik, setMenuAcik] = useState(false);
   const [artiAcik, setArtiAcik] = useState(false);
+  const tema = useTema();
+  const [bR1, bR2] = baslikRenk(tema);
+  const arkaCss = arkaPlanCss(tema);
   const [gecikmis, setGecikmis] = useState(0);
   const [arama, setArama] = useState('');
   const [aramaAnahtar, setAramaAnahtar] = useState(0);
@@ -187,7 +191,7 @@ function AnaUygulama() {
   if (genis) {
     return (
       <div style={s.kok}>
-        <aside style={s.yan}>
+        <aside style={{ ...s.yan, ...(tema.baslik !== 'lacivert' ? { background: `linear-gradient(180deg,${bR1} 0%,${bR2} 100%)` } : {}) }}>
           <div style={s.logoAlan}>
             <img src="/logo-alka.png" alt="ALKA" style={s.logo} />
             <div style={s.logoAltYazi}>{altBaslikYazi}</div>
@@ -207,7 +211,9 @@ function AnaUygulama() {
           {kullaniciKart}
         </aside>
 
-        <div style={{ marginLeft: 260, minHeight: '100vh' }}>
+        <div style={{ marginLeft: 260, minHeight: '100vh', position: 'relative' }}>
+          <div style={{ position: 'fixed', inset: 0, left: 260, zIndex: 0, background: arkaCss }} />
+          <div style={{ position: 'relative', zIndex: 1 }}>
           <header style={s.ustCubuk}>
             <form onSubmit={aramaYap} style={s.aramaKutu}>
               <span style={{ fontSize: 17, opacity: 0.6 }}>🔍</span>
@@ -224,6 +230,7 @@ function AnaUygulama() {
             </div>
           </header>
           <main>{sayfaIcerik}</main>
+          </div>
         </div>
       </div>
     );
@@ -233,7 +240,8 @@ function AnaUygulama() {
 
   return (
     <div style={s.mKok}>
-      <header style={s.mUst}>
+      <div style={{ position: 'fixed', inset: 0, zIndex: 0, background: arkaCss }} />
+      <header style={{ ...s.mUst, ...(tema.baslik !== 'lacivert' ? { background: `radial-gradient(ellipse at 50% 140%, rgba(255,255,255,0.18) 0%, transparent 60%), linear-gradient(180deg,${bR1} 0%,${bR2} 100%)` } : {}) }}>
         <div style={s.mUstSatir}>
           <button style={s.mYuvarlak} onClick={() => git('takvim')} aria-label="Gecikmiş bakımlar">
             <Ikon ad="zil" boyut={22} renk="#fff" kalin={1.6} />
@@ -265,7 +273,7 @@ function AnaUygulama() {
         ) : null}
       </header>
 
-      <main style={s.mIcerik}>{sayfaIcerik}</main>
+      <main style={{ ...s.mIcerik, position: 'relative', zIndex: 1 }}>{sayfaIcerik}</main>
 
       {(menuAcik || artiAcik) && (
         <div style={s.karartma} onClick={() => { setMenuAcik(false); setArtiAcik(false); }} />
@@ -423,9 +431,10 @@ const s = {
     padding: '13px 22px', fontSize: 16, fontWeight: 700, cursor: 'pointer', boxShadow: '0 6px 18px rgba(29,111,224,0.35)',
     whiteSpace: 'nowrap',
   },
-  mKok: { minHeight: '100vh', background: '#eef3f9', fontFamily: 'system-ui, -apple-system, sans-serif' },
+  mKok: { minHeight: '100vh', position: 'relative', background: '#eef3f9', fontFamily: 'system-ui, -apple-system, sans-serif' },
   mUst: {
-    padding: '0 16px 14px', paddingTop: 'calc(env(safe-area-inset-top, 0px) + 10px)',
+    position: 'relative', zIndex: 2,
+    padding: '0 16px 14px', paddingTop: 'max(calc(env(safe-area-inset-top, 0px) + 8px), 54px)',
     borderRadius: '0 0 24px 24px', boxShadow: '0 6px 20px rgba(6,40,72,0.25)',
     background:
       'radial-gradient(ellipse at 50% 140%, rgba(56,189,248,0.45) 0%, transparent 60%),' +
@@ -466,7 +475,7 @@ const s = {
   altBtnAktif: { color: '#1d4ed8', background: '#e0ecff', fontWeight: 800 },
   artiYer: { display: 'flex', justifyContent: 'center' },
   artiBtn: {
-    width: 58, height: 58, marginTop: -30, borderRadius: '50%', border: '5px solid #eef3f9',
+    width: 58, height: 58, marginTop: -30, borderRadius: '50%', border: '5px solid #fff',
     background: 'linear-gradient(135deg,#2563eb,#0b2a4a)', boxShadow: '0 8px 20px rgba(11,42,74,0.4)',
     display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, transition: 'transform .2s',
     boxSizing: 'content-box',
