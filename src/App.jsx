@@ -204,6 +204,10 @@ function AnaUygulama() {
     return `${d.getDate()} ${aylar[d.getMonth()]} ${d.getFullYear()}, ${gunler[d.getDay()]}`;
   };
 
+  const masaZemin = baslikFotoUrl
+    ? `linear-gradient(90deg, ${bR1} 0%, ${bR1} calc(100% - 495px), rgba(8,30,55,0.75) calc(100% - 420px), rgba(8,30,55,0.25) calc(100% - 320px), rgba(8,30,55,0) calc(100% - 240px)), linear-gradient(180deg, rgba(5,20,40,.35) 0%, rgba(5,20,40,0) 30%), url(${baslikFotoUrl}) right center / auto 100% no-repeat, ${bR1}`
+    : baslikZemin;
+
   if (genis) {
     return (
       <div style={s.kok}>
@@ -232,7 +236,7 @@ function AnaUygulama() {
           <div style={{ position: 'relative', zIndex: 1 }}>
           {sayfa === 'anasayfa' ? (
             <div style={s.masaHeroSar}>
-              <header style={{ ...s.masaHero, background: baslikZemin.replace('right center / cover', 'right 62% / cover') }}>
+              <header style={{ ...s.masaHero, background: masaZemin }}>
                 <div style={s.masaHeroUst}>
                   <div style={s.masaLogoAlan}>
                     <img src="/logo-alka.png" alt="ALKA" style={s.masaLogo} />
@@ -439,7 +443,7 @@ const s = {
     borderRadius: 10, padding: '8px 10px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
   },
   masaHero: {
-    position: 'relative', padding: '24px 28px 80px', borderRadius: 28, minHeight: 300, boxSizing: 'border-box',
+    position: 'relative', padding: '24px 28px 84px', borderRadius: 28, minHeight: 340, boxSizing: 'border-box',
     boxShadow: '0 14px 34px rgba(6,40,72,0.28)', color: '#fff', overflow: 'hidden',
   },
   masaHeroSar: { maxWidth: 928, margin: '0 auto', padding: '18px 14px 0', boxSizing: 'border-box' },
@@ -456,7 +460,7 @@ const s = {
     position: 'relative', width: 46, height: 46, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(15,30,55,0.5)',
     display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, backdropFilter: 'blur(6px)',
   },
-  masaSelam: { marginTop: 56, fontSize: 30, fontWeight: 800, letterSpacing: -0.5, textShadow: '0 2px 10px rgba(0,0,0,.35)' },
+  masaSelam: { marginTop: 84, fontSize: 30, fontWeight: 800, letterSpacing: -0.5, textShadow: '0 2px 10px rgba(0,0,0,.35)' },
   masaTarih: { marginTop: 6, fontSize: 16, opacity: 0.88, fontWeight: 500, textShadow: '0 1px 6px rgba(0,0,0,.35)' },
   ustCubuk: {
     position: 'sticky', top: 0, zIndex: 15, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
