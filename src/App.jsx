@@ -89,6 +89,12 @@ function AnaUygulama() {
   const tema = useTema();
   const [bR1, bR2] = baslikRenk(tema);
   const arkaCss = arkaPlanCss(tema);
+  const baslikZemin = tema.baslikFoto
+    ? `linear-gradient(90deg, rgba(5,20,40,.82) 0%, rgba(5,20,40,.45) 55%, rgba(5,20,40,.15) 100%), linear-gradient(180deg, rgba(5,20,40,.55) 0%, rgba(5,20,40,0) 35%), url(${tema.baslikFoto}) center / cover no-repeat`
+    : `radial-gradient(60% 55% at 85% 25%, rgba(255,214,140,0.18) 0%, transparent 70%),` +
+      `radial-gradient(80% 60% at 70% 115%, rgba(56,189,248,0.55) 0%, transparent 65%),` +
+      `radial-gradient(40% 30% at 10% 105%, rgba(14,165,233,0.35) 0%, transparent 70%),` +
+      `linear-gradient(165deg, ${bR1} 0%, ${bR2} 70%, ${bR2} 100%)`;
   const [gecikmis, setGecikmis] = useState(0);
   const [arama, setArama] = useState('');
   const [aramaAnahtar, setAramaAnahtar] = useState(0);
@@ -237,43 +243,43 @@ function AnaUygulama() {
   }
 
   const menudeMi = !ALT_MENU.includes(sayfa);
+  const selamMetni = () => { const h = new Date().getHours(); return h >= 5 && h < 12 ? 'Günaydın' : h < 18 && h >= 12 ? 'İyi günler' : h >= 18 && h < 23 ? 'İyi akşamlar' : 'İyi geceler'; };
+  const tarihMetni = () => {
+    const d = new Date();
+    const aylar = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+    const gunler = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+    return `${d.getDate()} ${aylar[d.getMonth()]} ${d.getFullYear()}, ${gunler[d.getDay()]}`;
+  };
 
   return (
     <div style={s.mKok}>
       <div style={{ position: 'fixed', inset: 0, zIndex: 0, background: arkaCss }} />
-      <header style={{ ...s.mUst, ...(tema.baslik !== 'lacivert' ? { background: `radial-gradient(ellipse at 50% 140%, rgba(255,255,255,0.18) 0%, transparent 60%), linear-gradient(180deg,${bR1} 0%,${bR2} 100%)` } : {}) }}>
+      <header style={{ ...s.mUst, background: baslikZemin, paddingBottom: sayfa === 'anasayfa' ? 54 : 16 }}>
         <div style={s.mUstSatir}>
-          <button style={s.mYuvarlak} onClick={() => git('takvim')} aria-label="Gecikmiş bakımlar">
-            <Ikon ad="zil" boyut={22} renk="#fff" kalin={1.6} />
-            {gecikmis > 0 && <span style={s.mRozet}>{gecikmis > 99 ? '99+' : gecikmis}</span>}
-          </button>
-
           <button style={s.mLogoAlan} onClick={() => git('anasayfa')} aria-label="Ana Sayfa">
             <img src="/logo-alka.png" alt="ALKA" style={s.mLogo} />
             <span style={s.mLogoYazi}>{altBaslikYazi}</span>
           </button>
-
-          <button style={{ ...s.mYuvarlak, background: avatarRenk, fontWeight: 800, fontSize: 17, color: '#fff' }}
-            onClick={() => git('ayarlar')} aria-label="Profil">
-            {ad.charAt(0)}
-          </button>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <button style={s.mYuvarlak} onClick={() => git('takvim')} aria-label="Gecikmiş bakımlar">
+              <Ikon ad="zil" boyut={22} renk="#fff" kalin={1.6} />
+              {gecikmis > 0 && <span style={s.mRozet}>{gecikmis > 99 ? '99+' : gecikmis}</span>}
+            </button>
+            <button style={{ ...s.mYuvarlak, background: avatarRenk, border: '2px solid rgba(255,255,255,.35)', fontWeight: 800, fontSize: 18, color: '#fff' }}
+              onClick={() => git('ayarlar')} aria-label="Profil">
+              {ad.charAt(0)}
+            </button>
+          </div>
         </div>
-
-        {sayfa === 'anasayfa' ? (
-          <form onSubmit={aramaYap} style={s.mArama}>
-            <Ikon ad="ara" boyut={19} renk="#64748b" kalin={2.2} />
-            <input
-              style={s.mAramaInput}
-              value={arama}
-              onChange={(e) => setArama(e.target.value)}
-              placeholder="Müşteri, adres, cihaz ara..."
-              enterKeyHint="search"
-            />
-          </form>
-        ) : null}
+        {sayfa === 'anasayfa' && (
+          <div style={s.mSelam}>
+            <div style={s.mSelamYazi}>{selamMetni()}, {String(ad).split(' ')[0]} 👋</div>
+            <div style={s.mSelamTarih}>{tarihMetni()}</div>
+          </div>
+        )}
       </header>
 
-      <main style={{ ...s.mIcerik, position: 'relative', zIndex: 1 }}>{sayfaIcerik}</main>
+      <main style={{ ...s.mIcerik, position: 'relative', zIndex: 3, ...(sayfa === 'anasayfa' ? { paddingTop: 0 } : {}) }}>{sayfaIcerik}</main>
 
       {(menuAcik || artiAcik) && (
         <div style={s.karartma} onClick={() => { setMenuAcik(false); setArtiAcik(false); }} />
@@ -344,8 +350,9 @@ function AnaUygulama() {
           onClick={() => { setArtiAcik(false); setMenuAcik(!menuAcik); }}
           style={{ ...s.altBtn, ...(menuAcik || menudeMi ? s.altBtnAktif : {}) }}
         >
-          <Ikon ad="menu" boyut={24} />
+          <Ikon ad="menu" boyut={25} />
           <span>Menü</span>
+          <span style={{ ...s.altNokta, opacity: menuAcik || menudeMi ? 1 : 0 }} />
         </button>
       </nav>
     </div>
@@ -356,8 +363,9 @@ function AnaUygulama() {
     const aktif = sayfa === id && !menuAcik && !artiAcik;
     return (
       <button key={id} onClick={() => git(id)} style={{ ...s.altBtn, ...(aktif ? s.altBtnAktif : {}) }}>
-        <Ikon ad={ALT_IKON[id]} boyut={24} />
+        <Ikon ad={ALT_IKON[id]} boyut={25} kalin={aktif ? 2.3 : 1.8} />
         <span>{m.kisa}</span>
+        <span style={{ ...s.altNokta, opacity: aktif ? 1 : 0 }} />
       </button>
     );
   }
@@ -434,32 +442,33 @@ const s = {
   mKok: { minHeight: '100vh', position: 'relative', background: '#eef3f9', fontFamily: 'system-ui, -apple-system, sans-serif' },
   mUst: {
     position: 'relative', zIndex: 2,
-    padding: '0 16px 14px', paddingTop: 'max(calc(env(safe-area-inset-top, 0px) + 8px), 54px)',
-    borderRadius: '0 0 24px 24px', boxShadow: '0 6px 20px rgba(6,40,72,0.25)',
-    background:
-      'radial-gradient(ellipse at 50% 140%, rgba(56,189,248,0.45) 0%, transparent 60%),' +
-      'linear-gradient(180deg,#0b2a4a 0%,#0a2440 55%,#063a63 100%)',
+    padding: '0 18px 16px', paddingTop: 'max(calc(env(safe-area-inset-top, 0px) + 10px), 56px)',
+    borderRadius: '0 0 28px 28px', boxShadow: '0 8px 24px rgba(6,40,72,0.28)',
   },
-  mUstSatir: { display: 'grid', gridTemplateColumns: '44px 1fr 44px', alignItems: 'center', gap: 10 },
+  mUstSatir: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
   mYuvarlak: {
-    position: 'relative', width: 44, height: 44, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.18)',
-    background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    cursor: 'pointer', padding: 0,
+    position: 'relative', width: 48, height: 48, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.22)',
+    background: 'rgba(15,30,55,0.55)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, flexShrink: 0,
   },
   mRozet: {
     position: 'absolute', top: -2, right: -2, minWidth: 18, height: 18, borderRadius: 9, background: '#ef4444',
     color: '#fff', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center',
     padding: '0 4px', border: '2px solid #0a2440', boxSizing: 'border-box',
   },
-  mLogoAlan: { display: 'flex', flexDirection: 'column', alignItems: 'center', border: 'none', background: 'none', padding: 0, cursor: 'pointer', minWidth: 0 },
-  mLogo: { height: 40, width: 'auto', maxWidth: '100%', filter: 'drop-shadow(0 3px 8px rgba(0,0,0,0.35))' },
-  mLogoYazi: { marginTop: 3, fontSize: 8, fontWeight: 800, letterSpacing: 1.4, color: '#cbd5e1', whiteSpace: 'nowrap' },
+  mLogoAlan: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', border: 'none', background: 'none', padding: 0, cursor: 'pointer', minWidth: 0 },
+  mLogo: { height: 52, width: 'auto', maxWidth: '62vw', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.4))' },
+  mLogoYazi: { marginTop: 4, fontSize: 9.5, fontWeight: 800, letterSpacing: 1.6, color: '#e2e8f0', whiteSpace: 'nowrap', textShadow: '0 1px 4px rgba(0,0,0,.4)' },
   mArama: {
     display: 'flex', alignItems: 'center', gap: 10, margin: '14px 0 0', background: '#fff', borderRadius: 14,
     padding: '0 14px', height: 46,
   },
   mAramaInput: { flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 16, color: '#0f172a', minWidth: 0 },
   mBaslik: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 14, color: '#fff', fontSize: 20, fontWeight: 800 },
+  mSelam: { marginTop: 18, color: '#fff', textShadow: '0 2px 8px rgba(0,0,0,.35)' },
+  mSelamYazi: { fontSize: 24, fontWeight: 800, letterSpacing: -0.3 },
+  mSelamTarih: { fontSize: 14, opacity: 0.88, marginTop: 4, fontWeight: 500 },
+  altNokta: { width: 5, height: 5, borderRadius: '50%', background: '#1d4ed8', marginTop: 1 },
   mIcerik: { paddingTop: 14, paddingBottom: 'calc(104px + env(safe-area-inset-bottom))' },
   altMenu: {
     position: 'fixed', left: 12, right: 12, bottom: 'calc(10px + env(safe-area-inset-bottom))', zIndex: 30,
@@ -472,7 +481,7 @@ const s = {
     border: 'none', background: 'transparent', color: '#64748b', fontSize: 11, fontWeight: 600, cursor: 'pointer',
     borderRadius: 16, margin: '0 2px', padding: 0,
   },
-  altBtnAktif: { color: '#1d4ed8', background: '#e0ecff', fontWeight: 800 },
+  altBtnAktif: { color: '#1d4ed8', fontWeight: 800 },
   artiYer: { display: 'flex', justifyContent: 'center' },
   artiBtn: {
     width: 58, height: 58, marginTop: -30, borderRadius: '50%', border: '5px solid #fff',
