@@ -156,10 +156,8 @@ export default function DashboardPage({ onNavigate, ad }) {
         {ANA_ISLEMLER.map((x) => (
           <button key={x.ad} style={{ ...s.anaKutu, background: x.zemin }} onClick={() => git(x.hedef)}>
             <span style={s.anaIkon}>{x.ikon}</span>
-            <span style={s.anaAlt}>
-              <span style={s.anaAd}>{x.ad}</span>
-              <svg width="16" height="16" viewBox="0 0 24 24" style={{ flexShrink: 0 }}><path d="m9 6 6 6-6 6" fill="none" stroke="#fff" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            </span>
+            <svg width="16" height="16" viewBox="0 0 24 24" style={{ position: 'absolute', top: 14, right: 8 }}><path d="m9 6 6 6-6 6" fill="none" stroke="rgba(255,255,255,.9)" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            <span style={s.anaAd}>{x.etiket}</span>
           </button>
         ))}
       </div>
@@ -170,9 +168,9 @@ export default function DashboardPage({ onNavigate, ad }) {
           <button key={k.ad} style={{ ...s.istKart, background: k.zemin, borderColor: k.kenar }} onClick={() => git(k.hedef)}>
             <div style={{ ...s.istIkon, background: k.ikonZemin }}>{SIMGE[k.simge](k.renk)}</div>
             <div style={{ ...s.istSayi, color: k.sayi > 0 && k.ad === 'Gecikmiş Bakım' ? '#dc2626' : '#0b1730' }}>{k.sayi}</div>
+            <svg width="16" height="16" viewBox="0 0 24 24" style={{ position: 'absolute', top: 12, right: 8 }}><path d="m9 6 6 6-6 6" fill="none" stroke={k.renk} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
             <div style={s.istAlt}>
               <span style={s.istAd}>{{ 'Gecikmiş Bakım': 'Gecikmiş\nBakım', 'Yaklaşan Bakım': 'Yaklaşan\nBakım', 'Bu Ay Tamamlanan': 'Bu Ay\nTamamlanan', 'Toplam Müşteri': 'Toplam\nMüşteri' }[k.ad] || k.ad}</span>
-              <svg width="16" height="16" viewBox="0 0 24 24" style={{ position: 'absolute', right: -4, bottom: 0 }}><path d="m9 6 6 6-6 6" fill="none" stroke={k.renk} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </div>
           </button>
         ))}
@@ -253,10 +251,10 @@ const beyazIkon = {
 };
 
 const ANA_ISLEMLER = [
-  { ad: 'Yeni İş Kaydı', hedef: 'isemirleri', ikon: beyazIkon.arti, zemin: 'linear-gradient(140deg,#3b82f6 0%,#1d4ed8 60%,#1e3a8a 100%)' },
-  { ad: 'Yeni Müşteri', hedef: 'musteriler', ikon: beyazIkon.kisi, zemin: 'linear-gradient(140deg,#14b8a6 0%,#0f8f72 60%,#065f46 100%)' },
-  { ad: 'Geliş Planı', hedef: 'gelisler', ikon: beyazIkon.takvim, zemin: 'linear-gradient(140deg,#fb923c 0%,#f97316 55%,#ea580c 100%)' },
-  { ad: 'Toplu Mesaj', hedef: 'toplumesaj', ikon: beyazIkon.mesaj, zemin: 'linear-gradient(140deg,#a78bfa 0%,#7c3aed 60%,#5b21b6 100%)' },
+  { ad: 'Yeni İş Kaydı', etiket: 'Yeni\nİş Kaydı', hedef: 'isemirleri', ikon: beyazIkon.arti, zemin: 'linear-gradient(140deg,#3b82f6 0%,#1d4ed8 60%,#1e3a8a 100%)' },
+  { ad: 'Yeni Müşteri', etiket: 'Yeni\nMüşteri', hedef: 'musteriler', ikon: beyazIkon.kisi, zemin: 'linear-gradient(140deg,#14b8a6 0%,#0f8f72 60%,#065f46 100%)' },
+  { ad: 'Geliş Planı', etiket: 'Geliş\nPlanı', hedef: 'gelisler', ikon: beyazIkon.takvim, zemin: 'linear-gradient(140deg,#fb923c 0%,#f97316 55%,#ea580c 100%)' },
+  { ad: 'Toplu Mesaj', etiket: 'Toplu\nMesaj', hedef: 'toplumesaj', ikon: beyazIkon.mesaj, zemin: 'linear-gradient(140deg,#a78bfa 0%,#7c3aed 60%,#5b21b6 100%)' },
 ];
 
 const KATEGORI_ZEMIN = {
@@ -334,14 +332,14 @@ const s = {
   },
   anaIzgara: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8, marginBottom: 12 },
   anaKutu: {
-    display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', minHeight: 96,
+    position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', minHeight: 96,
     padding: '12px 10px 10px', borderRadius: 18, border: 'none', cursor: 'pointer', textAlign: 'left', color: '#fff',
     boxShadow: '0 6px 16px rgba(15,45,74,0.18)', minWidth: 0,
   },
   anaIkon: { display: 'flex' },
   anaAlt: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', width: '100%', gap: 2, marginTop: 8 },
-  anaAd: { fontSize: 12.5, fontWeight: 800, lineHeight: 1.2, minWidth: 0, wordBreak: 'break-word' },
-  istAlt: { position: 'relative', width: '100%', paddingRight: 14, boxSizing: 'border-box' },
+  anaAd: { display: 'block', marginTop: 10, fontSize: 12, fontWeight: 800, lineHeight: 1.2, whiteSpace: 'pre-line', letterSpacing: -0.2 },
+  istAlt: { width: '100%' },
   bakimKural: { fontSize: 13, color: '#64748b', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   bakimMeta: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 12.5, color: '#64748b', marginTop: 5, minWidth: 0, whiteSpace: 'nowrap' },
   kalanHap: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 800, borderRadius: 20, padding: '5px 8px', whiteSpace: 'nowrap', flexShrink: 0 },
@@ -354,10 +352,10 @@ const s = {
   istAd: { display: 'block', fontSize: 11.5, color: '#1e293b', fontWeight: 700, lineHeight: 1.2, whiteSpace: 'pre-line', letterSpacing: -0.2 },
   kutu: { background: '#fff', borderRadius: 20, padding: '14px 12px', marginBottom: 14, boxShadow: kartGolge },
   kutuUst: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '0 4px' },
-  kutuBaslik: { margin: 0, whiteSpace: 'nowrap', fontSize: 17, fontWeight: 800, color: '#0b1730' },
+  kutuBaslik: { margin: 0, whiteSpace: 'nowrap', fontSize: 16.5, fontWeight: 800, color: '#0b1730' },
   linkBtn: {
     display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', flexShrink: 0, border: 'none', background: 'transparent', color: '#1d6fe0',
-    fontSize: 15, fontWeight: 600, cursor: 'pointer', padding: 4,
+    fontSize: 14, fontWeight: 600, cursor: 'pointer', padding: 4,
   },
   ipucu: { fontSize: 13, color: '#64748b', margin: '-4px 4px 10px' },
   hizliIzgara: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 },
