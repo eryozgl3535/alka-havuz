@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { supabase } from '../supabase';
-import EraiImza from '../components/EraiImza.jsx';
 
 export default function LoginPage() {
   const [kullanici, setKullanici] = useState('');
@@ -69,9 +68,6 @@ export default function LoginPage() {
 
         <div style={s.alt}>ALKA Mekanik ve Havuz Sistemleri<br />0533 371 39 35</div>
 
-        <div style={s.imzaSatir}>
-          <EraiImza boyut={15} />
-        </div>
       </form>
     </div>
   );
