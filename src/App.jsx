@@ -425,7 +425,7 @@ const s = {
   },
   mKok: { minHeight: '100vh', background: '#eef3f9', fontFamily: 'system-ui, -apple-system, sans-serif' },
   mUst: {
-    padding: '0 16px 14px', paddingTop: 'max(10px, env(safe-area-inset-top))',
+    padding: '0 16px 14px', paddingTop: 'calc(env(safe-area-inset-top, 0px) + 10px)',
     borderRadius: '0 0 24px 24px', boxShadow: '0 6px 20px rgba(6,40,72,0.25)',
     background:
       'radial-gradient(ellipse at 50% 140%, rgba(56,189,248,0.45) 0%, transparent 60%),' +
