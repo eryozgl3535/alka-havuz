@@ -28,7 +28,7 @@ export const BASLIK_RENKLERI = [
 ];
 
 const ANAHTAR = 'alkaTema1';
-const VARSAYILAN = { arka: 'sade', baslik: 'lacivert', foto: null, fotoBelirgin: 0.45 };
+const VARSAYILAN = { arka: 'sade', baslik: 'lacivert', foto: null, fotoBelirgin: 0.45, baslikFoto: null };
 
 export function temaOku() {
   try {
