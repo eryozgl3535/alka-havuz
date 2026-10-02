@@ -355,6 +355,85 @@ function BakimSecenekleri({ ekstra }) {
   );
 }
 
+const GRUP_IKON = { 'Hidrofor & Kuyu': '💧', Havuz: '🏊', Sulama: '🌱', Genel: '🏠' };
+const GRUP_ACIKLAMA = {
+  'Hidrofor & Kuyu': 'Hidrofor, genleşme tankı, kuyu pompası ve elektrik pano kontrolleri',
+  Havuz: 'Havuz suyu, filtre, motor, ısı pompası ve sezon işlemleri',
+  Sulama: 'Bahçe sulama sistemi açılış, kapanış ve temizlik',
+  Genel: 'Don kontrolü, su deposu, termosifon, arıtma ve elektrik güvenliği',
+};
+
+function BakimSecici({ baslik, mevcut, onSec, onKapat }) {
+  const [arama, setArama] = useState('');
+  const [acikGrup, setAcikGrup] = useState(() => bakimBul(mevcut)?.grup || GRUPLAR[0]);
+  const q = arama.trim().toLocaleLowerCase('tr-TR');
+  const sonuc = q ? BAKIMLAR.filter((b) => b.ad.toLocaleLowerCase('tr-TR').includes(q) || b.grup.toLocaleLowerCase('tr-TR').includes(q)) : null;
+
+  const satir = (b) => {
+    const secili = b.ad === mevcut;
+    return (
+      <button key={b.ad} onClick={() => onSec(b.ad)} style={{ ...s.bsSatir, ...(secili ? s.bsSatirSecili : {}) }}>
+        <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+          <div style={{ fontWeight: 700, fontSize: 15, color: '#0f2d4a' }}>{b.ad}</div>
+          <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 3 }}>
+            ⚠️ {b.riskler.slice(0, 2).map((r) => r[0]).join(' · ')}
+          </div>
+        </div>
+        <span style={s.bsPeriyot}>{b.periyot}</span>
+        {secili && <span style={{ color: '#1d6fe0', fontWeight: 900, fontSize: 18 }}>✓</span>}
+      </button>
+    );
+  };
+
+  return (
+    <div style={s.bsArka} onClick={onKapat}>
+      <div style={s.bsPanel} onClick={(e) => e.stopPropagation()}>
+        <div style={s.bsTutamac} />
+        <div style={s.bsUst}>
+          <div style={{ minWidth: 0 }}>
+            <div style={s.bsBaslik}>Hangi bakım hakkında bilgilendirilsin?</div>
+            <div style={s.bsAlt}>👤 {baslik}</div>
+          </div>
+          <button style={s.bsKapat} onClick={onKapat} aria-label="Kapat">✕</button>
+        </div>
+
+        <input style={{ ...s.input, marginBottom: 10 }} placeholder="🔍 Bakım ara... (örn: filtre, motor, don)" value={arama}
+          onChange={(e) => setArama(e.target.value)} />
+
+        <div style={s.bsListe}>
+          {sonuc ? (
+            sonuc.length ? sonuc.map(satir) : <div style={{ ...s.soluk, padding: 12 }}>Aramaya uyan bakım yok.</div>
+          ) : (
+            GRUPLAR.map((g) => {
+              const acik = acikGrup === g;
+              const liste = BAKIMLAR.filter((b) => b.grup === g);
+              const seciliVar = liste.some((b) => b.ad === mevcut);
+              return (
+                <div key={g} style={s.bsGrup}>
+                  <button style={{ ...s.bsGrupBtn, ...(acik ? s.bsGrupBtnAcik : {}) }} onClick={() => setAcikGrup(acik ? '' : g)}>
+                    <span style={s.bsGrupIkon}>{GRUP_IKON[g]}</span>
+                    <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                      <span style={{ display: 'block', fontWeight: 800, fontSize: 15.5 }}>
+                        {g} <span style={{ fontWeight: 600, fontSize: 12.5, color: '#64748b' }}>({liste.length})</span>
+                        {seciliVar && <span style={s.bsSeciliRozet}>seçili</span>}
+                      </span>
+                      <span style={{ display: 'block', fontSize: 12, color: '#64748b', fontWeight: 500, marginTop: 2 }}>{GRUP_ACIKLAMA[g]}</span>
+                    </span>
+                    <span style={{ fontSize: 18, color: '#94a3b8', transform: acik ? 'rotate(90deg)' : 'none', transition: 'transform .2s' }}>›</span>
+                  </button>
+                  {acik && <div style={{ padding: '4px 4px 8px' }}>{liste.map(satir)}</div>}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <button style={s.bsTemizle} onClick={() => onSec('')}>Bakım belirtme — genel bilgilendirme mesajı gönder</button>
+      </div>
+    </div>
+  );
+}
+
 const bosYeni = { ad: '', tel: '', adres: '', konu: '', konuDiger: '' };
 
 export default function TopluMesajPage() {
@@ -373,6 +452,7 @@ export default function TopluMesajPage() {
   const [sablonAd, setSablonAd] = useState(SABLONLAR[0].ad);
   const [haric, setHaric] = useState([]);
   const [konular, setKonular] = useState({});
+  const [secici, setSecici] = useState(null); // { id } tek müşteri, { toplu: true } hepsi
   const [elleEklenen, setElleEklenen] = useState([]);
 
   const [yeniAcik, setYeniAcik] = useState(false);
@@ -432,6 +512,18 @@ export default function TopluMesajPage() {
   const uygunlar = eslesenler.filter((m) => telefonWa(m.phone));
   const alicilar = uygunlar.filter((m) => !haric.includes(m.id));
   const konuBul = (m) => (konular[m.id] !== undefined ? konular[m.id] : enYakinBakim(m));
+  const bakimsizSayi = alicilar.filter((m) => !konuBul(m)).length;
+
+  function bakimSecildi(ad) {
+    if (secici?.toplu) {
+      const yeni = { ...konular };
+      alicilar.forEach((m) => { yeni[m.id] = ad; });
+      setKonular(yeni);
+    } else if (secici?.id) {
+      setKonular({ ...konular, [secici.id]: ad });
+    }
+    setSecici(null);
+  }
 
   function sablonSec(ad) {
     const sb = SABLONLAR.find((x) => x.ad === ad);
@@ -682,20 +774,49 @@ export default function TopluMesajPage() {
           <div style={s.uyari}>📵 {telefonsuz.length} müşterinin telefonu kayıtlı olmadığı için listede yok.</div>
         )}
 
+        {uygunlar.length > 0 && (
+          <div style={s.topluBar}>
+            <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+              <div style={{ fontWeight: 800, color: '#0f2d4a', fontSize: 14 }}>Bakım konusu</div>
+              <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 2 }}>
+                {bakimsizSayi > 0
+                  ? `${bakimsizSayi} kişide bakım seçilmedi — onlara genel açıklama gider.`
+                  : 'Tüm alıcıların bakım konusu seçili ✓'}
+              </div>
+            </div>
+            <button style={s.topluBtn} onClick={() => setSecici({ toplu: true })}>Hepsine aynı bakımı seç</button>
+          </div>
+        )}
+
         {uygunlar.map((m) => {
           const dahil = !haric.includes(m.id);
           const konu = konuBul(m);
+          const b = bakimBul(konu);
           return (
-            <div key={m.id} style={s.aliciSatir}>
-              <input type="checkbox" checked={dahil} onChange={() => haricDegistir(m.id)} style={{ width: 20, height: 20, flexShrink: 0 }} />
-              <div style={{ flex: 1, minWidth: 150 }}>
+            <div key={m.id} style={{ ...s.aliciSatir, opacity: dahil ? 1 : 0.5 }}>
+              <input type="checkbox" checked={dahil} onChange={() => haricDegistir(m.id)} style={{ width: 22, height: 22, flexShrink: 0, accentColor: '#1d6fe0' }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={s.aliciAd}>{m.name}{elleEklenen.includes(m.id) && <span style={s.yeniRozet}>elle eklendi</span>}</div>
-                <div style={s.soluk}>{m.phone}{m.address ? ` · ${m.address}` : ''}</div>
+                <div style={{ ...s.soluk, fontSize: 13 }}>{m.phone}{m.address ? ` · ${m.address}` : ''}</div>
+                <button style={konu ? s.konuCip : s.konuCipBos} onClick={() => setSecici({ id: m.id, ad: m.name })} disabled={!dahil}>
+                  {konu ? (
+                    <>
+                      <span style={{ fontSize: 16 }}>{GRUP_IKON[b?.grup] || '🔧'}</span>
+                      <span style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
+                        <span style={{ display: 'block', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{konu}</span>
+                        {b && <span style={{ display: 'block', fontSize: 11.5, color: '#64748b', fontWeight: 500 }}>{b.grup} · {b.periyot}</span>}
+                      </span>
+                      <span style={{ fontSize: 12, color: '#1d6fe0', fontWeight: 700 }}>Değiştir</span>
+                    </>
+                  ) : (
+                    <>
+                      <span style={{ fontSize: 16 }}>🔧</span>
+                      <span style={{ flex: 1, textAlign: 'left' }}>Hangi bakım için? <b>Seç</b></span>
+                      <span>›</span>
+                    </>
+                  )}
+                </button>
               </div>
-              <select style={s.konuSec} value={konu} onChange={(e) => setKonular({ ...konular, [m.id]: e.target.value })}>
-                <option value="">🔧 Bakım seçilmedi</option>
-                <BakimSecenekleri ekstra={konu} />
-              </select>
             </div>
           );
         })}
@@ -715,6 +836,14 @@ export default function TopluMesajPage() {
           ))
         )}
       </div>
+      {secici && (
+        <BakimSecici
+          baslik={secici.toplu ? `Seçili ${alicilar.length} kişinin tümü` : secici.ad}
+          mevcut={secici.toplu ? '' : konuBul(uygunlar.find((m) => m.id === secici.id) || {})}
+          onSec={bakimSecildi}
+          onKapat={() => setSecici(null)}
+        />
+      )}
     </div>
   );
 }
@@ -738,9 +867,46 @@ const s = {
   onizleme: { marginTop: 6, background: '#dcf8c6', borderRadius: 12, padding: '12px 14px', whiteSpace: 'pre-wrap', fontSize: 15, color: '#111827', lineHeight: 1.5 },
   uyari: { background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: 12, fontSize: 14, color: '#92400e', margin: '8px 0 12px' },
   yeniKutu: { background: '#f8fafc', border: '1px dashed #93c5fd', borderRadius: 12, padding: 14, margin: '10px 0 14px' },
-  aliciSatir: { display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderTop: '1px solid #eef2f6', flexWrap: 'wrap' },
+  aliciSatir: { display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 0', borderTop: '1px solid #eef2f6' },
   aliciAd: { fontWeight: 700, color: '#0f2d4a' },
   yeniRozet: { marginLeft: 8, fontSize: 11, background: '#ede9fe', color: '#6d28d9', padding: '2px 8px', borderRadius: 10, fontWeight: 700 },
+  topluBar: {
+    display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', background: '#f0f6ff', border: '1px solid #cfe0fb',
+    borderRadius: 12, padding: '10px 12px', margin: '8px 0 4px',
+  },
+  topluBtn: { flex: '1 1 auto', border: 'none', background: '#1d6fe0', color: '#fff', fontWeight: 700, fontSize: 13, borderRadius: 10, padding: '9px 12px', cursor: 'pointer' },
+  konuCip: {
+    display: 'flex', alignItems: 'center', gap: 10, width: '100%', marginTop: 8, padding: '9px 12px', borderRadius: 12,
+    border: '1px solid #bfdbfe', background: '#eff6ff', color: '#0f2d4a', fontSize: 13.5, cursor: 'pointer', boxSizing: 'border-box',
+  },
+  konuCipBos: {
+    display: 'flex', alignItems: 'center', gap: 10, width: '100%', marginTop: 8, padding: '10px 12px', borderRadius: 12,
+    border: '1.5px dashed #f59e0b', background: '#fffbeb', color: '#92400e', fontSize: 13.5, cursor: 'pointer', boxSizing: 'border-box',
+  },
+  bsArka: { position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(15,23,42,.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
+  bsPanel: {
+    width: '100%', maxWidth: 620, maxHeight: '88vh', background: '#fff', borderRadius: '22px 22px 0 0', padding: '8px 16px',
+    paddingBottom: 'calc(16px + env(safe-area-inset-bottom))', display: 'flex', flexDirection: 'column', boxSizing: 'border-box',
+    boxShadow: '0 -10px 40px rgba(0,0,0,.25)',
+  },
+  bsTutamac: { width: 40, height: 5, borderRadius: 3, background: '#cbd5e1', margin: '4px auto 10px' },
+  bsUst: { display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
+  bsBaslik: { fontSize: 18, fontWeight: 800, color: '#0f2d4a', lineHeight: 1.25 },
+  bsAlt: { fontSize: 13, color: '#64748b', marginTop: 4 },
+  bsKapat: { marginLeft: 'auto', width: 34, height: 34, borderRadius: '50%', border: 'none', background: '#f1f5f9', fontSize: 15, cursor: 'pointer', flexShrink: 0 },
+  bsListe: { overflowY: 'auto', flex: 1, margin: '0 -4px', padding: '0 4px', WebkitOverflowScrolling: 'touch' },
+  bsGrup: { border: '1px solid #e2e8f0', borderRadius: 14, marginBottom: 10, overflow: 'hidden', background: '#fff' },
+  bsGrupBtn: { display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '12px', border: 'none', background: '#fff', color: '#0f2d4a', cursor: 'pointer' },
+  bsGrupBtnAcik: { background: '#f8fafc', borderBottom: '1px solid #e2e8f0' },
+  bsGrupIkon: { width: 40, height: 40, borderRadius: 12, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 21, flexShrink: 0 },
+  bsSeciliRozet: { marginLeft: 6, background: '#dbeafe', color: '#1d4ed8', fontSize: 11, fontWeight: 800, borderRadius: 10, padding: '2px 7px', verticalAlign: 'middle' },
+  bsSatir: {
+    display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 10px', border: 'none', borderRadius: 10,
+    background: 'transparent', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', boxSizing: 'border-box',
+  },
+  bsSatirSecili: { background: '#eff6ff', boxShadow: 'inset 0 0 0 1.5px #1d6fe0' },
+  bsPeriyot: { fontSize: 11, fontWeight: 700, color: '#0f766e', background: '#ecfdf5', borderRadius: 8, padding: '4px 7px', whiteSpace: 'nowrap', flexShrink: 0, maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis' },
+  bsTemizle: { marginTop: 10, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#475569', borderRadius: 12, padding: '11px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer' },
   konuSec: { padding: '8px 10px', borderRadius: 10, border: '1px solid #cbd5e1', fontSize: 13, background: '#fff', maxWidth: 300 },
   anaBtn: { background: 'linear-gradient(135deg,#1d6fe0,#2563eb)', color: '#fff', border: 'none', borderRadius: 12, padding: '12px 18px', fontWeight: 700, cursor: 'pointer', fontSize: 15 },
   ikincilBtn: { background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 12, padding: '12px 16px', fontWeight: 700, cursor: 'pointer', fontSize: 15 },
