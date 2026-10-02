@@ -87,7 +87,7 @@ function hizliOku() {
   return VARSAYILAN_HIZLI;
 }
 
-export default function DashboardPage({ onNavigate }) {
+export default function DashboardPage({ onNavigate, ad }) {
   const [kurallar, setKurallar] = useState([]);
   const [tamamlanan, setTamamlanan] = useState(0);
   const [musteriSayi, setMusteriSayi] = useState(0);
@@ -124,7 +124,7 @@ export default function DashboardPage({ onNavigate }) {
   const liste = [...kurallar].sort((a, b) => a.next_due_date.localeCompare(b.next_due_date)).slice(0, 5);
 
   const istatistik = [
-    { ad: 'Bakımı Geçmiş', sayi: gecikmis, simge: 'pano', renk: '#dc2626', ikonZemin: '#fecaca', zemin: '#fdecec', kenar: '#fbd5d5', hedef: 'takvim' },
+    { ad: 'Gecikmiş Bakım', sayi: gecikmis, simge: 'pano', renk: '#dc2626', ikonZemin: '#fecaca', zemin: '#fdecec', kenar: '#fbd5d5', hedef: 'takvim' },
     { ad: 'Yaklaşan Bakım', sayi: yaklasan, simge: 'kumSaati', renk: '#f59e0b', ikonZemin: '#fde9c4', zemin: '#fff8e8', kenar: '#fbeccb', hedef: 'takvim' },
     { ad: 'Bu Ay Tamamlanan', sayi: tamamlanan, simge: 'tik', renk: '#16a34a', ikonZemin: '#c9f0d7', zemin: '#eaf9f0', kenar: '#d3f1de', hedef: 'isemirleri' },
     { ad: 'Toplam Müşteri', sayi: musteriSayi, simge: 'kisiler', renk: '#1d6fe0', ikonZemin: '#d6e6ff', zemin: '#eef4fd', kenar: '#dbe7f7', hedef: 'musteriler' },
@@ -134,17 +134,24 @@ export default function DashboardPage({ onNavigate }) {
 
   return (
     <div style={s.sayfa}>
+      <div style={s.selam}>
+        <div>
+          <div style={s.selamYazi}>{selamla()}{ad ? `, ${String(ad).split(' ')[0]}` : ''} 👋</div>
+          <div style={s.selamTarih}>{bugunYazi()}</div>
+        </div>
+      </div>
+
       <HavaKarti />
 
       {/* Özet kartları */}
       <div style={s.istIzgara}>
         {istatistik.map((k) => (
           <button key={k.ad} style={{ ...s.istKart, background: k.zemin, borderColor: k.kenar }} onClick={() => git(k.hedef)}>
-            <div style={{ ...s.istIkon, background: k.ikonZemin }}>{SIMGE[k.simge](k.renk)}</div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ ...s.istSayi, color: k.sayi > 0 && k.ad === 'Bakımı Geçmiş' ? '#dc2626' : '#0b1730' }}>{k.sayi}</div>
-              <div style={s.istAd}>{k.ad}</div>
+            <div style={s.istUst}>
+              <div style={{ ...s.istIkon, background: k.ikonZemin }}>{SIMGE[k.simge](k.renk)}</div>
+              <div style={{ ...s.istSayi, color: k.sayi > 0 && k.ad === 'Gecikmiş Bakım' ? '#dc2626' : '#0b1730' }}>{k.sayi}</div>
             </div>
+            <div style={s.istAd}>{k.ad}</div>
           </button>
         ))}
       </div>
@@ -212,6 +219,20 @@ export default function DashboardPage({ onNavigate }) {
   );
 }
 
+function selamla() {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 12) return 'Günaydın';
+  if (h >= 12 && h < 18) return 'İyi günler';
+  if (h >= 18 && h < 23) return 'İyi akşamlar';
+  return 'İyi geceler';
+}
+
+function bugunYazi() {
+  const d = new Date();
+  const gun = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'][d.getDay()];
+  return `${d.getDate()} ${AYLAR[d.getMonth()]} ${d.getFullYear()}, ${gun}`;
+}
+
 const kartGolge = '0 4px 18px rgba(15,45,74,0.07)';
 
 const s = {
@@ -258,12 +279,16 @@ const s = {
   havaSehir: { fontSize: 12, opacity: 0.9 },
   istIzgara: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(158px, 1fr))', gap: 10, marginBottom: 14 },
   istKart: {
-    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 12px', borderRadius: 18, border: '1px solid',
+    display: 'flex', flexDirection: 'column', gap: 10, padding: '12px 14px', borderRadius: 18, border: '1px solid',
     cursor: 'pointer', textAlign: 'left', minWidth: 0, boxShadow: kartGolge,
   },
-  istIkon: { width: 42, height: 42, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  istSayi: { fontSize: 24, fontWeight: 900, lineHeight: 1 },
-  istAd: { fontSize: 12, color: '#475569', lineHeight: 1.2, marginTop: 3, fontWeight: 600 },
+  istUst: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  selam: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', margin: '2px 2px 12px' },
+  selamYazi: { fontSize: 20, fontWeight: 800, color: '#0b1730', letterSpacing: -0.3 },
+  selamTarih: { fontSize: 13, color: '#64748b', marginTop: 2, fontWeight: 500 },
+  istIkon: { width: 38, height: 38, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  istSayi: { fontSize: 28, fontWeight: 900, lineHeight: 1, letterSpacing: -0.5 },
+  istAd: { fontSize: 12.5, color: '#475569', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   kutu: { background: '#fff', borderRadius: 18, padding: '14px 12px', marginBottom: 14, boxShadow: kartGolge },
   kutuUst: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '0 4px' },
   kutuBaslik: { margin: 0, fontSize: 17, fontWeight: 800, color: '#0b1730' },
