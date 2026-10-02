@@ -178,7 +178,7 @@ function AnaUygulama() {
 
   const zil = (
     <button style={s.zil} onClick={() => git('takvim')} title="Gecikmiş bakımlar">
-      🔔
+      <SIkon ad="zil" boyut={20} renk="#334155" />
       {gecikmis > 0 && <span style={s.zilRozet}>{gecikmis > 99 ? '99+' : gecikmis}</span>}
     </button>
   );
@@ -195,6 +195,14 @@ function AnaUygulama() {
       <button style={s.cikisBtn} onClick={cikisYap}>⎋ Çıkış</button>
     </div>
   );
+
+  const selamMetni = () => { const h = new Date().getHours(); return h >= 5 && h < 12 ? 'Günaydın' : h < 18 && h >= 12 ? 'İyi günler' : h >= 18 && h < 23 ? 'İyi akşamlar' : 'İyi geceler'; };
+  const tarihMetni = () => {
+    const d = new Date();
+    const aylar = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+    const gunler = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+    return `${d.getDate()} ${aylar[d.getMonth()]} ${d.getFullYear()}, ${gunler[d.getDay()]}`;
+  };
 
   if (genis) {
     return (
@@ -222,9 +230,27 @@ function AnaUygulama() {
         <div style={{ marginLeft: 260, minHeight: '100vh', position: 'relative' }}>
           <div style={{ position: 'fixed', inset: 0, left: 260, zIndex: 0, background: arkaCss }} />
           <div style={{ position: 'relative', zIndex: 1 }}>
+          {sayfa === 'anasayfa' ? (
+            <header style={{ ...s.masaHero, background: baslikZemin }}>
+              <div style={s.masaHeroIc}>
+                <div style={s.masaHeroUst}>
+                  <span />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <button style={s.masaHeroZil} onClick={() => git('takvim')} title="Gecikmiş bakımlar">
+                      <SIkon ad="zil" boyut={20} renk="#fff" />
+                      {gecikmis > 0 && <span style={s.zilRozet}>{gecikmis > 99 ? '99+' : gecikmis}</span>}
+                    </button>
+                    <button style={s.yeniIsBtn} onClick={() => git('isemirleri')}>+ Yeni İş Emri</button>
+                  </div>
+                </div>
+                <div style={s.masaSelam}>{selamMetni()}, {String(ad).split(' ')[0]} 👋</div>
+                <div style={s.masaTarih}>{tarihMetni()}</div>
+              </div>
+            </header>
+          ) : (
           <header style={s.ustCubuk}>
             <form onSubmit={aramaYap} style={s.aramaKutu}>
-              <span style={{ fontSize: 17, opacity: 0.6 }}>🔍</span>
+              <SIkon ad="ara" boyut={18} renk="#64748b" />
               <input
                 style={s.aramaInput}
                 value={arama}
@@ -237,6 +263,7 @@ function AnaUygulama() {
               <button style={s.yeniIsBtn} onClick={() => git('isemirleri')}>+ Yeni İş Emri</button>
             </div>
           </header>
+          )}
           <main>{sayfaIcerik}</main>
           </div>
         </div>
@@ -245,13 +272,6 @@ function AnaUygulama() {
   }
 
   const menudeMi = !ALT_MENU.includes(sayfa);
-  const selamMetni = () => { const h = new Date().getHours(); return h >= 5 && h < 12 ? 'Günaydın' : h < 18 && h >= 12 ? 'İyi günler' : h >= 18 && h < 23 ? 'İyi akşamlar' : 'İyi geceler'; };
-  const tarihMetni = () => {
-    const d = new Date();
-    const aylar = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
-    const gunler = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
-    return `${d.getDate()} ${aylar[d.getMonth()]} ${d.getFullYear()}, ${gunler[d.getDay()]}`;
-  };
 
   return (
     <div style={s.mKok}>
@@ -415,6 +435,23 @@ const s = {
     width: '100%', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.04)', color: '#e2e8f0',
     borderRadius: 10, padding: '8px 10px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
   },
+  masaHero: {
+    position: 'relative', padding: '22px 32px 76px', borderRadius: '0 0 30px 30px',
+    boxShadow: '0 10px 30px rgba(6,40,72,0.25)', color: '#fff',
+  },
+  masaHeroIc: { maxWidth: 900, margin: '0 auto' },
+  masaHeroUst: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
+  masaHeroArama: {
+    flex: 1, maxWidth: 520, display: 'flex', alignItems: 'center', gap: 10, margin: 0, borderRadius: 14, padding: '0 16px',
+    background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.25)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
+  },
+  masaHeroInput: { flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: 15, padding: '13px 0', color: '#fff', minWidth: 0, fontFamily: 'inherit' },
+  masaHeroZil: {
+    position: 'relative', width: 46, height: 46, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(15,30,55,0.5)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, backdropFilter: 'blur(6px)',
+  },
+  masaSelam: { marginTop: 70, fontSize: 32, fontWeight: 800, letterSpacing: -0.5, textShadow: '0 2px 10px rgba(0,0,0,.35)' },
+  masaTarih: { marginTop: 6, fontSize: 16, opacity: 0.88, fontWeight: 500, textShadow: '0 1px 6px rgba(0,0,0,.35)' },
   ustCubuk: {
     position: 'sticky', top: 0, zIndex: 15, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     gap: 16, padding: '14px 28px', background: 'rgba(241,245,251,0.88)', backdropFilter: 'blur(10px)',
