@@ -487,11 +487,15 @@ function GorunumAyarlari() {
       <div style={{ ...g.altBaslik, marginTop: 18 }}>Üst başlık fotoğrafı</div>
       <div style={g.ipucu}>Ana sayfanın üstünde, logonun arkasında görünür. Yaptığınız bir havuzun fotoğrafı çok güzel durur.</div>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
-        {tema.baslikFoto && (
-          <div style={{ width: 120, height: 64, borderRadius: 12, background: `url(${tema.baslikFoto}) center / cover`, border: '1px solid #e2e8f0' }} />
+        <div style={{ width: 120, height: 64, borderRadius: 12, border: '1px solid #e2e8f0',
+          background: tema.baslikFoto === 'yok' ? 'linear-gradient(165deg,#0b2a4a,#063a63)' : `url(${tema.baslikFoto || '/hero-alka.jpg'}) right center / cover` }} />
+        <button style={g.sifirla} onClick={() => baslikRef.current?.click()}>{yukleniyor ? '⏳ Yükleniyor...' : '📷 Kendi fotoğrafını seç'}</button>
+        {tema.baslikFoto !== null && tema.baslikFoto !== undefined && (
+          <button style={g.sifirla} onClick={() => degistir({ baslikFoto: null })}>Hazır villa fotoğrafı</button>
         )}
-        <button style={g.sifirla} onClick={() => baslikRef.current?.click()}>{yukleniyor ? '⏳ Yükleniyor...' : tema.baslikFoto ? '📷 Fotoğrafı değiştir' : '📷 Fotoğraf seç'}</button>
-        {tema.baslikFoto && <button style={{ ...g.sifirla, color: '#b91c1c', borderColor: '#fecaca' }} onClick={() => degistir({ baslikFoto: null })}>Kaldır</button>}
+        {tema.baslikFoto !== 'yok' && (
+          <button style={{ ...g.sifirla, color: '#b91c1c', borderColor: '#fecaca' }} onClick={() => degistir({ baslikFoto: 'yok' })}>Fotoğrafsız</button>
+        )}
         <input ref={baslikRef} type="file" accept="image/*" onChange={baslikFotoSec} style={{ display: 'none' }} />
       </div>
 
