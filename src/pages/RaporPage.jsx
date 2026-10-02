@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import EraiImza from '../components/EraiImza.jsx';
 
 const FIRMA_TEL = '0533 371 39 35';
 const FIRMA_WA = '905333713935';
@@ -179,8 +178,7 @@ export default function RaporPage({ token }) {
             <a href={`https://wa.me/${FIRMA_WA}`} target="_blank" rel="noreferrer" style={s.waBtn}>💬 WhatsApp</a>
             <button style={s.pdfBtn} onClick={() => window.print()}>📄 PDF olarak kaydet</button>
           </div>
-          <div style={{ ...s.soluk, marginTop: 14 }}>ALKA Havuz · Volkan Gülcemal · {FIRMA_TEL}</div>
-          <div style={{ marginTop: 10 }}><EraiImza boyut={12} /></div>
+          <div style={{ ...s.soluk, marginTop: 14 }}>ALKA Mekanik ve Havuz Sistemleri · Volkan Gülcemal · {FIRMA_TEL}</div>
         </div>
       </div>
 
