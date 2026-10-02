@@ -138,17 +138,9 @@ export default function DashboardPage({ onNavigate, ad }) {
   }
 
   return (
-    <div style={{ ...s.sayfa, ...(genis ? { paddingTop: 16 } : {}) }}>
-      {genis && (
-        <div style={s.selam}>
-          <div>
-            <div style={s.selamYazi}>{selamla()}{ad ? `, ${String(ad).split(' ')[0]}` : ''} 👋</div>
-            <div style={s.selamTarih}>{bugunYazi()}</div>
-          </div>
-        </div>
-      )}
+    <div style={s.sayfa}>
 
-      <HavaKarti onAra={aramaGit} ustuneBin={!genis} />
+      <HavaKarti onAra={aramaGit} ustuneBin />
 
       {/* Ana işlemler */}
       <div style={s.anaIzgara}>
