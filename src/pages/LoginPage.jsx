@@ -1,9 +1,23 @@
 import { useState } from 'react';
 import { supabase } from '../supabase';
 
+const HATIRLA_ANAHTAR = 'alkaGirisBilgi';
+
+function kayitliGiris() {
+  try {
+    const v = JSON.parse(localStorage.getItem(HATIRLA_ANAHTAR) || 'null');
+    if (!v) return null;
+    return { k: v.k || '', s: v.s ? decodeURIComponent(escape(atob(v.s))) : '' };
+  } catch {
+    return null;
+  }
+}
+
 export default function LoginPage() {
-  const [kullanici, setKullanici] = useState('');
-  const [sifre, setSifre] = useState('');
+  const kayitli = kayitliGiris();
+  const [kullanici, setKullanici] = useState(kayitli?.k || '');
+  const [sifre, setSifre] = useState(kayitli?.s || '');
+  const [hatirla, setHatirla] = useState(true);
   const [sifreGoster, setSifreGoster] = useState(false);
   const [hata, setHata] = useState('');
   const [yukleniyor, setYukleniyor] = useState(false);
@@ -19,7 +33,14 @@ export default function LoginPage() {
     const email = kullanici.trim().toLowerCase() + '@alka.app';
     const { error } = await supabase.auth.signInWithPassword({ email, password: sifre });
     setYukleniyor(false);
-    if (error) setHata('Kullanıcı adı veya şifre hatalı.');
+    if (error) { setHata('Kullanıcı adı veya şifre hatalı.'); return; }
+    try {
+      if (hatirla) {
+        localStorage.setItem(HATIRLA_ANAHTAR, JSON.stringify({ k: kullanici.trim(), s: btoa(unescape(encodeURIComponent(sifre))) }));
+      } else {
+        localStorage.removeItem(HATIRLA_ANAHTAR);
+      }
+    } catch { /* yoksay */ }
   }
 
   return (
@@ -39,7 +60,9 @@ export default function LoginPage() {
           style={s.input}
           value={kullanici}
           onChange={(e) => setKullanici(e.target.value)}
-          placeholder="örnek: volkan"
+          placeholder="Kullanıcı adınız"
+          name="username"
+          id="username"
           autoCapitalize="none"
           autoCorrect="off"
           autoComplete="username"
@@ -52,13 +75,20 @@ export default function LoginPage() {
             type={sifreGoster ? 'text' : 'password'}
             value={sifre}
             onChange={(e) => setSifre(e.target.value)}
-            placeholder="••••••"
+            placeholder="Şifreniz"
+            name="password"
+            id="password"
             autoComplete="current-password"
           />
           <button type="button" style={s.gosterBtn} onClick={() => setSifreGoster(!sifreGoster)}>
             {sifreGoster ? 'Gizle' : 'Göster'}
           </button>
         </div>
+
+        <label style={s.hatirlaSatir}>
+          <input type="checkbox" checked={hatirla} onChange={(e) => setHatirla(e.target.checked)} style={{ width: 20, height: 20, accentColor: '#1e5a82' }} />
+          <span>Beni hatırla</span>
+        </label>
 
         {hata && <div style={s.hata}>{hata}</div>}
 
@@ -74,6 +104,7 @@ export default function LoginPage() {
 }
 
 const s = {
+  hatirlaSatir: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 14, fontSize: 15, color: '#334155', fontWeight: 600, cursor: 'pointer' },
   zemin: {
     minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
     background: 'linear-gradient(135deg,#0f2d4a 0%,#1e5a82 60%,#0b2440 100%)',
