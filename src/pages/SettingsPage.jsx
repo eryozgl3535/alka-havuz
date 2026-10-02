@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabase';
+import { ARKA_PLANLAR, BASLIK_RENKLERI, useTema, temaKaydet, temaSifirla, arkaPlanCss, fotoKucult } from '../tema';
 import EraiImza from '../components/EraiImza.jsx';
 
 const YETKILI = ['Patron', 'Sistem Yöneticisi'];
@@ -302,6 +303,8 @@ export default function SettingsPage({ session }) {
         </form>
       </div>
 
+      <GorunumAyarlari />
+
       <div style={s.kart}>
         <h2 style={{ ...s.bolum, marginTop: 0 }}>🔒 Şifre değiştir</h2>
         <form onSubmit={sifreDegistir}>
@@ -335,9 +338,9 @@ export default function SettingsPage({ session }) {
 
       <div style={s.kart}>
         <h2 style={{ ...s.bolum, marginTop: 0 }}>ℹ️ Sistem</h2>
-        <div style={s.bilgiSatir}><span>Uygulama</span><b>ALKA Tesisat Operasyon Sistemi</b></div>
+        <div style={s.bilgiSatir}><span>Uygulama</span><b>ALKA Operasyon Sistemi</b></div>
         <div style={s.bilgiSatir}><span>Sürüm</span><b>1.0</b></div>
-        <div style={s.bilgiSatir}><span>Firma</span><b>ALKA Havuz · 0533 371 39 35</b></div>
+        <div style={s.bilgiSatir}><span>Firma</span><b>ALKA Mekanik ve Havuz Sistemleri · 0533 371 39 35</b></div>
         <div style={{ ...s.bilgiSatir, alignItems: 'center' }}>
           <span>Geliştirici</span>
           <EraiImza boyut={14} />
@@ -390,4 +393,119 @@ const s = {
     borderBottom: '1px solid #eef2f6', fontSize: 14, color: '#475569', flexWrap: 'wrap' },
   cikisBtn: { marginTop: 18, background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 12,
     padding: '12px 20px', fontWeight: 700, cursor: 'pointer', fontSize: 15 },
+};
+
+
+function GorunumAyarlari() {
+  const tema = useTema();
+  const dosyaRef = useRef(null);
+  const [mesaj, setMesaj] = useState('');
+  const [yukleniyor, setYukleniyor] = useState(false);
+
+  function degistir(yeni) {
+    try {
+      temaKaydet({ ...tema, ...yeni });
+      setMesaj('');
+    } catch {
+      setMesaj('Kaydedilemedi: fotoğraf çok büyük olabilir, daha küçük bir fotoğraf deneyin.');
+    }
+  }
+
+  async function fotoSec(e) {
+    const dosya = e.target.files?.[0];
+    e.target.value = '';
+    if (!dosya) return;
+    setYukleniyor(true);
+    try {
+      const veri = await fotoKucult(dosya);
+      degistir({ arka: 'foto', foto: veri });
+    } catch (err) {
+      setMesaj(err.message);
+    }
+    setYukleniyor(false);
+  }
+
+  const onizleme = (css, secili, ad, tik) => (
+    <button key={ad} onClick={tik} style={{ ...g.ornek, ...(secili ? g.ornekSecili : {}) }}>
+      <span style={{ ...g.ornekKutu, background: css }}>
+        <span style={{ ...g.ornekBaslik, background: `linear-gradient(180deg,${BASLIK_RENKLERI.find((b) => b.id === tema.baslik)?.renk[0] || '#0b2a4a'},${BASLIK_RENKLERI.find((b) => b.id === tema.baslik)?.renk[1] || '#063a63'})` }} />
+        <span style={g.ornekKart} /><span style={{ ...g.ornekKart, width: '40%' }} />
+        {secili && <span style={g.tik}>✓</span>}
+      </span>
+      <span style={g.ornekAd}>{ad}</span>
+    </button>
+  );
+
+  return (
+    <div style={s.kart}>
+      <h2 style={{ ...s.bolum, marginTop: 0 }}>🎨 Görünüm</h2>
+      <p style={g.aciklama}>Uygulamanın arka planını ve başlık rengini seç. Ayar bu cihaza kaydedilir, diğer kullanıcıları etkilemez.</p>
+
+      <div style={g.altBaslik}>Arka plan</div>
+      <div style={g.izgara}>
+        {ARKA_PLANLAR.map((a) => onizleme(a.css, tema.arka === a.id, a.ad, () => degistir({ arka: a.id })))}
+        {tema.foto && onizleme(arkaPlanCss({ ...tema, arka: 'foto' }), tema.arka === 'foto', 'Fotoğrafım', () => degistir({ arka: 'foto' }))}
+        <button style={g.ornek} onClick={() => dosyaRef.current?.click()}>
+          <span style={{ ...g.ornekKutu, ...g.fotoEkle }}>{yukleniyor ? '⏳' : '📷'}<small style={{ fontSize: 11, marginTop: 4 }}>{tema.foto ? 'Değiştir' : 'Fotoğraf seç'}</small></span>
+          <span style={g.ornekAd}>Kendi fotoğrafın</span>
+        </button>
+        <input ref={dosyaRef} type="file" accept="image/*" onChange={fotoSec} style={{ display: 'none' }} />
+      </div>
+
+      {tema.arka === 'foto' && tema.foto && (
+        <div style={g.kaydirmaAlan}>
+          <div style={g.altBaslik}>Fotoğraf belirginliği · %{Math.round((tema.fotoBelirgin ?? 0.45) * 100)}</div>
+          <input type="range" min="15" max="85" step="5" value={Math.round((tema.fotoBelirgin ?? 0.45) * 100)}
+            onChange={(e) => degistir({ fotoBelirgin: Number(e.target.value) / 100 })} style={{ width: '100%', accentColor: '#1d6fe0' }} />
+          <div style={g.ipucu}>Yazıların rahat okunması için %30–%55 arası önerilir.</div>
+        </div>
+      )}
+
+      <div style={{ ...g.altBaslik, marginTop: 18 }}>Başlık ve menü rengi</div>
+      <div style={g.renkSatir}>
+        {BASLIK_RENKLERI.map((b) => (
+          <button key={b.id} onClick={() => degistir({ baslik: b.id })} style={g.renkBtn}>
+            <span style={{ ...g.renkDaire, background: `linear-gradient(135deg,${b.renk[0]},${b.renk[1]})`,
+              boxShadow: tema.baslik === b.id ? '0 0 0 3px #fff, 0 0 0 5px #1d6fe0' : '0 2px 6px rgba(0,0,0,.15)' }}>
+              {tema.baslik === b.id && '✓'}
+            </span>
+            <span style={g.renkAd}>{b.ad}</span>
+          </button>
+        ))}
+      </div>
+
+      {mesaj && <div style={g.hata}>{mesaj}</div>}
+
+      <button style={g.sifirla} onClick={() => { temaSifirla(); setMesaj(''); }}>↺ Varsayılana dön</button>
+    </div>
+  );
+}
+
+const g = {
+  aciklama: { margin: '-4px 0 14px', color: '#64748b', fontSize: 13.5, lineHeight: 1.5 },
+  altBaslik: { fontSize: 13, fontWeight: 800, color: '#334155', marginBottom: 10 },
+  izgara: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(92px, 1fr))', gap: 12 },
+  ornek: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, border: 'none', background: 'none', padding: 0, cursor: 'pointer' },
+  ornekSecili: {},
+  ornekKutu: {
+    position: 'relative', width: '100%', aspectRatio: '3 / 4', borderRadius: 14, overflow: 'hidden',
+    border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(15,45,74,.08)', display: 'flex', flexDirection: 'column',
+    alignItems: 'center', boxSizing: 'border-box',
+  },
+  ornekBaslik: { width: '100%', height: '24%', borderRadius: '0 0 10px 10px', marginBottom: 8, flexShrink: 0 },
+  ornekKart: { width: '76%', height: '14%', background: 'rgba(255,255,255,.92)', borderRadius: 6, marginBottom: 6, boxShadow: '0 1px 3px rgba(0,0,0,.08)', alignSelf: 'center' },
+  tik: {
+    position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, color: '#fff',
+    background: 'rgba(29,111,224,.35)', boxShadow: 'inset 0 0 0 3px #1d6fe0', borderRadius: 14, fontWeight: 900,
+  },
+  ornekAd: { fontSize: 12.5, fontWeight: 700, color: '#0f2d4a', textAlign: 'center' },
+  fotoEkle: { justifyContent: 'center', background: '#f8fafc', border: '2px dashed #cbd5e1', fontSize: 26, color: '#475569' },
+  kaydirmaAlan: { marginTop: 16, padding: 14, background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0' },
+  ipucu: { fontSize: 12, color: '#64748b', marginTop: 4 },
+  renkSatir: { display: 'flex', flexWrap: 'wrap', gap: 14 },
+  renkBtn: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, border: 'none', background: 'none', cursor: 'pointer', padding: 0 },
+  renkDaire: { width: 44, height: 44, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: 18 },
+  renkAd: { fontSize: 12, fontWeight: 600, color: '#334155' },
+  hata: { marginTop: 12, background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: 10, padding: 10, fontSize: 13 },
+  sifirla: { marginTop: 18, border: '1px solid #cbd5e1', background: '#fff', color: '#334155', borderRadius: 10, padding: '9px 14px', fontWeight: 600, cursor: 'pointer', fontSize: 14 },
 };
