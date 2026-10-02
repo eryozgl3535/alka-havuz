@@ -544,6 +544,11 @@ export default function TopluMesajPage() {
   }
 
   useEffect(() => { yukle(); }, []);
+  useEffect(() => {
+    const hazir = sessionStorage.getItem('alkaSablon');
+    if (hazir) { sessionStorage.removeItem('alkaSablon'); sablonSec(hazir); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (kuyruk) localStorage.setItem(KUYRUK_ANAHTAR, JSON.stringify(kuyruk));
@@ -1161,3 +1166,5 @@ const s = {
   atlaBtn: { background: '#fff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: 12, padding: '15px 18px', fontWeight: 700, cursor: 'pointer', fontSize: 15 },
   bitirBtn: { display: 'block', margin: '18px auto 0', background: 'none', border: 'none', color: '#dc2626', fontWeight: 700, cursor: 'pointer', fontSize: 14 },
 };
+
+export { BAKIMLAR, bakimBul, kisisel, BILGI_SABLON, telefonWa };
