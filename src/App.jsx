@@ -231,7 +231,7 @@ function AnaUygulama() {
           <div style={{ position: 'fixed', inset: 0, left: 260, zIndex: 0, background: arkaCss }} />
           <div style={{ position: 'relative', zIndex: 1 }}>
           {sayfa === 'anasayfa' ? (
-            <header style={{ ...s.masaHero, background: baslikZemin }}>
+            <header style={{ ...s.masaHero, background: baslikZemin.replace('right center / cover', 'right 72% / cover') }}>
               <div style={s.masaHeroIc}>
                 <div style={s.masaHeroUst}>
                   <span />
@@ -436,7 +436,7 @@ const s = {
     borderRadius: 10, padding: '8px 10px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
   },
   masaHero: {
-    position: 'relative', padding: '22px 32px 76px', borderRadius: '0 0 30px 30px',
+    position: 'relative', padding: '22px 32px 92px', borderRadius: '0 0 30px 30px', minHeight: 230,
     boxShadow: '0 10px 30px rgba(6,40,72,0.25)', color: '#fff',
   },
   masaHeroIc: { maxWidth: 900, margin: '0 auto' },
@@ -450,7 +450,7 @@ const s = {
     position: 'relative', width: 46, height: 46, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(15,30,55,0.5)',
     display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, backdropFilter: 'blur(6px)',
   },
-  masaSelam: { marginTop: 70, fontSize: 32, fontWeight: 800, letterSpacing: -0.5, textShadow: '0 2px 10px rgba(0,0,0,.35)' },
+  masaSelam: { marginTop: 96, fontSize: 32, fontWeight: 800, letterSpacing: -0.5, textShadow: '0 2px 10px rgba(0,0,0,.35)' },
   masaTarih: { marginTop: 6, fontSize: 16, opacity: 0.88, fontWeight: 500, textShadow: '0 1px 6px rgba(0,0,0,.35)' },
   ustCubuk: {
     position: 'sticky', top: 0, zIndex: 15, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
