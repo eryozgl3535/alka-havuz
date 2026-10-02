@@ -394,6 +394,7 @@ const s = {
 function GorunumAyarlari() {
   const tema = useTema();
   const dosyaRef = useRef(null);
+  const baslikRef = useRef(null);
   const [mesaj, setMesaj] = useState('');
   const [yukleniyor, setYukleniyor] = useState(false);
 
@@ -404,6 +405,20 @@ function GorunumAyarlari() {
     } catch {
       setMesaj('Kaydedilemedi: fotoğraf çok büyük olabilir, daha küçük bir fotoğraf deneyin.');
     }
+  }
+
+  async function baslikFotoSec(e) {
+    const dosya = e.target.files?.[0];
+    e.target.value = '';
+    if (!dosya) return;
+    setYukleniyor(true);
+    try {
+      const veri = await fotoKucult(dosya, 1400);
+      degistir({ baslikFoto: veri });
+    } catch (err) {
+      setMesaj(err.message);
+    }
+    setYukleniyor(false);
   }
 
   async function fotoSec(e) {
@@ -467,6 +482,17 @@ function GorunumAyarlari() {
             <span style={g.renkAd}>{b.ad}</span>
           </button>
         ))}
+      </div>
+
+      <div style={{ ...g.altBaslik, marginTop: 18 }}>Üst başlık fotoğrafı</div>
+      <div style={g.ipucu}>Ana sayfanın üstünde, logonun arkasında görünür. Yaptığınız bir havuzun fotoğrafı çok güzel durur.</div>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
+        {tema.baslikFoto && (
+          <div style={{ width: 120, height: 64, borderRadius: 12, background: `url(${tema.baslikFoto}) center / cover`, border: '1px solid #e2e8f0' }} />
+        )}
+        <button style={g.sifirla} onClick={() => baslikRef.current?.click()}>{yukleniyor ? '⏳ Yükleniyor...' : tema.baslikFoto ? '📷 Fotoğrafı değiştir' : '📷 Fotoğraf seç'}</button>
+        {tema.baslikFoto && <button style={{ ...g.sifirla, color: '#b91c1c', borderColor: '#fecaca' }} onClick={() => degistir({ baslikFoto: null })}>Kaldır</button>}
+        <input ref={baslikRef} type="file" accept="image/*" onChange={baslikFotoSec} style={{ display: 'none' }} />
       </div>
 
       {mesaj && <div style={g.hata}>{mesaj}</div>}
