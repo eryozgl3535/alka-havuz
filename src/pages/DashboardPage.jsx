@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabase';
 import { FIRMA } from '../firma';
+import { Ikon as SIkon, IkonKutu } from '../ikonlar';
 
 const AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 const KATEGORI_IKON = { Havuz: '🏊', Kuyu: '💧', Hidrofor: '🔵', Sulama: '🌱', Tesisat: '🔧', Elektrik: '⚡' };
-const HIZLI_ANAHTAR = 'alkaHizliErisim3';
+const HIZLI_ANAHTAR = 'alkaHizliErisim4';
 
 const yerel = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -66,16 +67,14 @@ const SIMGE = {
 };
 
 const TUM_HIZLI = [
-  { id: 'yeniMusteri', hedef: 'musteriler', ad: 'Yeni Müşteri', simge: 'kisiEkle', renk: '#1d6fe0', zemin: '#e8f1ff' },
-  { id: 'yeniIs', hedef: 'isemirleri', ad: 'Yeni İş Kaydı', simge: 'artiKare', renk: '#16a34a', zemin: '#e7f8ee' },
-  { id: 'isEmirleri', hedef: 'isemirleri', ad: 'İş Emirleri', simge: 'pano', renk: '#f97316', zemin: '#fdecea' },
-  { id: 'takvim', hedef: 'takvim', ad: 'Bakım Takvimi', simge: 'takvim', renk: '#7c3aed', zemin: '#f1eafe', yaziRenk: '#6d28d9' },
-  { id: 'musteriler', hedef: 'musteriler', ad: 'Müşteriler', simge: 'kisiler', renk: '#1d6fe0', zemin: '#ecf3fb' },
-  { id: 'gelisler', hedef: 'gelisler', ad: 'Geliş Planı', simge: 'gelis', renk: '#0e7490', zemin: '#e8f4f4' },
-  { id: 'raporlar', hedef: 'raporlar', ad: 'Raporlar', simge: 'grafik', renk: '#1d6fe0', zemin: '#ecf3fb' },
-  { id: 'ayarlar', hedef: 'ayarlar', ad: 'Ayarlar', simge: 'ayar', renk: '#475569', zemin: '#eef1f5' },
-  { id: 'toplumesaj', hedef: 'toplumesaj', ad: 'Toplu Mesaj', simge: 'mesaj', renk: '#0891b2', zemin: '#e6f6fa' },
-  { id: 'rehber', hedef: 'rehber', ad: 'Rehberden Aktar', simge: 'rehber', renk: '#db2777', zemin: '#fdeef5' },
+  { id: 'musteriler', hedef: 'musteriler', ad: 'Müşteriler', ik: 'kisiler', renk: '#2563eb' },
+  { id: 'takvim', hedef: 'takvim', ad: 'Takvim', ik: 'takvim', renk: '#7c3aed' },
+  { id: 'raporlar', hedef: 'raporlar', ad: 'Raporlar', ik: 'grafik', renk: '#16a34a' },
+  { id: 'ayarlar', hedef: 'ayarlar', ad: 'Ayarlar', ik: 'ayar', renk: '#475569' },
+  { id: 'isEmirleri', hedef: 'isemirleri', ad: 'İş Emirleri', ik: 'pano', renk: '#ea580c' },
+  { id: 'gelisler', hedef: 'gelisler', ad: 'Geliş Planı', ik: 'takvimSaat', renk: '#0d9488' },
+  { id: 'toplumesaj', hedef: 'toplumesaj', ad: 'Toplu Mesaj', ik: 'hoparlor', renk: '#db2777' },
+  { id: 'rehber', hedef: 'rehber', ad: 'Rehber', ik: 'rehber', renk: '#0891b2' },
 ];
 const VARSAYILAN_HIZLI = ['musteriler', 'takvim', 'raporlar', 'ayarlar'];
 
@@ -124,10 +123,10 @@ export default function DashboardPage({ onNavigate, ad }) {
   const liste = [...kurallar].sort((a, b) => a.next_due_date.localeCompare(b.next_due_date)).slice(0, 5);
 
   const istatistik = [
-    { ad: 'Gecikmiş Bakım', sayi: gecikmis, simge: 'pano', renk: '#dc2626', ikonZemin: '#fecaca', zemin: '#fdecec', kenar: '#fbd5d5', hedef: 'takvim' },
-    { ad: 'Yaklaşan Bakım', sayi: yaklasan, simge: 'kumSaati', renk: '#f59e0b', ikonZemin: '#fde9c4', zemin: '#fff8e8', kenar: '#fbeccb', hedef: 'takvim' },
-    { ad: 'Bu Ay Tamamlanan', sayi: tamamlanan, simge: 'tik', renk: '#16a34a', ikonZemin: '#c9f0d7', zemin: '#eaf9f0', kenar: '#d3f1de', hedef: 'isemirleri' },
-    { ad: 'Toplam Müşteri', sayi: musteriSayi, simge: 'kisiler', renk: '#1d6fe0', ikonZemin: '#d6e6ff', zemin: '#eef4fd', kenar: '#dbe7f7', hedef: 'musteriler' },
+    { ad: 'Gecikmiş', alt: 'bakım', sayi: gecikmis, ik: 'pano', renk: '#dc2626', hedef: 'takvim' },
+    { ad: 'Yaklaşan', alt: '30 gün içinde', sayi: yaklasan, ik: 'kumSaati', renk: '#d97706', hedef: 'takvim' },
+    { ad: 'Tamamlanan', alt: 'bu ay', sayi: tamamlanan, ik: 'tik', renk: '#16a34a', hedef: 'isemirleri' },
+    { ad: 'Müşteri', alt: 'toplam', sayi: musteriSayi, ik: 'kisiler', renk: '#2563eb', hedef: 'musteriler' },
   ];
 
   const gorunenHizli = duzenle ? TUM_HIZLI : hizli.map((id) => TUM_HIZLI.find((h) => h.id === id)).filter(Boolean);
@@ -155,23 +154,20 @@ export default function DashboardPage({ onNavigate, ad }) {
       <div style={s.anaIzgara}>
         {ANA_ISLEMLER.map((x) => (
           <button key={x.ad} style={{ ...s.anaKutu, background: x.zemin }} onClick={() => git(x.hedef)}>
-            <span style={s.anaIkon}>{x.ikon}</span>
-            <svg width="16" height="16" viewBox="0 0 24 24" style={{ position: 'absolute', top: 14, right: 8 }}><path d="m9 6 6 6-6 6" fill="none" stroke="rgba(255,255,255,.9)" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            <span style={s.anaIkon}><SIkon ad={x.ik} boyut={21} renk="#fff" kalin={2.2} /></span>
             <span style={s.anaAd}>{x.etiket}</span>
           </button>
         ))}
       </div>
 
-      {/* Özet kartları */}
-      <div style={s.istIzgara}>
-        {istatistik.map((k) => (
-          <button key={k.ad} style={{ ...s.istKart, background: k.zemin, borderColor: k.kenar }} onClick={() => git(k.hedef)}>
-            <div style={{ ...s.istIkon, background: k.ikonZemin }}>{SIMGE[k.simge](k.renk)}</div>
-            <div style={{ ...s.istSayi, color: k.sayi > 0 && k.ad === 'Gecikmiş Bakım' ? '#dc2626' : '#0b1730' }}>{k.sayi}</div>
-            <svg width="16" height="16" viewBox="0 0 24 24" style={{ position: 'absolute', top: 12, right: 8 }}><path d="m9 6 6 6-6 6" fill="none" stroke={k.renk} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            <div style={s.istAlt}>
-              <span style={s.istAd}>{{ 'Gecikmiş Bakım': 'Gecikmiş\nBakım', 'Yaklaşan Bakım': 'Yaklaşan\nBakım', 'Bu Ay Tamamlanan': 'Bu Ay\nTamamlanan', 'Toplam Müşteri': 'Toplam\nMüşteri' }[k.ad] || k.ad}</span>
-            </div>
+      {/* Özet */}
+      <div style={s.istKutu}>
+        {istatistik.map((k, i) => (
+          <button key={k.ad} style={{ ...s.istHucre, ...(i > 0 ? { borderLeft: '1px solid #eef1f5' } : {}) }} onClick={() => git(k.hedef)}>
+            <IkonKutu ad={k.ik} renk={k.renk} boyut={34} yaricap={10} />
+            <span style={{ ...s.istSayi, color: k.sayi > 0 && k.ad === 'Gecikmiş' ? '#dc2626' : '#0b1730' }}>{k.sayi}</span>
+            <span style={s.istAd}>{k.ad}</span>
+            <span style={s.istAlt}>{k.alt}</span>
           </button>
         ))}
       </div>
@@ -179,35 +175,38 @@ export default function DashboardPage({ onNavigate, ad }) {
       {/* Yaklaşan Bakımlar */}
       <section style={s.kutu}>
         <div style={s.kutuUst}>
-          <h2 style={s.kutuBaslik}><span style={{ display: 'inline-flex', verticalAlign: '-5px', marginRight: 8 }}>{SIMGE.takvim('#1d6fe0')}</span>Yaklaşan Bakımlar</h2>
-          <button style={s.linkBtn} onClick={() => git('takvim')}>Tümünü Gör {SIMGE.ok('#1d6fe0')}</button>
+          <h2 style={s.kutuBaslik}>Yaklaşan Bakımlar</h2>
+          <button style={s.linkBtn} onClick={() => git('takvim')}>Tümü <SIkon ad="sag" boyut={16} renk="#2563eb" kalin={2.4} /></button>
         </div>
-        {liste.length === 0 && <div style={s.bos}>Takipte bakım yok. Müşteri kartından cihaz ve bakım ekleyebilirsin.</div>}
-        {liste.map((k) => {
+        {liste.length === 0 && (
+          <div style={s.bosKutu}>
+            <IkonKutu ad="takvim" renk="#2563eb" boyut={44} yaricap={14} />
+            <div>
+              <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 14.5 }}>Takipte bakım yok</div>
+              <div style={{ color: '#64748b', fontSize: 13, marginTop: 2 }}>Müşteri kartından cihaz ve bakım ekleyebilirsin.</div>
+            </div>
+          </div>
+        )}
+        {liste.map((k, i) => {
           const e = k.equipment || {};
           const m = e.customers || {};
           const g = kalanGun(k.next_due_date);
           const kalan = kalanYazi(g);
-          const tema = g < 0 ? { r: '#dc2626', z: '#fee2e2' } : g <= 14 ? { r: '#ea7a0c', z: '#ffedd5' } : { r: '#1d6fe0', z: '#dbeafe' };
+          const tema = g < 0 ? { r: '#dc2626', z: '#fef2f2' } : g <= 14 ? { r: '#c2410c', z: '#fff7ed' } : { r: '#1d4ed8', z: '#eff6ff' };
+          const kat = KATEGORI_IK[e.category] || KATEGORI_IK.varsayilan;
           const konum = String(m.address || '').split(',')[0].trim();
           return (
-            <button key={k.id} style={s.bakimSatir} onClick={() => git('takvim')}>
-              <div style={{ ...s.bakimResim, background: KATEGORI_ZEMIN[e.category] || KATEGORI_ZEMIN.varsayilan }}>
-                <span style={{ fontSize: 28, filter: 'drop-shadow(0 2px 3px rgba(0,0,0,.25))' }}>{KATEGORI_IKON[e.category] || '🛠️'}</span>
-              </div>
+            <button key={k.id} style={{ ...s.bakimSatir, ...(i === 0 ? { borderTop: 'none' } : {}) }} onClick={() => git('takvim')}>
+              <IkonKutu ad={kat.ik} renk={kat.renk} boyut={44} yaricap={13} />
               <div style={s.bakimOrta}>
                 <div style={s.bakimAd}>{m.name || 'Müşteri'}</div>
                 <div style={s.bakimKural}>{k.rule_name}</div>
                 <div style={s.bakimMeta}>
-                  {SIMGE.takvimKucuk('#94a3b8')}<span>{trTarih(k.next_due_date)}</span>
-                  {konum && <>{SIMGE.konum('#94a3b8')}<span style={s.tekSatir}>{konum}</span></>}
+                  <SIkon ad="takvim" boyut={13} renk="#94a3b8" /><span>{trTarih(k.next_due_date)}</span>
+                  {konum && <><span style={{ color: '#cbd5e1' }}>·</span><SIkon ad="konum" boyut={13} renk="#94a3b8" /><span style={s.tekSatir}>{konum}</span></>}
                 </div>
               </div>
-              <div style={{ ...s.kalanHap, color: tema.r, background: tema.z }}>
-                <svg width="15" height="15" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke={tema.r} strokeWidth="2.2" /><path d="M12 7v5l3 2" fill="none" stroke={tema.r} strokeWidth="2.2" strokeLinecap="round" /></svg>
-                {kalan.yazi}
-              </div>
-              {SIMGE.ok('#64748b')}
+              <span style={{ ...s.kalanHap, color: tema.r, background: tema.z }}>{kalan.yazi}</span>
             </button>
           );
         })}
@@ -216,9 +215,9 @@ export default function DashboardPage({ onNavigate, ad }) {
       {/* Hızlı Erişim */}
       <section style={s.kutu}>
         <div style={s.kutuUst}>
-          <h2 style={s.kutuBaslik}><span style={{ marginRight: 8, color: '#1d6fe0' }}>⚡</span>Hızlı Erişim</h2>
+          <h2 style={s.kutuBaslik}>Hızlı Erişim</h2>
           <button style={s.linkBtn} onClick={() => setDuzenle(!duzenle)}>
-            {duzenle ? 'Bitti ✓' : <>Düzenle {SIMGE.kalem('#1d6fe0')}</>}
+            {duzenle ? 'Bitti' : <>Düzenle <SIkon ad="kalem" boyut={14} renk="#2563eb" /></>}
           </button>
         </div>
         {duzenle && <div style={s.ipucu}>Görmek istediğin kutulara dokunarak seç.</div>}
@@ -228,12 +227,11 @@ export default function DashboardPage({ onNavigate, ad }) {
             return (
               <button
                 key={h.id}
-                style={{ ...s.hizliBtn, background: h.zemin, ...(duzenle && !secili ? { opacity: 0.4 } : {}),
-                  ...(duzenle && secili ? { boxShadow: '0 0 0 2px #1d6fe0' } : {}) }}
+                style={{ ...s.hizliBtn, ...(duzenle && !secili ? { opacity: 0.4 } : {}), ...(duzenle && secili ? { boxShadow: '0 0 0 2px #2563eb' } : {}) }}
                 onClick={() => (duzenle ? hizliDegis(h.id) : git(h.hedef))}
               >
-                {SIMGE[h.simge](h.renk)}
-                <span style={{ ...s.hizliAd, ...(h.yaziRenk ? { color: h.yaziRenk } : {}) }}>{h.ad}</span>
+                <IkonKutu ad={h.ik} renk={h.renk} boyut={42} yaricap={13} />
+                <span style={s.hizliAd}>{h.ad}</span>
               </button>
             );
           })}
@@ -251,11 +249,21 @@ const beyazIkon = {
 };
 
 const ANA_ISLEMLER = [
-  { ad: 'Yeni İş Kaydı', etiket: 'Yeni\nİş Kaydı', hedef: 'isemirleri', ikon: beyazIkon.arti, zemin: 'linear-gradient(140deg,#3b82f6 0%,#1d4ed8 60%,#1e3a8a 100%)' },
-  { ad: 'Yeni Müşteri', etiket: 'Yeni\nMüşteri', hedef: 'musteriler', ikon: beyazIkon.kisi, zemin: 'linear-gradient(140deg,#14b8a6 0%,#0f8f72 60%,#065f46 100%)' },
-  { ad: 'Geliş Planı', etiket: 'Geliş\nPlanı', hedef: 'gelisler', ikon: beyazIkon.takvim, zemin: 'linear-gradient(140deg,#fb923c 0%,#f97316 55%,#ea580c 100%)' },
-  { ad: 'Toplu Mesaj', etiket: 'Toplu\nMesaj', hedef: 'toplumesaj', ikon: beyazIkon.mesaj, zemin: 'linear-gradient(140deg,#a78bfa 0%,#7c3aed 60%,#5b21b6 100%)' },
+  { ad: 'Yeni İş Kaydı', etiket: 'Yeni\nİş Kaydı', hedef: 'isemirleri', ik: 'arti', zemin: 'linear-gradient(150deg,#2f6bff 0%,#1d4ed8 55%,#1e3a8a 100%)' },
+  { ad: 'Yeni Müşteri', etiket: 'Yeni\nMüşteri', hedef: 'musteriler', ik: 'kisiEkle', zemin: 'linear-gradient(150deg,#14b8a6 0%,#0d9488 55%,#115e59 100%)' },
+  { ad: 'Geliş Planı', etiket: 'Geliş\nPlanı', hedef: 'gelisler', ik: 'takvimSaat', zemin: 'linear-gradient(150deg,#f59e0b 0%,#ea7a0c 55%,#c2410c 100%)' },
+  { ad: 'Toplu Mesaj', etiket: 'Toplu\nMesaj', hedef: 'toplumesaj', ik: 'mesaj', zemin: 'linear-gradient(150deg,#8b5cf6 0%,#7c3aed 55%,#5b21b6 100%)' },
 ];
+
+const KATEGORI_IK = {
+  Havuz: { ik: 'dalga', renk: '#0284c7' },
+  Kuyu: { ik: 'damla', renk: '#0891b2' },
+  Hidrofor: { ik: 'gosterge', renk: '#2563eb' },
+  Sulama: { ik: 'filiz', renk: '#16a34a' },
+  Tesisat: { ik: 'anahtar', renk: '#d97706' },
+  Elektrik: { ik: 'simsek', renk: '#ca8a04' },
+  varsayilan: { ik: 'anahtar', renk: '#64748b' },
+};
 
 const KATEGORI_ZEMIN = {
   Havuz: 'linear-gradient(160deg,#7dd3fc 0%,#0ea5e9 55%,#0369a1 100%)',
@@ -281,10 +289,11 @@ function bugunYazi() {
   return `${d.getDate()} ${AYLAR[d.getMonth()]} ${d.getFullYear()}, ${gun}`;
 }
 
+const kartGolge2 = '0 1px 2px rgba(16,24,40,.04), 0 6px 18px rgba(16,24,40,.06)';
 const kartGolge = '0 4px 18px rgba(15,45,74,0.07)';
 
 const s = {
-  sayfa: { padding: '0 14px 20px', maxWidth: 900, margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif' },
+  sayfa: { padding: '0 14px 20px', maxWidth: 900, margin: '0 auto', fontFamily: "'Inter', system-ui, -apple-system, sans-serif" },
   bugunKart: {
     position: 'relative', overflow: 'hidden', borderRadius: 24, minHeight: 190, background: '#fff',
     boxShadow: '0 8px 26px rgba(15,45,74,0.12)', border: '2px solid #fff', marginBottom: 14,
@@ -330,48 +339,57 @@ const s = {
     position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6, padding: '10px 10px 10px',
     borderRadius: 18, border: '1px solid', cursor: 'pointer', textAlign: 'left', minWidth: 0, boxShadow: kartGolge,
   },
-  anaIzgara: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8, marginBottom: 12 },
+  anaIzgara: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 9, margin: '14px 0 12px' },
   anaKutu: {
-    position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', minHeight: 96,
-    padding: '12px 10px 10px', borderRadius: 18, border: 'none', cursor: 'pointer', textAlign: 'left', color: '#fff',
-    boxShadow: '0 6px 16px rgba(15,45,74,0.18)', minWidth: 0,
+    position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', height: 96,
+    padding: '11px 10px', borderRadius: 18, border: 'none', cursor: 'pointer', textAlign: 'left', color: '#fff', minWidth: 0,
+    boxShadow: '0 6px 14px rgba(15,23,42,0.14), inset 0 1px 0 rgba(255,255,255,0.18)', fontFamily: 'inherit',
   },
-  anaIkon: { display: 'flex' },
+  anaIkon: { width: 36, height: 36, borderRadius: 11, background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   anaAlt: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', width: '100%', gap: 2, marginTop: 8 },
-  anaAd: { display: 'block', marginTop: 10, fontSize: 12, fontWeight: 800, lineHeight: 1.2, whiteSpace: 'pre-line', letterSpacing: -0.2 },
-  istAlt: { width: '100%' },
+  anaAd: { display: 'block', fontSize: 12.5, fontWeight: 700, lineHeight: 1.22, whiteSpace: 'pre-line', letterSpacing: -0.1 },
+  istAlt: { fontSize: 10.5, color: '#94a3b8', fontWeight: 500, whiteSpace: 'nowrap' },
   bakimKural: { fontSize: 13, color: '#64748b', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
-  bakimMeta: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 12.5, color: '#64748b', marginTop: 5, minWidth: 0, whiteSpace: 'nowrap' },
-  kalanHap: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 800, borderRadius: 20, padding: '5px 8px', whiteSpace: 'nowrap', flexShrink: 0 },
+  bakimMeta: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#64748b', marginTop: 4, minWidth: 0, whiteSpace: 'nowrap' },
+  kalanHap: { fontSize: 11.5, fontWeight: 700, borderRadius: 8, padding: '5px 8px', whiteSpace: 'nowrap', flexShrink: 0 },
+  istKutu: {
+    display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', background: '#fff', borderRadius: 20, marginBottom: 14,
+    boxShadow: kartGolge2, border: '1px solid #eef1f5', overflow: 'hidden',
+  },
+  istHucre: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '14px 4px 12px', border: 'none', background: 'transparent',
+    cursor: 'pointer', minWidth: 0, fontFamily: 'inherit',
+  },
+  bosKutu: { display: 'flex', alignItems: 'center', gap: 12, padding: '6px 4px 2px' },
   istUst: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   selam: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', margin: '2px 2px 12px' },
   selamYazi: { fontSize: 20, fontWeight: 800, color: '#0b1730', letterSpacing: -0.3 },
   selamTarih: { fontSize: 13, color: '#64748b', marginTop: 2, fontWeight: 500 },
   istIkon: { width: 36, height: 36, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  istSayi: { fontSize: 24, fontWeight: 900, lineHeight: 1, marginTop: 4 },
-  istAd: { display: 'block', fontSize: 11.5, color: '#1e293b', fontWeight: 700, lineHeight: 1.2, whiteSpace: 'pre-line', letterSpacing: -0.2 },
-  kutu: { background: '#fff', borderRadius: 20, padding: '14px 12px', marginBottom: 14, boxShadow: kartGolge },
-  kutuUst: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '0 4px' },
-  kutuBaslik: { margin: 0, whiteSpace: 'nowrap', fontSize: 16.5, fontWeight: 800, color: '#0b1730' },
+  istSayi: { fontSize: 22, fontWeight: 800, lineHeight: 1.1, marginTop: 8, letterSpacing: -0.5 },
+  istAd: { fontSize: 12, color: '#0f172a', fontWeight: 700 },
+  kutu: { background: '#fff', borderRadius: 20, padding: '14px 14px 10px', marginBottom: 14, boxShadow: kartGolge2, border: '1px solid #eef1f5' },
+  kutuUst: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, padding: '0 2px' },
+  kutuBaslik: { margin: 0, fontSize: 16, fontWeight: 700, color: '#0b1730', letterSpacing: -0.2 },
   linkBtn: {
-    display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', flexShrink: 0, border: 'none', background: 'transparent', color: '#1d6fe0',
-    fontSize: 14, fontWeight: 600, cursor: 'pointer', padding: 4,
+    display: 'flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap', flexShrink: 0, border: 'none', background: 'transparent', color: '#2563eb',
+    fontSize: 13.5, fontWeight: 600, cursor: 'pointer', padding: 4, fontFamily: 'inherit',
   },
   ipucu: { fontSize: 13, color: '#64748b', margin: '-4px 4px 10px' },
-  hizliIzgara: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 },
+  hizliIzgara: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 6, paddingBottom: 4 },
   hizliBtn: {
-    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8,
-    padding: '16px 4px', borderRadius: 16, border: 'none', cursor: 'pointer', minHeight: 84, minWidth: 0,
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 7,
+    padding: '10px 2px', borderRadius: 14, border: 'none', background: 'transparent', cursor: 'pointer', minWidth: 0, fontFamily: 'inherit',
   },
-  hizliAd: { fontSize: 12.5, fontWeight: 700, color: '#0b1730', textAlign: 'center', lineHeight: 1.2 },
+  hizliAd: { fontSize: 12, fontWeight: 600, color: '#334155', textAlign: 'center', lineHeight: 1.2 },
   bos: { color: '#64748b', fontSize: 14, padding: '6px 4px 4px' },
   bakimSatir: {
-    display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '12px 2px', border: 'none',
-    borderTop: '1px solid #eef2f7', background: 'transparent', cursor: 'pointer', textAlign: 'left',
+    display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '12px 0', border: 'none',
+    borderTop: '1px solid #f1f4f8', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
   },
   bakimResim: { width: 56, height: 50, borderRadius: 14, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'inset 0 -8px 14px rgba(255,255,255,.25), 0 2px 6px rgba(15,45,74,.15)' },
   bakimOrta: { flex: 1, minWidth: 0 },
-  bakimAd: { fontSize: 15, fontWeight: 800, color: '#0b1730', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  bakimAd: { fontSize: 14.5, fontWeight: 700, color: '#0b1730', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   bakimKonum: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: '#64748b', marginTop: 3, minWidth: 0 },
   tekSatir: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   bakimSag: { flexShrink: 0, textAlign: 'left' },
