@@ -537,7 +537,7 @@ export default function TopluMesajPage() {
     ]);
     if (m.error) setHata(m.error.message);
     setMusteriler(m.data || []);
-    setKayitlar(k.data || []);
+    setKayitlar((k.data || []).filter((x) => !String(x.tur || '').startsWith('not')));
     const meta = u.data?.user?.user_metadata || {};
     setGonderen(meta.ad || (u.data?.user?.email || '').split('@')[0]);
     setYukleniyor(false);
