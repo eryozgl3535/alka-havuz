@@ -8,6 +8,7 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="ALKA" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/alka-ikon-v2.png" />
     <link rel="icon" type="image/png" href="/alka-ikon-v2.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -18,5 +19,6 @@
   <body style="margin:0;background:#f3f6fa;font-family:'Inter',system-ui,-apple-system,sans-serif;-webkit-tap-highlight-color:transparent;">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>if ("serviceWorker" in navigator) { window.addEventListener("load", function () { navigator.serviceWorker.register("/sw.js").catch(function () {}); }); }</script>
   </body>
 </html>
