@@ -6,7 +6,7 @@ import { bakimBul, kisisel, BILGI_SABLON, telefonWa } from './TopluMesajPage.jsx
 
 const AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 const KATEGORI_IKON = { Havuz: '🏊', Kuyu: '💧', Hidrofor: '🔵', Sulama: '🌱', Tesisat: '🔧', Elektrik: '⚡' };
-const HIZLI_ANAHTAR = 'alkaHizliErisim5';
+const HIZLI_ANAHTAR = 'alkaHizliErisim6';
 
 const yerel = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -70,6 +70,7 @@ const SIMGE = {
 const TUM_HIZLI = [
   { id: 'musteriler', hedef: 'musteriler', ad: 'Müşteriler', ik: 'kisiler', renk: '#2563eb' },
   { id: 'harita', hedef: 'harita', ad: 'Harita', ik: 'harita', renk: '#0284c7' },
+  { id: 'notlar', hedef: 'notlar', ad: 'Notlar', ik: 'kalem', renk: '#d97706' },
   { id: 'takvim', hedef: 'takvim', ad: 'Takvim', ik: 'takvim', renk: '#7c3aed' },
   { id: 'raporlar', hedef: 'raporlar', ad: 'Raporlar', ik: 'grafik', renk: '#16a34a' },
   { id: 'ayarlar', hedef: 'ayarlar', ad: 'Ayarlar', ik: 'ayar', renk: '#475569' },
@@ -78,7 +79,7 @@ const TUM_HIZLI = [
   { id: 'toplumesaj', hedef: 'toplumesaj', ad: 'Toplu Mesaj', ik: 'hoparlor', renk: '#db2777' },
   { id: 'rehber', hedef: 'rehber', ad: 'Rehber', ik: 'rehber', renk: '#0891b2' },
 ];
-const VARSAYILAN_HIZLI = ['musteriler', 'harita', 'raporlar', 'ayarlar'];
+const VARSAYILAN_HIZLI = ['musteriler', 'harita', 'notlar', 'raporlar'];
 
 function hizliOku() {
   try {
@@ -104,8 +105,8 @@ export default function DashboardPage({ onNavigate, ad }) {
       const bugun = new Date();
       const ayBas = yerel(new Date(bugun.getFullYear(), bugun.getMonth(), 1));
       const ucHafta = new Date(); ucHafta.setDate(ucHafta.getDate() - 21);
-      supabase.from('mesaj_kayitlari').select('customer_id, baslik, created_at').gte('created_at', ucHafta.toISOString())
-        .then((r) => setSonMesajlar(r.data || []));
+      supabase.from('mesaj_kayitlari').select('customer_id, baslik, tur, created_at').gte('created_at', ucHafta.toISOString())
+        .then((r) => setSonMesajlar((r.data || []).filter((x) => !String(x.tur || '').startsWith('not'))));
       const [k, t, m] = await Promise.all([
         supabase.from('maintenance_rules').select('*, equipment(category, equipment_type, customers(id, name, phone, address))'),
         supabase.from('work_orders').select('id', { count: 'exact', head: true }).eq('status', 'tamamlandi').gte('completed_date', ayBas),
