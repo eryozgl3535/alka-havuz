@@ -14,6 +14,7 @@ import RehberPage from './pages/RehberPage.jsx';
 import ReportsPage from './pages/ReportsPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import HaritaPage from './pages/HaritaPage.jsx';
+import NotlarPage from './pages/NotlarPage.jsx';
 import RaporPage from './pages/RaporPage.jsx';
 
 const MENU = [
@@ -23,6 +24,7 @@ const MENU = [
   { id: 'isemirleri', ad: 'İş Emirleri', kisa: 'İş Emri', ik: 'pano', renk: '#ea580c' },
   { id: 'gelisler', ad: 'Geliş Planı', kisa: 'Geliş', ik: 'takvimSaat', renk: '#0d9488' },
   { id: 'harita', ad: 'Harita ve Rota', kisa: 'Harita', ik: 'harita', renk: '#0284c7' },
+  { id: 'notlar', ad: 'Notlar', kisa: 'Notlar', ik: 'kalem', renk: '#d97706' },
   { id: 'toplumesaj', ad: 'Toplu Mesaj', kisa: 'Mesaj', ik: 'hoparlor', renk: '#db2777' },
   { id: 'rehber', ad: 'Rehberden Aktar', kisa: 'Rehber', ik: 'rehber', renk: '#0891b2' },
   { id: 'raporlar', ad: 'Raporlar', kisa: 'Raporlar', ik: 'grafik', renk: '#16a34a' },
@@ -32,7 +34,7 @@ const MENU = [
 const ALT_MENU = ['anasayfa', 'musteriler', 'takvim'];
 
 const MENU_GRUPLARI = [
-  { ad: 'İş Takibi', idler: ['isemirleri', 'takvim', 'gelisler', 'harita'] },
+  { ad: 'İş Takibi', idler: ['isemirleri', 'takvim', 'gelisler', 'harita', 'notlar'] },
   { ad: 'Müşteriler', idler: ['musteriler', 'rehber', 'toplumesaj'] },
   { ad: 'Yönetim', idler: ['raporlar', 'ayarlar'] },
 ];
@@ -41,6 +43,7 @@ const ARTI_MENU = [
   { id: 'isemirleri', ad: 'Yeni İş Emri', ik: 'pano', renk: '#ea580c' },
   { id: 'musteriler', ad: 'Yeni Müşteri', ik: 'kisiEkle', renk: '#2563eb' },
   { id: 'gelisler', ad: 'Geliş Ekle', ik: 'takvimSaat', renk: '#0d9488' },
+  { id: 'notlar', ad: 'Not Ekle', ik: 'kalem', renk: '#d97706' },
   { id: 'rehber', ad: 'Rehberden Aktar', ik: 'rehber', renk: '#0891b2' },
 ];
 
@@ -174,6 +177,7 @@ function AnaUygulama() {
       {sayfa === 'toplumesaj' && <TopluMesajPage />}
       {sayfa === 'rehber' && <RehberPage />}
       {sayfa === 'harita' && <HaritaPage />}
+      {sayfa === 'notlar' && <NotlarPage ad={ad} />}
       {sayfa === 'raporlar' && <ReportsPage />}
       {sayfa === 'ayarlar' && <SettingsPage session={session} />}
     </>
