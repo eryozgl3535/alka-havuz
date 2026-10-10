@@ -95,6 +95,7 @@ export default function DashboardPage({ onNavigate, ad }) {
   const [musteriSayi, setMusteriSayi] = useState(0);
   const [hizli, setHizli] = useState(hizliOku);
   const [sonMesajlar, setSonMesajlar] = useState([]);
+  const [hatirlatmalar, setHatirlatmalar] = useState([]);
   const [gonderilen, setGonderilen] = useState([]);
   const [duzenle, setDuzenle] = useState(false);
 
@@ -106,7 +107,9 @@ export default function DashboardPage({ onNavigate, ad }) {
       const ayBas = yerel(new Date(bugun.getFullYear(), bugun.getMonth(), 1));
       const ucHafta = new Date(); ucHafta.setDate(ucHafta.getDate() - 21);
       supabase.from('mesaj_kayitlari').select('customer_id, baslik, tur, created_at').gte('created_at', ucHafta.toISOString())
-        .then((r) => setSonMesajlar((r.data || []).filter((x) => !String(x.tur || '').startsWith('not'))));
+        .then((r) => setSonMesajlar((r.data || []).filter((x) => !String(x.tur || '').startsWith('not') && !String(x.tur || '').startsWith('hatirlatma'))));
+      supabase.from('mesaj_kayitlari').select('id, tur, mesaj, customers(name)').eq('tur', 'hatirlatma')
+        .then((r) => setHatirlatmalar(r.data || []));
       const [k, t, m] = await Promise.all([
         supabase.from('maintenance_rules').select('*, equipment(category, equipment_type, customers(id, name, phone, address))'),
         supabase.from('work_orders').select('id', { count: 'exact', head: true }).eq('status', 'tamamlandi').gte('completed_date', ayBas),
@@ -139,6 +142,13 @@ export default function DashboardPage({ onNavigate, ad }) {
 
   const gorunenHizli = duzenle ? TUM_HIZLI : hizli.map((id) => TUM_HIZLI.find((h) => h.id === id)).filter(Boolean);
   const genis = typeof window !== 'undefined' && window.innerWidth >= 900;
+
+  const bugunHatirlatma = hatirlatmalar
+    .map((h) => { let v = {}; try { v = JSON.parse(h.mesaj || '{}'); } catch { v = {}; }
+      const g = v.tarih ? Math.round((new Date(v.tarih + 'T00:00:00') - new Date(new Date().toDateString())) / 86400000) : null;
+      return { h, v, g }; })
+    .filter((x) => x.g != null && x.g <= 2)
+    .sort((a, b) => a.g - b.g);
 
   const mesajAdaylari = kurallar
     .map((k) => ({ k, g: kalanGun(k.next_due_date), m: k.equipment?.customers }))
@@ -176,6 +186,30 @@ export default function DashboardPage({ onNavigate, ad }) {
     <div style={s.sayfa}>
 
       <HavaKarti onAra={aramaGit} ustuneBin onUyari={uyariAksiyon} />
+
+      {bugunHatirlatma.length > 0 && (
+        <section style={s.hatSerit}>
+          <div style={s.hatSeritBaslik}>
+            <span style={{ display: 'inline-flex', verticalAlign: '-4px', marginRight: 7 }}><SIkon ad="zil" boyut={17} renk="#b91c1c" /></span>
+            Hatırlatmalar
+            <span style={s.hatSeritRozet}>{bugunHatirlatma.length}</span>
+          </div>
+          {bugunHatirlatma.slice(0, 3).map((x) => {
+            const gec = x.g < 0;
+            return (
+              <button key={x.h.id} style={s.hatSeritSatir} onClick={() => git('hatirlatmalar')}>
+                <span style={{ ...s.hatNokta, background: gec ? '#dc2626' : '#f59e0b' }} />
+                <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                  <span style={s.hatSeritAd}>{x.v.baslik || 'Hatırlatma'}</span>
+                  <span style={s.hatSeritAlt}>{gec ? `${-x.g} gün geçti` : x.g === 0 ? 'Bugün' : x.g === 1 ? 'Yarın' : `${x.g} gün kaldı`}{x.h.customers?.name ? ` · ${x.h.customers.name}` : ''}</span>
+                </span>
+                {x.v.tutar != null && <span style={s.hatSeritTutar}>{Number(x.v.tutar).toLocaleString('tr-TR')} ₺</span>}
+              </button>
+            );
+          })}
+          {bugunHatirlatma.length > 3 && <button style={s.hatSeritHepsi} onClick={() => git('hatirlatmalar')}>+{bugunHatirlatma.length - 3} tane daha · Tümünü gör</button>}
+        </section>
+      )}
 
       {/* Ana işlemler */}
       <div style={s.anaIzgara}>
@@ -320,6 +354,7 @@ const ANA_ISLEMLER = [
   { ad: 'Yeni Müşteri', etiket: 'Yeni\nMüşteri', hedef: 'musteriler', ik: 'kisiEkle', zemin: 'linear-gradient(150deg,#14b8a6 0%,#0d9488 55%,#115e59 100%)' },
   { ad: 'Geliş Planı', etiket: 'Geliş\nPlanı', hedef: 'gelisler', ik: 'takvimSaat', zemin: 'linear-gradient(150deg,#f59e0b 0%,#ea7a0c 55%,#c2410c 100%)' },
   { ad: 'Toplu Mesaj', etiket: 'Toplu\nMesaj', hedef: 'toplumesaj', ik: 'mesaj', zemin: 'linear-gradient(150deg,#8b5cf6 0%,#7c3aed 55%,#5b21b6 100%)' },
+  { ad: 'Hatırlatma', etiket: 'Hatır-\nlatma', hedef: 'hatirlatmalar', ik: 'zil', zemin: 'linear-gradient(150deg,#f87171 0%,#dc2626 55%,#991b1b 100%)' },
 ];
 
 const KATEGORI_IK = {
@@ -406,15 +441,15 @@ const s = {
     position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6, padding: '10px 10px 10px',
     borderRadius: 18, border: '1px solid', cursor: 'pointer', textAlign: 'left', minWidth: 0, boxShadow: kartGolge,
   },
-  anaIzgara: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 9, margin: '14px 0 12px' },
+  anaIzgara: { display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 7, margin: '14px 0 12px' },
   anaKutu: {
-    position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', height: 96,
+    position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', height: 92,
     padding: '11px 10px', borderRadius: 18, border: 'none', cursor: 'pointer', textAlign: 'left', color: '#fff', minWidth: 0,
     boxShadow: '0 6px 14px rgba(15,23,42,0.14), inset 0 1px 0 rgba(255,255,255,0.18)', fontFamily: 'inherit',
   },
-  anaIkon: { width: 36, height: 36, borderRadius: 11, background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  anaIkon: { width: 32, height: 32, borderRadius: 10, background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   anaAlt: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', width: '100%', gap: 2, marginTop: 8 },
-  anaAd: { display: 'block', fontSize: 12.5, fontWeight: 700, lineHeight: 1.22, whiteSpace: 'pre-line', letterSpacing: -0.1 },
+  anaAd: { display: 'block', fontSize: 11, fontWeight: 700, lineHeight: 1.2, whiteSpace: 'pre-line', letterSpacing: -0.2 },
   istAlt: { fontSize: 10.5, color: '#94a3b8', fontWeight: 500, whiteSpace: 'nowrap' },
   bakimKural: { fontSize: 13, color: '#64748b', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   bakimMeta: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#64748b', marginTop: 4, minWidth: 0, whiteSpace: 'nowrap' },
@@ -428,6 +463,15 @@ const s = {
     cursor: 'pointer', minWidth: 0, fontFamily: 'inherit',
   },
   bosKutu: { display: 'flex', alignItems: 'center', gap: 12, padding: '6px 4px 2px' },
+  hatSerit: { background: '#fff', border: '1px solid #fde0e0', borderRadius: 18, padding: '12px 12px 8px', marginBottom: 12, boxShadow: '0 1px 2px rgba(16,24,40,.04), 0 6px 18px rgba(220,38,38,.07)' },
+  hatSeritBaslik: { fontSize: 14.5, fontWeight: 800, color: '#0b1730', marginBottom: 8, display: 'flex', alignItems: 'center' },
+  hatSeritRozet: { marginLeft: 'auto', background: '#dc2626', color: '#fff', fontSize: 11.5, fontWeight: 800, borderRadius: 10, padding: '2px 8px' },
+  hatSeritSatir: { display: 'flex', alignItems: 'center', gap: 10, width: '100%', border: 'none', background: 'transparent', borderTop: '1px solid #f6eaea', padding: '10px 0', cursor: 'pointer', fontFamily: 'inherit' },
+  hatNokta: { width: 9, height: 9, borderRadius: '50%', flexShrink: 0 },
+  hatSeritAd: { display: 'block', fontSize: 14, fontWeight: 700, color: '#0b1730', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  hatSeritAlt: { display: 'block', fontSize: 12, color: '#64748b', marginTop: 2 },
+  hatSeritTutar: { fontSize: 14, fontWeight: 800, color: '#16a34a', whiteSpace: 'nowrap', flexShrink: 0 },
+  hatSeritHepsi: { border: 'none', background: 'transparent', color: '#2563eb', fontSize: 13, fontWeight: 700, cursor: 'pointer', padding: '6px 0 2px', fontFamily: 'inherit' },
   sayiRozet: { marginLeft: 8, background: '#dc2626', color: '#fff', fontSize: 11.5, fontWeight: 800, borderRadius: 10, padding: '2px 7px', verticalAlign: 2 },
   mesajSatir: { display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderTop: '1px solid #f1f4f8' },
   waBtn: {
