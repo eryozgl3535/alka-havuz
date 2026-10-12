@@ -3,7 +3,7 @@ import { supabase } from '../supabase';
 
 // Ana sayfadaki sesli asistan: konuş → Gemini anlar → sesli cevap verir.
 // Hatırlatma ekleyebilir / tamamlayabilir (onay alarak), hatırlatmalar hakkında soru cevaplar.
-const MODEL = 'gemini-3.8-flash';
+const VAPID_PUBLIC = 'BJUQaPBgiZZBfiwUVprGm_uZvvPJyL1O8LRkSB7SA9-5ZteuaLGbskvnKIZ4cGfyd7oZq4Ye7Ge_edz6pfKfT6I';
 const TUR_ACIK = 'hatirlatma';
 const TUR_BITTI = 'hatirlatma-bitti';
 const AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
@@ -29,6 +29,23 @@ const HAYIR = /^(hay[ıi]r|iptal|vazge[cç]|yok|yanl[ıi][sş]|dur|bo[sş]ver)\b
 
 const SR = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
 
+function base64Uint8(b64) {
+  const dolgu = '='.repeat((4 - (b64.length % 4)) % 4);
+  const ham = atob((b64 + dolgu).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from([...ham].map((c) => c.charCodeAt(0)));
+}
+
+const pushDestek = () => typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const iosMu = () => typeof navigator !== 'undefined' && /iphone|ipad|ipod/i.test(navigator.userAgent);
+const yukluMu = () => typeof window !== 'undefined' && (window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true);
+
+// iPhone/Android: sesli okuma ancak kullanıcı dokunuşuyla açılır; ilk dokunuşta boş bir konuşmayla kilidi aç.
+let sesKilidiAcik = false;
+function sesKilidiAc() {
+  if (sesKilidiAcik || typeof window === 'undefined' || !window.speechSynthesis) return;
+  try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; window.speechSynthesis.speak(u); sesKilidiAcik = true; } catch { /* yok */ }
+}
+
 // Gemini sohbeti kullanıcıyla başlamalı ve sırayla ilerlemeli: ardışık aynı tarafı birleştir.
 function sirala(gecmis) {
   const sonuc = [];
@@ -42,25 +59,27 @@ function sirala(gecmis) {
   return sonuc;
 }
 
+// Gemini'ye kendi sunucumuz (/api/asistan) üzerinden bağlanır; 55 sn içinde cevap gelmezse vazgeçer.
 async function geminiSor(sistem, gecmis) {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!apiKey) throw new Error('VITE_GEMINI_API_KEY Vercel ayarlarında yok');
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey.trim() },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: sistem }] },
-      contents: sirala(gecmis),
-      generationConfig: { responseMimeType: 'application/json', temperature: 0.3 },
-    }),
-  });
-  if (!res.ok) {
-    let detay = '';
-    try { detay = (await res.json())?.error?.message || ''; } catch { /* yok */ }
-    throw new Error('Gemini ' + res.status + (detay ? ': ' + detay : ''));
+  const kontrol = new AbortController();
+  const zaman = setTimeout(() => kontrol.abort(), 55000);
+  let res;
+  try {
+    res = await fetch('/api/asistan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sistem, contents: sirala(gecmis) }),
+      signal: kontrol.signal,
+    });
+  } catch (e) {
+    if (e?.name === 'AbortError') throw new Error('Cevap çok gecikti. İnternet bağlantını kontrol edip tekrar dene.');
+    throw new Error('Sunucuya ulaşılamadı. İnternet bağlantını kontrol et.');
+  } finally {
+    clearTimeout(zaman);
   }
-  const data = await res.json();
-  const icerik = data.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.hata || 'Sunucu hatası ' + res.status);
+  const icerik = String(data.metin || '');
   const temiz = icerik.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   try { return JSON.parse(temiz); } catch { return { cevap: temiz, islem: null }; }
 }
@@ -107,6 +126,8 @@ export default function SesliAsistan({ ad, onDegisti }) {
   const [bekleyen, setBekleyen] = useState(null);
   const [sesAcik, setSesAcik] = useState(() => { try { return localStorage.getItem('alkaAsistanSes') !== '0'; } catch { return true; } });
   const [hata, setHata] = useState('');
+  const [bildirim, setBildirim] = useState('bilinmiyor'); // bilinmiyor | acik | kapali | desteklenmiyor
+  const [bilgi, setBilgi] = useState('');
   const [hatirlatmalar, setHatirlatmalar] = useState([]);
   const [musteriler, setMusteriler] = useState([]);
   const tanima = useRef(null);
@@ -127,6 +148,50 @@ export default function SesliAsistan({ ad, onDegisti }) {
     setMusteriler(m.data || []);
   }
   useEffect(() => { veriYukle(); }, []);
+
+  // Bu cihazda bildirim açık mı?
+  useEffect(() => {
+    (async () => {
+      if (!pushDestek()) { setBildirim('desteklenmiyor'); return; }
+      try {
+        const kayit = await navigator.serviceWorker.getRegistration();
+        const abone = kayit && await kayit.pushManager.getSubscription();
+        setBildirim(abone && Notification.permission === 'granted' ? 'acik' : 'kapali');
+      } catch { setBildirim('kapali'); }
+    })();
+  }, []);
+
+  async function bildirimAc() {
+    setHata(''); setBilgi('');
+    if (!pushDestek()) {
+      setHata(iosMu() && !yukluMu()
+        ? 'iPhone\'da bildirim için önce uygulamayı ana ekrana ekle: Safari\'de Paylaş → Ana Ekrana Ekle. Sonra ana ekrandaki ALKA simgesinden açıp tekrar dene.'
+        : 'Bu tarayıcı bildirimleri desteklemiyor. Chrome kullanmayı dene.');
+      return;
+    }
+    try {
+      const izin = await Notification.requestPermission();
+      if (izin !== 'granted') { setHata('Bildirim izni verilmedi. Tarayıcı ayarlarından bu site için bildirimlere izin ver.'); return; }
+      let kayit = await navigator.serviceWorker.getRegistration();
+      if (!kayit) kayit = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+      let abone = await kayit.pushManager.getSubscription();
+      if (!abone) abone = await kayit.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64Uint8(VAPID_PUBLIC) });
+      const json = abone.toJSON();
+      const { data } = await supabase.auth.getUser();
+      const eski = Array.isArray(data?.user?.user_metadata?.push) ? data.user.user_metadata.push : [];
+      const liste = [...eski.filter((a) => a.endpoint !== json.endpoint), json].slice(-5);
+      const { error } = await supabase.auth.updateUser({ data: { push: liste } });
+      if (error) throw new Error(error.message);
+      setBildirim('acik');
+      const r = await fetch('/api/hatirlatma-bildirim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ abonelik: json }) });
+      const v = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(v.hata || 'Deneme bildirimi gönderilemedi.');
+      setBilgi('Bildirimler açık. Her gün 10:00 ve 21:00\'de o günün hatırlatmaları gelecek. Az önce bir deneme bildirimi gönderdim.');
+    } catch (e) {
+      setHata('Bildirim açılamadı: ' + (e?.message || e));
+    }
+  }
 
   useEffect(() => {
     if (listeRef.current) listeRef.current.scrollTop = listeRef.current.scrollHeight;
@@ -236,12 +301,14 @@ export default function SesliAsistan({ ad, onDegisti }) {
       if (islem) setBekleyen(islem);
       asistanDer(cevap, islem ? { islem } : {});
     } catch (e) {
-      setHata(e.message);
+      setHata(e?.message || 'Bir hata oldu, tekrar dene.');
+    } finally {
+      setDusunuyor(false);
     }
-    setDusunuyor(false);
   }
 
   function dinle() {
+    sesKilidiAc();
     if (!SR) { setHata('Bu tarayıcı sesli komutu desteklemiyor. Chrome veya Edge kullan, ya da aşağıya yazarak sor.'); return; }
     if (dinliyor) { try { tanima.current?.stop(); } catch { /* yok */ } return; }
     try { window.speechSynthesis?.cancel(); } catch { /* yok */ }
@@ -284,6 +351,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
 
   function yaziGonder(e) {
     e.preventDefault();
+    sesKilidiAc();
     const t = yaziMetin;
     setYaziMetin('');
     gonder(t);
@@ -298,10 +366,18 @@ export default function SesliAsistan({ ad, onDegisti }) {
           <div style={s.baslik}>✨ Sesli Asistan</div>
           <div style={s.alt}>Mikrofona bas ve konuş. Hatırlatma ekler, soruları cevaplar.</div>
         </div>
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+        <button style={{ ...s.sesBtn, ...(bildirim === 'acik' ? s.bildirimAcik : {}) }} onClick={bildirimAc}
+          title={bildirim === 'acik' ? 'Bildirimler açık (10:00 ve 21:00)' : 'Hatırlatma bildirimlerini aç'}>
+          {bildirim === 'acik' ? '🔔' : '🔕'}
+        </button>
         <button style={s.sesBtn} onClick={sesDegis} title={sesAcik ? 'Sesli okumayı kapat' : 'Sesli okumayı aç'}>
           {sesAcik ? '🔊' : '🔇'}
         </button>
+        </div>
       </div>
+
+      {bilgi && <div style={s.bilgi}>{bilgi}</div>}
 
       {(!bos || hata) && (
         <div ref={listeRef} style={s.liste}>
@@ -357,6 +433,8 @@ const s = {
   ust: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 10 },
   baslik: { fontSize: 16.5, fontWeight: 800, color: '#4c1d95' },
   alt: { fontSize: 12.5, color: '#6d28d9', marginTop: 2 },
+  bildirimAcik: { background: '#f5f3ff', borderColor: '#a78bfa' },
+  bilgi: { background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', borderRadius: 12, padding: 10, fontSize: 13, margin: '0 0 10px' },
   sesBtn: { border: '1px solid #ddd6fe', background: '#fff', borderRadius: 10, width: 36, height: 36, fontSize: 17, cursor: 'pointer', flexShrink: 0 },
   liste: { maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 2px 8px' },
   benBalon: { background: 'linear-gradient(145deg,#3b82f6,#1d4ed8)', color: '#fff', borderRadius: '16px 16px 4px 16px', padding: '9px 12px', fontSize: 14.5, maxWidth: '85%', lineHeight: 1.4, wordBreak: 'break-word' },

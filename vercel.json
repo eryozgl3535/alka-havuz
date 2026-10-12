@@ -1,5 +1,18 @@
 {
   "rewrites": [
-    { "source": "/rapor/:token", "destination": "/index.html" }
+    {
+      "source": "/rapor/:token",
+      "destination": "/index.html"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/hatirlatma-bildirim",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/hatirlatma-bildirim",
+      "schedule": "0 18 * * *"
+    }
   ]
 }
