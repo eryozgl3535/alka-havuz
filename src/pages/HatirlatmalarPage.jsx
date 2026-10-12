@@ -316,4 +316,114 @@ export default function HatirlatmalarPage({ ad }) {
           <label style={s.etiket}>Müşteri (isteğe bağlı)</label>
           <select style={s.input} value={form.customer_id} onChange={(e) => setForm({ ...form, customer_id: e.target.value })}>
             <option value="">Seçilmedi</option>
-            {musteriler.map((m) => <option key={m.id}
+            {musteriler.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+          <label style={s.etiket}>Açıklama (isteğe bağlı)</label>
+          <textarea style={{ ...s.input, minHeight: 60, resize: 'vertical' }} value={form.aciklama}
+            onChange={(e) => setForm({ ...form, aciklama: e.target.value })} placeholder="Ek not..." />
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <button style={{ ...s.kaydetBtn, opacity: kaydediliyor ? 0.6 : 1 }} disabled={kaydediliyor} onClick={kaydet}>
+              {kaydediliyor ? 'Kaydediliyor...' : 'Kaydet'}
+            </button>
+            <button style={s.vazgecBtn} onClick={() => { setFormAcik(false); setDuzenlenenId(null); }}>Vazgeç</button>
+          </div>
+        </div>
+      )}
+
+      <div style={s.sekmeler}>
+        {[['bugun', `Bugün (${bugunSayi})`], ['yaklasan', `Açık (${acikSayi})`], ['tamam', `Tamamlanan (${bittiSayi})`]].map(([id, yazi]) => (
+          <button key={id} onClick={() => setSekme(id)} style={{ ...s.sekme, ...(sekme === id ? s.sekmeAktif : {}) }}>{yazi}</button>
+        ))}
+      </div>
+
+      {gorunen.length === 0 && (
+        <div style={{ ...s.kart, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <IkonKutu ad="zil" renk="#64748b" boyut={44} yaricap={14} />
+          <div style={{ color: '#64748b', fontSize: 14 }}>
+            {sekme === 'tamam' ? 'Tamamlanan hatırlatma yok.' : sekme === 'bugun' ? 'Bugün için hatırlatma yok.' : 'Hatırlatma yok. "Yeni" ile ekleyebilirsin.'}
+          </div>
+        </div>
+      )}
+
+      {gorunen.map((x) => {
+        const k = kalanYaz(x.g);
+        return (
+          <div key={x.id} style={{ ...s.hat, ...(x.bitti ? { opacity: 0.6 } : {}) }}>
+            {!x.bitti && (
+              <button style={s.tik} onClick={() => tamamla(x)} title="Tamamlandı / tahsil edildi">
+                <span style={{ color: '#cbd5e1', fontSize: 18 }}>○</span>
+              </button>
+            )}
+            {x.bitti && (
+              <button style={{ ...s.tik, ...s.tikAktif }} onClick={() => geriAl(x)} title="Geri al">
+                <span style={{ color: '#fff', fontWeight: 900, fontSize: 14 }}>✓</span>
+              </button>
+            )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ ...s.hatBaslik, ...(x.bitti ? { textDecoration: 'line-through' } : {}) }}>{x.v.baslik}</div>
+              <div style={s.hatMeta}>
+                {x.v.tarih && <><Ikon ad="takvim" boyut={13} renk="#94a3b8" /><span>{tarihYaz(x.v.tarih)}</span></>}
+                {x.v.tekrar && x.v.tekrar !== 'tek' && <span style={s.tekrarRozet}>🔁 {TEKRARLAR.find((t) => t.id === x.v.tekrar)?.ad}</span>}
+                {x.customers?.name && <span style={s.musteriRozet}>👤 {x.customers.name}</span>}
+              </div>
+              {x.v.aciklama && <div style={s.hatAciklama}>{x.v.aciklama}</div>}
+              {!x.bitti && (
+                <div style={s.islemler}>
+                  <button style={s.islem} onClick={() => formAc(x)}>Düzenle</button>
+                  <button style={{ ...s.islem, color: '#b91c1c' }} onClick={() => sil(x)}>Sil</button>
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
+              {x.v.tutar != null && <div style={s.tutar}>{tutarYaz(x.v.tutar)}</div>}
+              {!x.bitti && <span style={{ ...s.kalanHap, color: k.renk, background: k.zemin }}>{k.yazi}</span>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const golge = '0 1px 2px rgba(16,24,40,.04), 0 6px 18px rgba(16,24,40,.06)';
+const s = {
+  sayfa: { padding: '14px 14px 24px', maxWidth: 900, margin: '0 auto', fontFamily: "'Inter', system-ui, -apple-system, sans-serif" },
+  ustSatir: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  baslik: { margin: 0, fontSize: 22, fontWeight: 800, color: '#0b1730', letterSpacing: -0.3 },
+  yeniBtn: { display: 'flex', alignItems: 'center', gap: 6, border: 'none', borderRadius: 12, padding: '10px 14px', background: 'linear-gradient(145deg,#3b82f6,#1d4ed8)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' },
+  yzBtn: { display: 'flex', alignItems: 'center', gap: 6, border: '1.5px solid #a78bfa', borderRadius: 12, padding: '10px 14px', background: 'linear-gradient(145deg,#ede9fe,#ddd6fe)', color: '#5b21b6', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' },
+  yzKart: { background: 'linear-gradient(135deg,#faf5ff,#ede9fe)', borderRadius: 20, padding: 16, boxShadow: golge, border: '1.5px solid #c4b5fd', marginBottom: 14 },
+  yzBaslik: { fontSize: 16, fontWeight: 800, color: '#4c1d95', marginBottom: 4 },
+  yzAciklama: { fontSize: 13, color: '#6d28d9', margin: '0 0 8px' },
+  yzOrnek: { fontSize: 12, color: '#7c3aed', background: '#f5f3ff', borderRadius: 8, padding: '6px 10px', marginBottom: 10, fontStyle: 'italic' },
+  yzInput: { width: '100%', boxSizing: 'border-box', border: '1.5px solid #c4b5fd', borderRadius: 12, padding: '11px 12px', fontSize: 15, outline: 'none', fontFamily: 'inherit', color: '#0f172a', background: '#fff', resize: 'vertical' },
+  alt: { margin: '4px 0 14px', color: '#64748b', fontSize: 13.5 },
+  tutarKart: { display: 'flex', alignItems: 'center', gap: 12, background: '#fff', borderRadius: 18, padding: 14, boxShadow: golge, border: '1px solid #eef1f5', marginBottom: 12 },
+  hata: { background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: 12, padding: 10, fontSize: 13.5, marginBottom: 12 },
+  formKart: { background: '#fff', borderRadius: 20, padding: 16, boxShadow: golge, border: '1px solid #dbe3ee', marginBottom: 12 },
+  formBaslik: { fontSize: 16, fontWeight: 800, color: '#0b1730', marginBottom: 12 },
+  etiket: { display: 'block', fontSize: 13, fontWeight: 600, color: '#334155', margin: '10px 0 5px' },
+  input: { width: '100%', boxSizing: 'border-box', border: '1px solid #e2e8f0', borderRadius: 12, padding: '11px 12px', fontSize: 16, outline: 'none', fontFamily: 'inherit', color: '#0f172a', background: '#fff' },
+  ikili: { display: 'flex', gap: 10 },
+  tekrarSatir: { display: 'flex', gap: 6, flexWrap: 'wrap' },
+  tekrarBtn: { border: '1px solid #e2e8f0', background: '#fff', borderRadius: 10, padding: '8px 12px', fontSize: 13, fontWeight: 600, color: '#475569', cursor: 'pointer', fontFamily: 'inherit' },
+  tekrarAktif: { background: '#eff6ff', borderColor: '#93c5fd', color: '#1d4ed8' },
+  kaydetBtn: { flex: 1, border: 'none', borderRadius: 12, padding: 12, background: 'linear-gradient(145deg,#3b82f6,#1d4ed8)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer', fontFamily: 'inherit' },
+  vazgecBtn: { border: '1px solid #e2e8f0', background: '#fff', borderRadius: 12, padding: '12px 16px', color: '#475569', fontWeight: 600, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' },
+  sekmeler: { display: 'flex', background: '#e8eef6', borderRadius: 12, padding: 3, marginBottom: 10 },
+  sekme: { flex: 1, border: 'none', background: 'transparent', padding: '9px 6px', borderRadius: 10, fontSize: 12.5, fontWeight: 600, color: '#475569', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' },
+  sekmeAktif: { background: '#fff', color: '#0b1730', boxShadow: '0 1px 3px rgba(0,0,0,.12)' },
+  kart: { background: '#fff', borderRadius: 18, padding: 14, boxShadow: golge, border: '1px solid #eef1f5' },
+  hat: { display: 'flex', gap: 12, background: '#fff', borderRadius: 18, padding: 14, boxShadow: golge, border: '1px solid #eef1f5', marginBottom: 10 },
+  tik: { width: 28, height: 28, borderRadius: 9, border: '2px solid #cbd5e1', background: '#fff', flexShrink: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, marginTop: 1 },
+  tikAktif: { background: '#16a34a', borderColor: '#16a34a' },
+  hatBaslik: { fontSize: 15.5, fontWeight: 700, color: '#0b1730', lineHeight: 1.35, wordBreak: 'break-word' },
+  hatMeta: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12.5, color: '#64748b' },
+  tekrarRozet: { background: '#f1f5f9', color: '#475569', borderRadius: 8, padding: '2px 7px', fontWeight: 600 },
+  musteriRozet: { background: '#eff6ff', color: '#1d4ed8', borderRadius: 8, padding: '2px 7px', fontWeight: 600 },
+  hatAciklama: { fontSize: 13, color: '#475569', marginTop: 6, lineHeight: 1.4, whiteSpace: 'pre-wrap' },
+  islemler: { display: 'flex', gap: 14, marginTop: 8 },
+  islem: { border: 'none', background: 'none', padding: 0, fontSize: 12.5, fontWeight: 600, color: '#2563eb', cursor: 'pointer', fontFamily: 'inherit' },
+  tutar: { fontSize: 16, fontWeight: 800, color: '#16a34a', whiteSpace: 'nowrap', letterSpacing: -0.3 },
+  kalanHap: { fontSize: 11.5, fontWeight: 700, borderRadius: 8, padding: '5px 8px', whiteSpace: 'nowrap' },
+};
