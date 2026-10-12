@@ -80,15 +80,23 @@ Sadece JSON döndür, başka bir şey yazma.
 
 Metin: "${metin}"`;
 
+  if (!apiKey) throw new Error('VITE_GEMINI_API_KEY Vercel ayarlarında yok');
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey.trim() },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: 'application/json' },
+      }),
     }
   );
-  if (!res.ok) throw new Error('Gemini API hatası: ' + res.status);
+  if (!res.ok) {
+    let detay = '';
+    try { detay = (await res.json())?.error?.message || ''; } catch { /* yok */ }
+    throw new Error('Gemini ' + res.status + (detay ? ': ' + detay : ''));
+  }
   const data = await res.json();
   const icerik = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
   const temiz = icerik.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
