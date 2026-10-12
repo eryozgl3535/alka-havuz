@@ -67,6 +67,34 @@ const TEKRARLAR = [
 
 const bosForm = () => ({ baslik: '', tarih: yerel(new Date()), tutar: '', tekrar: 'tek', aciklama: '', customer_id: '' });
 
+async function geminiAyristir(metin) {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  const bugun = yerel(new Date());
+  const prompt = `Bugünün tarihi: ${bugun}. Aşağıdaki Türkçe metinden bir hatırlatma oluştur. Şu alanları JSON formatında çıkar:
+- baslik: kişi adı ve ödeme/iş açıklaması (örn: "Ahmet Bey ödemesi")
+- tarih: YYYY-MM-DD formatında, eğer "ayın 15'i" gibi bir ifade varsa bu ayki o gün, geçmişte kaldıysa gelecek ay
+- tutar: sadece sayı olarak TL tutarı (örn: 30000), yoksa null
+- tekrar: "tek", "aylik", "haftalik" veya "yillik", belirtilmemişse "tek"
+
+Sadece JSON döndür, başka bir şey yazma.
+
+Metin: "${metin}"`;
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+    }
+  );
+  if (!res.ok) throw new Error('Gemini API hatası: ' + res.status);
+  const data = await res.json();
+  const icerik = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const temiz = icerik.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  return JSON.parse(temiz);
+}
+
 export default function HatirlatmalarPage({ ad }) {
   const [ham, setHam] = useState([]);
   const [musteriler, setMusteriler] = useState([]);
@@ -76,6 +104,12 @@ export default function HatirlatmalarPage({ ad }) {
   const [duzenlenenId, setDuzenlenenId] = useState(null);
   const [hata, setHata] = useState('');
   const [kaydediliyor, setKaydediliyor] = useState(false);
+
+  // Yapay zeka kutusu
+  const [yapayzakaAcik, setYapayzakaAcik] = useState(false);
+  const [yzMetin, setYzMetin] = useState('');
+  const [yzYukleniyor, setYzYukleniyor] = useState(false);
+  const [yzHata, setYzHata] = useState('');
 
   async function yukle() {
     const [n, m] = await Promise.all([
@@ -118,6 +152,30 @@ export default function HatirlatmalarPage({ ad }) {
       setForm(bosForm());
     }
     setFormAcik(true);
+  }
+
+  async function yzGonder() {
+    if (!yzMetin.trim()) return;
+    setYzYukleniyor(true);
+    setYzHata('');
+    try {
+      const sonuc = await geminiAyristir(yzMetin.trim());
+      setDuzenlenenId(null);
+      setForm({
+        baslik: sonuc.baslik || '',
+        tarih: sonuc.tarih || yerel(new Date()),
+        tutar: sonuc.tutar != null ? String(sonuc.tutar) : '',
+        tekrar: sonuc.tekrar || 'tek',
+        aciklama: '',
+        customer_id: '',
+      });
+      setYapayzakaAcik(false);
+      setYzMetin('');
+      setFormAcik(true);
+    } catch (e) {
+      setYzHata('Anlaşılamadı, tekrar dene. (' + e.message + ')');
+    }
+    setYzYukleniyor(false);
   }
 
   async function kaydet() {
@@ -176,11 +234,40 @@ export default function HatirlatmalarPage({ ad }) {
     <div style={s.sayfa}>
       <div style={s.ustSatir}>
         <h1 style={s.baslik}>Hatırlatmalar</h1>
-        <button style={s.yeniBtn} onClick={() => formAc(null)}>
-          <Ikon ad="arti" boyut={18} renk="#fff" kalin={2.6} /> Yeni
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button style={s.yzBtn} onClick={() => { setYapayzakaAcik(!yapayzakaAcik); setYzHata(''); setYzMetin(''); }}>
+            ✨ Yapay Zeka
+          </button>
+          <button style={s.yeniBtn} onClick={() => formAc(null)}>
+            <Ikon ad="arti" boyut={18} renk="#fff" kalin={2.6} /> Yeni
+          </button>
+        </div>
       </div>
       <p style={s.alt}>Ödeme ve iş hatırlatmaları. Günü gelen hatırlatma ana sayfanın en üstünde çıkar.</p>
+
+      {/* Yapay Zeka Kutusu */}
+      {yapayzakaAcik && (
+        <div style={s.yzKart}>
+          <div style={s.yzBaslik}>✨ Yapay Zeka ile Ekle</div>
+          <p style={s.yzAciklama}>Serbest metin yaz, otomatik ayrıştırır ve formu doldurur.</p>
+          <div style={s.yzOrnek}>Örnek: "İhsan Köstekçi'nin 20'sinde 30 bin TL ödemesi var"</div>
+          <textarea
+            style={s.yzInput}
+            value={yzMetin}
+            onChange={(e) => setYzMetin(e.target.value)}
+            placeholder="Hatırlatmayı buraya yaz..."
+            rows={3}
+            onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) yzGonder(); }}
+          />
+          {yzHata && <div style={s.hata}>{yzHata}</div>}
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+            <button style={{ ...s.kaydetBtn, opacity: yzYukleniyor ? 0.6 : 1, flex: 1 }} disabled={yzYukleniyor} onClick={yzGonder}>
+              {yzYukleniyor ? '⏳ Anlaşılıyor...' : '✨ Ayrıştır ve Forma Aktar'}
+            </button>
+            <button style={s.vazgecBtn} onClick={() => setYapayzakaAcik(false)}>İptal</button>
+          </div>
+        </div>
+      )}
 
       {toplamTutar > 0 && (
         <div style={s.tutarKart}>
@@ -296,6 +383,12 @@ const s = {
   ustSatir: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   baslik: { margin: 0, fontSize: 22, fontWeight: 800, color: '#0b1730', letterSpacing: -0.3 },
   yeniBtn: { display: 'flex', alignItems: 'center', gap: 6, border: 'none', borderRadius: 12, padding: '10px 14px', background: 'linear-gradient(145deg,#3b82f6,#1d4ed8)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' },
+  yzBtn: { display: 'flex', alignItems: 'center', gap: 6, border: '1.5px solid #a78bfa', borderRadius: 12, padding: '10px 14px', background: 'linear-gradient(145deg,#ede9fe,#ddd6fe)', color: '#5b21b6', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' },
+  yzKart: { background: 'linear-gradient(135deg,#faf5ff,#ede9fe)', borderRadius: 20, padding: 16, boxShadow: golge, border: '1.5px solid #c4b5fd', marginBottom: 14 },
+  yzBaslik: { fontSize: 16, fontWeight: 800, color: '#4c1d95', marginBottom: 4 },
+  yzAciklama: { fontSize: 13, color: '#6d28d9', margin: '0 0 8px' },
+  yzOrnek: { fontSize: 12, color: '#7c3aed', background: '#f5f3ff', borderRadius: 8, padding: '6px 10px', marginBottom: 10, fontStyle: 'italic' },
+  yzInput: { width: '100%', boxSizing: 'border-box', border: '1.5px solid #c4b5fd', borderRadius: 12, padding: '11px 12px', fontSize: 15, outline: 'none', fontFamily: 'inherit', color: '#0f172a', background: '#fff', resize: 'vertical' },
   alt: { margin: '4px 0 14px', color: '#64748b', fontSize: 13.5 },
   tutarKart: { display: 'flex', alignItems: 'center', gap: 12, background: '#fff', borderRadius: 18, padding: 14, boxShadow: golge, border: '1px solid #eef1f5', marginBottom: 12 },
   hata: { background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: 12, padding: 10, fontSize: 13.5, marginBottom: 12 },
