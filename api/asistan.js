@@ -33,27 +33,31 @@ export default async function handler(req, res) {
     if (!Array.isArray(contents) || !contents.length) return cevap(res, 400, { hata: 'Mesaj yok.' });
     const aracli = Array.isArray(tools) && tools.length > 0;
 
-    const kontrol = new AbortController();
-    const zaman = setTimeout(() => kontrol.abort(), 50000);
-    let yanit;
-    try {
-      yanit = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+    // Hız: modelin uzun uzun "düşünmesini" kısıyoruz (günlük işler için gerekmiyor).
+    // Model bu ayarı tanımazsa ayarsız tekrar denenir.
+    const istek = (dusunmeKisa) => {
+      const kontrol = new AbortController();
+      const zaman = setTimeout(() => kontrol.abort(), 50000);
+      const gc = aracli ? { temperature: 0.4 } : { responseMimeType: 'application/json', temperature: 0.3 };
+      if (dusunmeKisa) gc.thinkingConfig = { thinkingLevel: 'low' };
+      return fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': anahtar },
         body: JSON.stringify({
           systemInstruction: sistem ? { parts: [{ text: String(sistem) }] } : undefined,
           contents,
-          ...(aracli
-            ? { tools: [{ functionDeclarations: tools }], toolConfig: { functionCallingConfig: { mode: 'AUTO' } }, generationConfig: { temperature: 0.4 } }
-            : { generationConfig: { responseMimeType: 'application/json', temperature: 0.3 } }),
+          ...(aracli ? { tools: [{ functionDeclarations: tools }], toolConfig: { functionCallingConfig: { mode: 'AUTO' } } } : {}),
+          generationConfig: gc,
         }),
         signal: kontrol.signal,
-      });
-    } finally {
-      clearTimeout(zaman);
+      }).finally(() => clearTimeout(zaman));
+    };
+    let yanit = await istek(true);
+    let veri = await yanit.json().catch(() => null);
+    if (yanit.status === 400 && /think/i.test(veri?.error?.message || '')) {
+      yanit = await istek(false);
+      veri = await yanit.json().catch(() => null);
     }
-
-    const veri = await yanit.json().catch(() => null);
     if (!yanit.ok) return cevap(res, 502, { hata: `Gemini ${yanit.status}: ${veri?.error?.message || 'bilinmeyen hata'}` });
     const icerik = veri?.candidates?.[0]?.content || { role: 'model', parts: [] };
     const metin = (icerik.parts || []).filter((p) => p.text && !p.thought).map((p) => p.text).join('');

@@ -43,11 +43,58 @@ const pushDestek = () => typeof window !== 'undefined' && 'serviceWorker' in nav
 const iosMu = () => typeof navigator !== 'undefined' && /iphone|ipad|ipod/i.test(navigator.userAgent);
 const yukluMu = () => typeof window !== 'undefined' && (window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true);
 
-// iPhone/Android: sesli okuma ancak kullanıcı dokunuşuyla açılır; ilk dokunuşta boş bir konuşmayla kilidi aç.
+// iPhone/Android: ses ancak kullanıcı dokunuşuyla açılır; ilk dokunuşta sessiz bir çalma ile kilidi aç.
+// Doğal ses tek bir oynatıcıdan çalınır (iPhone ancak dokunuşla açılmış oynatıcının sonradan çalmasına izin verir).
+const SESSIZ = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
+const oynatici = typeof Audio !== 'undefined' ? new Audio() : null;
 let sesKilidiAcik = false;
 function sesKilidiAc() {
-  if (sesKilidiAcik || typeof window === 'undefined' || !window.speechSynthesis) return;
-  try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; window.speechSynthesis.speak(u); sesKilidiAcik = true; } catch { /* yok */ }
+  if (sesKilidiAcik || typeof window === 'undefined') return;
+  sesKilidiAcik = true;
+  try { if (window.speechSynthesis) { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; window.speechSynthesis.speak(u); } } catch { /* yok */ }
+  try { if (oynatici) { oynatici.src = SESSIZ; oynatici.play().catch(() => {}); } } catch { /* yok */ }
+}
+let dogalSesBozuk = false;   // sunucu sesi bir kez başarısız olursa bu oturumda tarayıcı sesine geç
+let sesSira = 0;
+// Doğal sesle oku; bitince (ya da hata olursa) döner. Hata olursa false döner.
+async function dogalSesle(metin) {
+  if (!oynatici || dogalSesBozuk) return false;
+  const benim = ++sesSira;
+  try {
+    let url;
+    try {
+      const r = await fetch('/api/ses', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ metin }) });
+      if (!r.ok) throw new Error('ses ' + r.status);
+      url = URL.createObjectURL(await r.blob());
+    } catch {
+      dogalSesBozuk = true;   // sunucu sesi çalışmıyor: bu oturumda telefonun kendi sesine geç
+      return false;
+    }
+    if (benim !== sesSira) { URL.revokeObjectURL(url); return true; } // arada yeni konuşma başladı
+    try { window.speechSynthesis?.cancel(); } catch { /* yok */ }
+    oynatici.pause();
+    oynatici.src = url;
+    await oynatici.play();
+    await new Promise((bitti) => {
+      const son = () => { oynatici.onended = null; oynatici.onerror = null; bitti(); };
+      oynatici.onended = son; oynatici.onerror = son;
+      setTimeout(son, Math.min(90000, 3000 + metin.length * 120));
+    });
+    URL.revokeObjectURL(url);
+    return true;
+  } catch {
+    return benim !== sesSira; // yeni bir konuşma araya girdiyse sorun yok; yoksa tarayıcı sesiyle dene
+  }
+}
+function sesiSustur() {
+  sesSira++;
+  try { oynatici?.pause(); } catch { /* yok */ }
+  try { window.speechSynthesis?.cancel(); } catch { /* yok */ }
+}
+// Tarayıcı sesi gerekirse: en kaliteli Türkçe sesi seç
+function enIyiTrSes() {
+  const tr = (window.speechSynthesis?.getVoices() || []).filter((v) => v.lang && v.lang.toLowerCase().startsWith('tr'));
+  return tr.find((v) => /premium|enhanced|geli[sş]mi[sş]|natural|neural|google/i.test(v.name)) || tr.find((v) => /yelda|cem/i.test(v.name)) || tr[0] || null;
 }
 
 // Sohbet geçmişi çok uzarsa baştan kırp; geçmiş her zaman kullanıcının yazdığı bir mesajla başlamalı
@@ -196,7 +243,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
 
   useEffect(() => () => {
     try { tanima.current?.abort(); } catch { /* yok */ }
-    try { window.speechSynthesis?.cancel(); } catch { /* yok */ }
+    sesiSustur();
   }, []);
 
   // Sohbet modunda: konuşma bitince mikrofonu kendiliğinden tekrar aç
@@ -205,14 +252,15 @@ export default function SesliAsistan({ ad, onDegisti }) {
     setTimeout(() => { if (sohbetRef.current && dinleRef.current) dinleRef.current(true); }, 350);
   }
 
-  function konus(metin) {
-    const sesYok = !sesAcik || !metin || typeof window === 'undefined' || !window.speechSynthesis;
-    if (sesYok) { sonraDinle(); return; }
+  async function konus(metin) {
+    if (!sesAcik || !metin || typeof window === 'undefined') { sonraDinle(); return; }
+    if (await dogalSesle(metin)) { sonraDinle(); return; }
+    if (!window.speechSynthesis) { sonraDinle(); return; }
     try {
       window.speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(metin);
       u.lang = 'tr-TR';
-      const ses = window.speechSynthesis.getVoices().find((v) => v.lang && v.lang.toLowerCase().startsWith('tr'));
+      const ses = enIyiTrSes();
       if (ses) u.voice = ses;
       u.rate = 1.03;
       // Bazı telefonlarda "bitti" olayı gelmiyor: tahmini süre dolunca yine de devam et
@@ -224,6 +272,14 @@ export default function SesliAsistan({ ad, onDegisti }) {
       sozRef.current = u; // Chrome konuşmayı yarıda unutmasın
       window.speechSynthesis.speak(u);
     } catch { sonraDinle(); }
+  }
+
+  // Araç çalışırken araya giren kısa söz: mikrofonu yeniden açmaz, cevabı bölmez
+  function kisaSoz(metin) {
+    dogalSesle(metin).then((ok) => {
+      if (ok || !window.speechSynthesis) return;
+      try { const u = new SpeechSynthesisUtterance(metin); u.lang = 'tr-TR'; u.rate = 1.08; const v = enIyiTrSes(); if (v) u.voice = v; window.speechSynthesis.speak(u); } catch { /* yok */ }
+    });
   }
 
   function sohbetBaslat() {
@@ -259,7 +315,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
       const isim = String(ad || '').split(' ')[0];
       asistanDer(`Görüşürüz${isim ? ' ' + isim : ''}.`);
     } else {
-      try { window.speechSynthesis?.cancel(); } catch { /* yok */ }
+      sesiSustur();
     }
   }
 
@@ -311,14 +367,19 @@ export default function SesliAsistan({ ad, onDegisti }) {
         gecmis = [...gecmis, icerik];
         const cagrilar = icerik.parts.filter((p) => p.functionCall);
         if (!cagrilar.length) { son = String(r.metin || '').trim(); break; }
-        const cevaplar = [];
-        for (const p of cagrilar) {
-          const { name, args, id } = p.functionCall;
-          setDurumYazi(YAZAN_ARACLAR.has(name) ? 'Kaydediyorum…' : 'Kayıtlara bakıyorum…');
-          const sonuc = await aracCalistir(name, args, { ad });
+        const yazar = cagrilar.some((p) => YAZAN_ARACLAR.has(p.functionCall.name));
+        setDurumYazi(yazar ? 'Kaydediyorum…' : 'Kayıtlara bakıyorum…');
+        // Sesli sohbette beklerken sessiz kalmasın: ilk araç turunda kısa bir "bakıyorum" der
+        if (tur === 0 && sohbetRef.current && sesAcik) kisaSoz(yazar ? 'Hemen hallediyorum.' : 'Bir bakayım.');
+        // Okuma araçları aynı anda çalışır (daha hızlı); kayıt yapanlar sırayla
+        const sonuclar = yazar
+          ? await cagrilar.reduce(async (onceki, p) => [...(await onceki), await aracCalistir(p.functionCall.name, p.functionCall.args, { ad })], Promise.resolve([]))
+          : await Promise.all(cagrilar.map((p) => aracCalistir(p.functionCall.name, p.functionCall.args, { ad })));
+        const cevaplar = cagrilar.map((p, k) => {
+          const { name, id } = p.functionCall, sonuc = sonuclar[k];
           if (sonuc.geriAl) eylemler.push({ yazi: sonuc.eylem || name, geriAl: sonuc.geriAl, durum: '' });
-          cevaplar.push({ functionResponse: { ...(id ? { id } : {}), name, response: { sonuc: sonuc.sonuc } } });
-        }
+          return { functionResponse: { ...(id ? { id } : {}), name, response: { sonuc: sonuc.sonuc } } };
+        });
         gecmis = [...gecmis, { role: 'user', parts: cevaplar }];
       }
       gecmisRef.current = gecmis;
@@ -340,7 +401,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
     if (otomatik && (dinliyor || tanima.current?._aktif)) return;
     if (!SR) { setHata('Bu tarayıcı sesli komutu desteklemiyor. Chrome veya Edge kullan, ya da aşağıya yazarak sor.'); return; }
     if (dinliyor) { try { tanima.current?.stop(); } catch { /* yok */ } return; }
-    try { window.speechSynthesis?.cancel(); } catch { /* yok */ }
+    sesiSustur();
     setHata('');
     const r = new SR();
     r.lang = 'tr-TR';
@@ -380,7 +441,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
     const yeni = !sesAcik;
     setSesAcik(yeni);
     try { localStorage.setItem('alkaAsistanSes', yeni ? '1' : '0'); } catch { /* yok */ }
-    if (!yeni) { try { window.speechSynthesis?.cancel(); } catch { /* yok */ } }
+    if (!yeni) sesiSustur();
   }
 
   function yaziGonder(e) {
