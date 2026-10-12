@@ -25,6 +25,7 @@ function veriCoz(mesaj) {
 
 const kucuk = (x) => String(x || '').toLocaleLowerCase('tr-TR').trim();
 const EVET = /^(evet|olur|tamam|onayl[ıi]yorum|onay|kaydet|ekle|do[gğ]ru|aynen|tabii|tabi|evet kaydet)\b/;
+const BITIR = /^(g[öo]r[üu][şs][üu]r[üu]z|kapat|bitir|sohbeti bitir|tamam bu kadar|bu kadar|ho[şs][çc]a kal|g[üu]le g[üu]le|ba[şs]ka bir [şs]ey yok)\b/;
 const HAYIR = /^(hay[ıi]r|iptal|vazge[cç]|yok|yanl[ıi][sş]|dur|bo[sş]ver)\b/;
 
 const SR = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
@@ -135,6 +136,10 @@ export default function SesliAsistan({ ad, onDegisti }) {
   const listeRef = useRef(null);
   const mesajRef = useRef([]);
   const bekleyenRef = useRef(null);
+  const [sohbet, setSohbet] = useState(false);
+  const sohbetRef = useRef(false);
+  const dinleRef = useRef(null);
+  const sozRef = useRef(null);
 
   mesajRef.current = mesajlar;
   bekleyenRef.current = bekleyen;
@@ -202,8 +207,15 @@ export default function SesliAsistan({ ad, onDegisti }) {
     try { window.speechSynthesis?.cancel(); } catch { /* yok */ }
   }, []);
 
+  // Sohbet modunda: konuşma bitince mikrofonu kendiliğinden tekrar aç
+  function sonraDinle() {
+    if (!sohbetRef.current) return;
+    setTimeout(() => { if (sohbetRef.current && dinleRef.current) dinleRef.current(true); }, 350);
+  }
+
   function konus(metin) {
-    if (!sesAcik || !metin || typeof window === 'undefined' || !window.speechSynthesis) return;
+    const sesYok = !sesAcik || !metin || typeof window === 'undefined' || !window.speechSynthesis;
+    if (sesYok) { sonraDinle(); return; }
     try {
       window.speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(metin);
@@ -211,8 +223,52 @@ export default function SesliAsistan({ ad, onDegisti }) {
       const ses = window.speechSynthesis.getVoices().find((v) => v.lang && v.lang.toLowerCase().startsWith('tr'));
       if (ses) u.voice = ses;
       u.rate = 1.03;
+      // Bazı telefonlarda "bitti" olayı gelmiyor: tahmini süre dolunca yine de devam et
+      let bitti = false;
+      const devam = () => { if (bitti) return; bitti = true; sonraDinle(); };
+      u.onend = devam;
+      u.onerror = devam;
+      setTimeout(devam, Math.min(60000, 1500 + metin.length * 85));
+      sozRef.current = u; // Chrome konuşmayı yarıda unutmasın
       window.speechSynthesis.speak(u);
-    } catch { /* yok */ }
+    } catch { sonraDinle(); }
+  }
+
+  function sohbetBaslat() {
+    sesKilidiAc();
+    setHata(''); setBilgi('');
+    sohbetRef.current = true;
+    setSohbet(true);
+    const bugun = yerel(new Date());
+    const acik = hatirlatmalar.filter((h) => h.tur !== TUR_BITTI && h.v.tarih);
+    const bugunku = acik.filter((h) => h.v.tarih === bugun);
+    const geciken = acik.filter((h) => h.v.tarih < bugun);
+    const isim = String(ad || '').split(' ')[0];
+    const saat = new Date().getHours();
+    const selam = saat < 12 ? 'Günaydın' : saat < 18 ? 'Merhaba' : 'İyi akşamlar';
+    let metin = `${selam}${isim ? ' ' + isim : ''}. `;
+    if (bugunku.length) {
+      const adlar = bugunku.slice(0, 3).map((h) => h.v.baslik + (h.v.tutar ? ', ' + Number(h.v.tutar).toLocaleString('tr-TR') + ' lira' : '')).join('. ');
+      metin += `Bugün ${bugunku.length} hatırlatman var. ${adlar}. `;
+      if (bugunku.length > 3) metin += `Ve ${bugunku.length - 3} tane daha. `;
+    } else {
+      metin += 'Bugün için hatırlatman yok. ';
+    }
+    if (geciken.length) metin += `Ayrıca ${geciken.length} gecikmiş hatırlatma var. `;
+    metin += 'Seni dinliyorum.';
+    asistanDer(metin);
+  }
+
+  function sohbetBitir(sesli) {
+    sohbetRef.current = false;
+    setSohbet(false);
+    try { tanima.current?.abort(); } catch { /* yok */ }
+    if (sesli) {
+      const isim = String(ad || '').split(' ')[0];
+      asistanDer(`Görüşürüz${isim ? ' ' + isim : ''}.`);
+    } else {
+      try { window.speechSynthesis?.cancel(); } catch { /* yok */ }
+    }
   }
 
   function ekle(kim, yazi, ek = {}) {
@@ -284,6 +340,8 @@ export default function SesliAsistan({ ad, onDegisti }) {
     setHata('');
     ekle('ben', t);
 
+    if (sohbetRef.current && BITIR.test(kucuk(t))) { sohbetBitir(true); return; }
+
     // Bekleyen bir işlem varsa evet/hayır cevabını burada yakala
     if (bekleyenRef.current) {
       const k = kucuk(t);
@@ -302,13 +360,15 @@ export default function SesliAsistan({ ad, onDegisti }) {
       asistanDer(cevap, islem ? { islem } : {});
     } catch (e) {
       setHata(e?.message || 'Bir hata oldu, tekrar dene.');
+      if (sohbetRef.current) { sohbetRef.current = false; setSohbet(false); }
     } finally {
       setDusunuyor(false);
     }
   }
 
-  function dinle() {
-    sesKilidiAc();
+  function dinle(otomatik) {
+    if (!otomatik) sesKilidiAc();
+    if (otomatik && (dinliyor || tanima.current?._aktif)) return;
     if (!SR) { setHata('Bu tarayıcı sesli komutu desteklemiyor. Chrome veya Edge kullan, ya da aşağıya yazarak sor.'); return; }
     if (dinliyor) { try { tanima.current?.stop(); } catch { /* yok */ } return; }
     try { window.speechSynthesis?.cancel(); } catch { /* yok */ }
@@ -327,10 +387,14 @@ export default function SesliAsistan({ ad, onDegisti }) {
     };
     r.onerror = (e) => {
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') setHata('Mikrofon izni verilmedi. Adres çubuğundaki kilit simgesinden mikrofona izin ver.');
-      else if (e.error === 'no-speech') setHata('Ses duyamadım, tekrar dene.');
+      else if (e.error === 'no-speech') {
+        if (sohbetRef.current) { sohbetRef.current = false; setSohbet(false); setBilgi('Bir süre ses gelmedi, sohbeti durdurdum. Devam etmek için "Konuşalım"a bas.'); }
+        else setHata('Ses duyamadım, tekrar dene.');
+      }
       else if (e.error !== 'aborted') setHata('Ses tanıma hatası: ' + e.error);
     };
     r.onend = () => {
+      r._aktif = false;
       setDinliyor(false);
       setAraMetin('');
       const m = sonMetin.current;
@@ -338,6 +402,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
       if (m.trim()) gonder(m);
     };
     tanima.current = r;
+    r._aktif = true;
     setDinliyor(true);
     try { r.start(); } catch { setDinliyor(false); }
   }
@@ -357,6 +422,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
     gonder(t);
   }
 
+  dinleRef.current = dinle;
   const bos = mesajlar.length === 0 && !dinliyor && !dusunuyor;
 
   return (
@@ -378,6 +444,16 @@ export default function SesliAsistan({ ad, onDegisti }) {
       </div>
 
       {bilgi && <div style={s.bilgi}>{bilgi}</div>}
+
+      {SR && (
+        sohbet ? (
+          <button style={{ ...s.sohbetBtn, ...s.sohbetBitirBtn }} onClick={() => sohbetBitir(false)}>
+            ⏹ Sohbeti bitir {dinliyor ? '· dinliyorum…' : dusunuyor ? '· düşünüyorum…' : '· konuşuyorum…'}
+          </button>
+        ) : (
+          <button style={s.sohbetBtn} onClick={sohbetBaslat} disabled={dusunuyor}>🗣️ Konuşalım</button>
+        )
+      )}
 
       {(!bos || hata) && (
         <div ref={listeRef} style={s.liste}>
@@ -413,7 +489,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
       )}
 
       <div style={s.altSatir}>
-        <button style={{ ...s.mikBtn, ...(dinliyor ? s.mikAktif : {}) }} onClick={dinle} disabled={dusunuyor}
+        <button style={{ ...s.mikBtn, ...(dinliyor ? s.mikAktif : {}) }} onClick={() => dinle(false)} disabled={dusunuyor}
           title={dinliyor ? 'Durdur' : 'Konuş'}>
           {dinliyor ? '■' : '🎤'}
         </button>
@@ -433,6 +509,8 @@ const s = {
   ust: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 10 },
   baslik: { fontSize: 16.5, fontWeight: 800, color: '#4c1d95' },
   alt: { fontSize: 12.5, color: '#6d28d9', marginTop: 2 },
+  sohbetBtn: { width: '100%', border: 'none', borderRadius: 14, padding: '13px 14px', marginBottom: 10, background: 'linear-gradient(145deg,#8b5cf6,#6d28d9)', color: '#fff', fontWeight: 800, fontSize: 16, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 4px 14px rgba(109,40,217,.3)' },
+  sohbetBitirBtn: { background: 'linear-gradient(145deg,#f87171,#dc2626)', boxShadow: '0 4px 14px rgba(220,38,38,.3)', fontSize: 14.5 },
   bildirimAcik: { background: '#f5f3ff', borderColor: '#a78bfa' },
   bilgi: { background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', borderRadius: 12, padding: 10, fontSize: 13, margin: '0 0 10px' },
   sesBtn: { border: '1px solid #ddd6fe', background: '#fff', borderRadius: 10, width: 36, height: 36, fontSize: 17, cursor: 'pointer', flexShrink: 0 },
