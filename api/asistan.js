@@ -1,3 +1,4 @@
+// Asistan sunucusu (Gemini). Son güncelleme: 12 Ekim 2026
 // Yapay zeka asistanı için Gemini aracısı: tarayıcı Google'a doğrudan değil bu sunucu üzerinden bağlanır.
 // (Mobilde bazı ağ/reklam engelleyiciler googleapis adresini kesebiliyor; ayrıca anahtar tarayıcıya gitmez.)
 // İki kullanım:
