@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabase';
+import { ARACLAR, YAZAN_ARACLAR, aracCalistir } from '../asistanAraclar';
 
-// Ana sayfadaki sesli asistan: konuş → Gemini anlar → sesli cevap verir.
-// Hatırlatma ekleyebilir / tamamlayabilir (onay alarak), hatırlatmalar hakkında soru cevaplar.
+// Ana sayfadaki yapay zeka asistanı: normal bir sohbet gibi konuşur (yazarak ya da sesle),
+// arkada uygulamanın tamamına hâkimdir. Gemini hangi aracı kullanacağına kendi karar verir
+// (müşteri ara, iş emri aç, hatırlatma kur, not ekle...). Onay sormaz; yaptığı her kaydın
+// altında "Geri al" düğmesi çıkar. Silme yetkisi yoktur.
 const VAPID_PUBLIC = 'BJUQaPBgiZZBfiwUVprGm_uZvvPJyL1O8LRkSB7SA9-5ZteuaLGbskvnKIZ4cGfyd7oZq4Ye7Ge_edz6pfKfT6I';
 const TUR_ACIK = 'hatirlatma';
 const TUR_BITTI = 'hatirlatma-bitti';
@@ -24,9 +27,9 @@ function veriCoz(mesaj) {
 }
 
 const kucuk = (x) => String(x || '').toLocaleLowerCase('tr-TR').trim();
-const EVET = /^(evet|olur|tamam|onayl[ıi]yorum|onay|kaydet|ekle|do[gğ]ru|aynen|tabii|tabi|evet kaydet)\b/;
 const BITIR = /^(g[öo]r[üu][şs][üu]r[üu]z|kapat|bitir|sohbeti bitir|tamam bu kadar|bu kadar|ho[şs][çc]a kal|g[üu]le g[üu]le|ba[şs]ka bir [şs]ey yok)\b/;
-const HAYIR = /^(hay[ıi]r|iptal|vazge[cç]|yok|yanl[ıi][sş]|dur|bo[sş]ver)\b/;
+const MAX_TUR = 6;          // bir mesajda en fazla kaç araç turu
+const MAX_GECMIS = 40;      // modele gönderilen en fazla sohbet parçası
 
 const SR = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
 
@@ -47,21 +50,15 @@ function sesKilidiAc() {
   try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; window.speechSynthesis.speak(u); sesKilidiAcik = true; } catch { /* yok */ }
 }
 
-// Gemini sohbeti kullanıcıyla başlamalı ve sırayla ilerlemeli: ardışık aynı tarafı birleştir.
-function sirala(gecmis) {
-  const sonuc = [];
-  for (const m of gecmis) {
-    const role = m.kim === 'ben' ? 'user' : 'model';
-    if (!sonuc.length && role === 'model') continue;
-    const son = sonuc[sonuc.length - 1];
-    if (son && son.role === role) son.parts[0].text += '\n' + m.yazi;
-    else sonuc.push({ role, parts: [{ text: m.yazi }] });
-  }
-  return sonuc;
+// Sohbet geçmişi çok uzarsa baştan kırp; geçmiş her zaman kullanıcının yazdığı bir mesajla başlamalı
+function kirp(gecmis) {
+  let g = gecmis.slice(-MAX_GECMIS);
+  while (g.length && !(g[0].role === 'user' && g[0].parts?.some((p) => p.text))) g = g.slice(1);
+  return g;
 }
 
 // Gemini'ye kendi sunucumuz (/api/asistan) üzerinden bağlanır; 55 sn içinde cevap gelmezse vazgeçer.
-async function geminiSor(sistem, gecmis) {
+async function modelSor(sistem, contents) {
   const kontrol = new AbortController();
   const zaman = setTimeout(() => kontrol.abort(), 55000);
   let res;
@@ -69,7 +66,7 @@ async function geminiSor(sistem, gecmis) {
     res = await fetch('/api/asistan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sistem, contents: sirala(gecmis) }),
+      body: JSON.stringify({ sistem, contents, tools: ARACLAR }),
       signal: kontrol.signal,
     });
   } catch (e) {
@@ -80,42 +77,37 @@ async function geminiSor(sistem, gecmis) {
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.hata || 'Sunucu hatası ' + res.status);
-  const icerik = String(data.metin || '');
-  const temiz = icerik.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-  try { return JSON.parse(temiz); } catch { return { cevap: temiz, islem: null }; }
+  return data;
 }
 
-function sistemMetni(hatirlatmalar, musteriler, ad) {
+function sistemMetni(musteriler, ad, sesli) {
   const b = new Date();
   const bugun = `${yerel(b)} (${GUNLER[b.getDay()]}, ${b.getDate()} ${AYLAR[b.getMonth()]} ${b.getFullYear()})`;
-  const hatListe = hatirlatmalar.length
-    ? hatirlatmalar.map((h) => `- id=${h.id} | ${h.v.baslik} | tarih=${h.v.tarih || 'yok'} | tutar=${h.v.tutar ?? 'yok'} | tekrar=${h.v.tekrar || 'tek'} | durum=${h.tur === TUR_BITTI ? 'tamamlandı' : 'açık'}${h.customers?.name ? ' | müşteri=' + h.customers.name : ''}`).join('\n')
-    : '(kayıt yok)';
-  const musteriListe = musteriler.slice(0, 400).map((m) => m.name).join(', ') || '(yok)';
-  return `Sen ALKA Mekanik ve Havuz Sistemleri'nin sesli asistanısın. Konuştuğun kişi: ${ad || 'ekip üyesi'}.
-Bugün: ${bugun}.
-Cevapların sesli okunacak: kısa, doğal, konuşma dilinde Türkçe yaz. Madde işareti, yıldız, emoji, markdown KULLANMA. Tutarları "30 bin lira" gibi söyle, tarihleri "20 Ekim Salı" gibi söyle.
+  const ilkAd = String(ad || '').split(' ')[0];
+  const hitap = /^volkan/i.test(ilkAd) ? 'Volkan abi' : ilkAd || 'ekip arkadaşım';
+  const liste = musteriler.slice(0, 700).map((m) => `${m.id}|${m.name}`).join('\n') || '(henüz müşteri yok)';
+  return `Sen ALKA Mekanik ve Havuz Sistemleri'nin yapay zeka asistanısın. Çeşme/İzmir'de havuz, kuyu, hidrofor, sulama, tesisat ve elektrik servisi veren bir firma; yazlık villalara bakım ve servis yapıyor.
+Konuştuğun kişi: ${ad || 'ekip üyesi'} (ona "${hitap}" diye hitap et). Bugün: ${bugun}. Saat dilimi İstanbul.
 
-Kayıtlı hatırlatmalar:
-${hatListe}
+NASIL KONUŞURSUN
+- Normal, samimi, akıllı bir asistan gibi; uzun uzun anlatmadan, işi bilen bir çalışma arkadaşı gibi doğal Türkçe konuş.
+- ${sesli ? 'Cevapların sesli okunuyor: kısa tut (genelde 1-3 cümle), liste yapma.' : 'Cevaplar ekranda okunuyor: kısa ve net tut, gerekirse satır satır yaz.'}
+- Madde işareti, yıldız, markdown, emoji kullanma. Tutarları "30 bin lira", tarihleri "20 Ekim Salı" gibi söyle.
+- Önceki konuşmayı hatırla: "onun telefonu", "aynısını Ahmet Bey'e de yap" gibi sözlerde kimi/neyi kastettiğini bağlamdan anla.
+- Havuz kimyası, pompa, hidrofor, tesisat, elektrik, müşteriye mesaj taslağı gibi genel sorulara da bilgili ve pratik cevap ver; bunlar için araç gerekmez.
 
-Müşteri adları: ${musteriListe}
+UYGULAMAYA HÂKİMSİN
+- Firmanın verileri hakkında her soruda araçları kullan; asla tahmin etme, uydurma. Bulamazsan "kayıtlarda yok" de.
+- Bir şey yapmanı isterse (müşteri ekle, hatırlatma kur, iş emri aç, ödemeyi işle, not al, geliş kaydet...) bilgi yeterliyse ONAY SORMADAN hemen yap, sonra ne yaptığını tek cümleyle söyle. Ekranda "Geri al" düğmesi çıkıyor; kullanıcıya bunu ayrıca söylemene gerek yok.
+- Sadece gerçekten eksik/belirsiz bilgi varsa sor (örn. tarih hiç yok, ya da aynı isimde iki müşteri var).
+- Müşteri gerektiren işlerde aşağıdaki listeden id'yi bul. İsim tam uymuyorsa ya da emin değilsen musteri_ara aracını kullan. Yeni müşteri eklemeden önce listede aynı kişi var mı bak.
+- Tarih kuralları: "20'sinde" → bu ayın 20'si, geçtiyse gelecek ayın 20'si. "yarın", "cuma", "haftaya" gibi ifadeleri bugüne göre hesapla. "30 bin" = 30000.
+- Bir mesajda birden fazla iş istenirse hepsini yap.
+- Silme yetkin yok. Silmek isterse ilgili sayfadan silebileceğini söyle.
+- Araçtan hata dönerse kullanıcıya sade dille ne olduğunu söyle.
 
-YAPABİLDİKLERİN:
-1) Yeni hatırlatma ekleme. Kullanıcı bir ödeme, tahsilat, iş veya hatırlatılacak bir şey söylerse islem doldur:
-   {"tur":"hatirlatma_ekle","baslik":"...","tarih":"YYYY-MM-DD","tutar":sayı veya null,"tekrar":"tek|aylik|haftalik|yillik","musteri_adi":"müşteri listesinde eşleşen ad veya null","aciklama":""}
-   - "20'sinde" gibi sadece gün söylenirse bu ayın o günü; geçmişte kaldıysa gelecek ayın o günü.
-   - "30 bin" = 30000. Tekrar söylenmemişse "tek". "her ay" = aylik.
-   - baslik kısa olsun, örn: "İhsan Köstekçi ödemesi".
-   - cevap alanında ne kaydedeceğini tek cümleyle söyle ve "Onaylıyor musun?" diye sor. Kaydettim DEME, kayıt onaydan sonra yapılır.
-2) Hatırlatmayı tamamlama. "X'in ödemesini aldım", "X tamam" gibi bir şey derse listeden doğru kaydı bul:
-   {"tur":"hatirlatma_tamamla","id":"listedeki id","baslik":"..."} ve cevapta onay sor.
-3) Soru cevaplama: "bu hafta kimin ödemesi var", "toplam ne kadar alacak var" gibi sorulara yukarıdaki listeye bakarak cevap ver (islem null). Uydurma bilgi verme; listede yoksa yok de.
-4) Genel sohbet ve iş soruları (havuz bakımı, kimya, tesisat, mesaj taslağı vb.): kısa ve faydalı cevap ver (islem null).
-
-Eksik bilgi varsa (örn. tarih yok) islem null bırak ve eksik olanı sor.
-
-YALNIZCA şu JSON'u döndür: {"cevap":"sesli okunacak metin","islem":null veya yukarıdaki nesnelerden biri}`;
+MÜŞTERİ LİSTESİ (id|ad):
+${liste}`;
 }
 
 export default function SesliAsistan({ ad, onDegisti }) {
@@ -124,7 +116,6 @@ export default function SesliAsistan({ ad, onDegisti }) {
   const [araMetin, setAraMetin] = useState('');
   const [yaziMetin, setYaziMetin] = useState('');
   const [dusunuyor, setDusunuyor] = useState(false);
-  const [bekleyen, setBekleyen] = useState(null);
   const [sesAcik, setSesAcik] = useState(() => { try { return localStorage.getItem('alkaAsistanSes') !== '0'; } catch { return true; } });
   const [hata, setHata] = useState('');
   const [bildirim, setBildirim] = useState('bilinmiyor'); // bilinmiyor | acik | kapali | desteklenmiyor
@@ -135,14 +126,15 @@ export default function SesliAsistan({ ad, onDegisti }) {
   const sonMetin = useRef('');
   const listeRef = useRef(null);
   const mesajRef = useRef([]);
-  const bekleyenRef = useRef(null);
+  const gecmisRef = useRef([]);   // modele giden sohbet (araç çağrıları dahil)
+  const notRef = useRef('');      // bir sonraki mesaja eklenecek bilgi (örn. geri alınan işlem)
+  const [durumYazi, setDurumYazi] = useState('');
   const [sohbet, setSohbet] = useState(false);
   const sohbetRef = useRef(false);
   const dinleRef = useRef(null);
   const sozRef = useRef(null);
 
   mesajRef.current = mesajlar;
-  bekleyenRef.current = bekleyen;
 
   async function veriYukle() {
     const [h, m] = await Promise.all([
@@ -280,58 +272,21 @@ export default function SesliAsistan({ ad, onDegisti }) {
     konus(yazi);
   }
 
-  async function islemYap(islem) {
-    if (islem.tur === 'hatirlatma_ekle') {
-      const musteri = islem.musteri_adi ? musteriler.find((m) => kucuk(m.name) === kucuk(islem.musteri_adi)) : null;
-      const icerik = JSON.stringify({
-        baslik: String(islem.baslik || 'Hatırlatma').trim(),
-        tarih: islem.tarih || null,
-        tutar: islem.tutar != null && islem.tutar !== '' ? Number(String(islem.tutar).replace(/[^\d.]/g, '')) : null,
-        tekrar: islem.tekrar || 'tek',
-        aciklama: String(islem.aciklama || '').trim(),
-      });
-      const { error } = await supabase.from('mesaj_kayitlari').insert([{
-        tur: TUR_ACIK, kanal: 'hatirlatma', baslik: 'Hatırlatma', mesaj: icerik, gonderen: ad || '', customer_id: musteri?.id || null,
-      }]);
-      if (error) throw new Error('Kaydedilemedi: ' + error.message);
-      return 'Kaydettim. Hatırlatmalar sayfasına ekledim.';
-    }
-    if (islem.tur === 'hatirlatma_tamamla') {
-      const h = hatirlatmalar.find((x) => String(x.id) === String(islem.id));
-      if (!h) throw new Error('Bu hatırlatmayı bulamadım.');
-      if (h.v.tekrar && h.v.tekrar !== 'tek' && h.v.tarih) {
-        const yeni = sonrakiTarih(h.v.tarih, h.v.tekrar);
-        const { error } = await supabase.from('mesaj_kayitlari').update({ mesaj: JSON.stringify({ ...h.v, tarih: yeni }) }).eq('id', h.id);
-        if (error) throw new Error('Güncellenemedi: ' + error.message);
-        const d = new Date(yeni + 'T00:00:00');
-        return `Tamam, işaretledim. Tekrarlı olduğu için bir sonrakini ${d.getDate()} ${AYLAR[d.getMonth()]} tarihine kurdum.`;
-      }
-      const { error } = await supabase.from('mesaj_kayitlari').update({ tur: TUR_BITTI }).eq('id', h.id);
-      if (error) throw new Error('Güncellenemedi: ' + error.message);
-      return 'Tamam, tamamlandı olarak işaretledim.';
-    }
-    throw new Error('Bu işlemi yapamıyorum.');
-  }
-
-  async function onayla() {
-    const b = bekleyenRef.current;
-    if (!b) return;
-    setBekleyen(null);
-    setDusunuyor(true);
+  async function geriAl(mesajNo, eylemNo) {
+    const e = mesajRef.current[mesajNo]?.eylemler?.[eylemNo];
+    if (!e || e.durum) return;
+    const isaretle = (durum) => setMesajlar((l) => l.map((m, i) => (i !== mesajNo ? m : { ...m, eylemler: m.eylemler.map((x, j) => (j === eylemNo ? { ...x, durum } : x)) })));
+    isaretle('bekliyor');
     try {
-      const sonuc = await islemYap(b);
-      asistanDer(sonuc);
+      await e.geriAl();
+      isaretle('geri alındı');
+      notRef.current += `(Bilgi: kullanıcı "${e.yazi}" işlemini geri aldı, artık o kayıt yok.) `;
       await veriYukle();
       onDegisti && onDegisti();
-    } catch (e) {
-      asistanDer(e.message);
+    } catch (err) {
+      isaretle('');
+      setHata('Geri alınamadı: ' + (err?.message || err));
     }
-    setDusunuyor(false);
-  }
-
-  function iptal() {
-    setBekleyen(null);
-    asistanDer('Tamam, iptal ettim.');
   }
 
   async function gonder(metin) {
@@ -342,27 +297,41 @@ export default function SesliAsistan({ ad, onDegisti }) {
 
     if (sohbetRef.current && BITIR.test(kucuk(t))) { sohbetBitir(true); return; }
 
-    // Bekleyen bir işlem varsa evet/hayır cevabını burada yakala
-    if (bekleyenRef.current) {
-      const k = kucuk(t);
-      if (EVET.test(k)) { await onayla(); return; }
-      if (HAYIR.test(k)) { iptal(); return; }
-      setBekleyen(null);
-    }
-
     setDusunuyor(true);
+    setDurumYazi('Düşünüyorum…');
+    const eylemler = [];
     try {
-      const gecmis = [...mesajRef.current, { kim: 'ben', yazi: t }].slice(-12);
-      const sonuc = await geminiSor(sistemMetni(hatirlatmalar, musteriler, ad), gecmis);
-      const cevap = String(sonuc.cevap || '').trim() || 'Anlayamadım, tekrar söyler misin?';
-      const islem = sonuc.islem && typeof sonuc.islem === 'object' && sonuc.islem.tur ? sonuc.islem : null;
-      if (islem) setBekleyen(islem);
-      asistanDer(cevap, islem ? { islem } : {});
+      const sistem = sistemMetni(musteriler, ad, sohbetRef.current);
+      let gecmis = kirp([...gecmisRef.current, { role: 'user', parts: [{ text: notRef.current + t }] }]);
+      notRef.current = '';
+      let son = '';
+      for (let tur = 0; tur < MAX_TUR; tur++) {
+        const r = await modelSor(sistem, gecmis);
+        const icerik = r.icerik && Array.isArray(r.icerik.parts) ? r.icerik : { role: 'model', parts: [{ text: r.metin || '' }] };
+        gecmis = [...gecmis, icerik];
+        const cagrilar = icerik.parts.filter((p) => p.functionCall);
+        if (!cagrilar.length) { son = String(r.metin || '').trim(); break; }
+        const cevaplar = [];
+        for (const p of cagrilar) {
+          const { name, args, id } = p.functionCall;
+          setDurumYazi(YAZAN_ARACLAR.has(name) ? 'Kaydediyorum…' : 'Kayıtlara bakıyorum…');
+          const sonuc = await aracCalistir(name, args, { ad });
+          if (sonuc.geriAl) eylemler.push({ yazi: sonuc.eylem || name, geriAl: sonuc.geriAl, durum: '' });
+          cevaplar.push({ functionResponse: { ...(id ? { id } : {}), name, response: { sonuc: sonuc.sonuc } } });
+        }
+        gecmis = [...gecmis, { role: 'user', parts: cevaplar }];
+      }
+      gecmisRef.current = gecmis;
+      if (!son) son = eylemler.length ? 'Tamam, hallettim.' : 'Anlayamadım, tekrar söyler misin?';
+      asistanDer(son, eylemler.length ? { eylemler } : {});
+      if (eylemler.length) { await veriYukle(); onDegisti && onDegisti(); }
     } catch (e) {
+      if (eylemler.length) ekle('asistan', 'İşlem yarıda kaldı ama şunları yaptım:', { eylemler });
       setHata(e?.message || 'Bir hata oldu, tekrar dene.');
       if (sohbetRef.current) { sohbetRef.current = false; setSohbet(false); }
     } finally {
       setDusunuyor(false);
+      setDurumYazi('');
     }
   }
 
@@ -429,8 +398,8 @@ export default function SesliAsistan({ ad, onDegisti }) {
     <section style={s.kart}>
       <div style={s.ust}>
         <div>
-          <div style={s.baslik}>✨ Sesli Asistan</div>
-          <div style={s.alt}>Mikrofona bas ve konuş. Hatırlatma ekler, soruları cevaplar.</div>
+          <div style={s.baslik}>✨ Asistan</div>
+          <div style={s.alt}>Yaz ya da konuş: her şeyi sorabilirsin. Müşteri, iş emri, hatırlatma, not, geliş ekler.</div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
         <button style={{ ...s.sesBtn, ...(bildirim === 'acik' ? s.bildirimAcik : {}) }} onClick={bildirimAc}
@@ -458,8 +427,16 @@ export default function SesliAsistan({ ad, onDegisti }) {
       {(!bos || hata) && (
         <div ref={listeRef} style={s.liste}>
           {mesajlar.map((m, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: m.kim === 'ben' ? 'flex-end' : 'flex-start' }}>
+            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: m.kim === 'ben' ? 'flex-end' : 'flex-start', gap: 4 }}>
               <div style={m.kim === 'ben' ? s.benBalon : s.asBalon}>{m.yazi}</div>
+              {(m.eylemler || []).map((e, j) => (
+                <div key={j} style={{ ...s.eylem, ...(e.durum === 'geri alındı' ? s.eylemGeri : {}) }}>
+                  <span style={{ minWidth: 0 }}>{e.durum === 'geri alındı' ? '↩︎ ' : '✓ '}{e.yazi}</span>
+                  {e.durum === 'geri alındı'
+                    ? <span style={s.eylemNot}>geri alındı</span>
+                    : <button style={s.geriBtn} disabled={e.durum === 'bekliyor'} onClick={() => geriAl(i, j)}>{e.durum === 'bekliyor' ? '…' : 'Geri al'}</button>}
+                </div>
+              ))}
             </div>
           ))}
           {dinliyor && (
@@ -467,14 +444,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
               <div style={{ ...s.benBalon, opacity: 0.65 }}>{araMetin || 'Dinliyorum…'}</div>
             </div>
           )}
-          {dusunuyor && <div style={s.asBalon}>⏳ Düşünüyorum…</div>}
-        </div>
-      )}
-
-      {bekleyen && !dusunuyor && (
-        <div style={s.onaySatir}>
-          <button style={s.onayBtn} onClick={onayla}>✓ Onayla</button>
-          <button style={s.iptalBtn} onClick={iptal}>İptal</button>
+          {dusunuyor && <div style={s.asBalon}>⏳ {durumYazi || 'Düşünüyorum…'}</div>}
         </div>
       )}
 
@@ -482,7 +452,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
 
       {bos && !hata && (
         <div style={s.ornekler}>
-          {['İhsan Köstekçi\'nin 20\'sinde 30 bin TL ödemesi var', 'Bu hafta kimin ödemesi var?'].map((o) => (
+          {['Bugün ne var?', 'İhsan Köstekçi\'nin 20\'sinde 30 bin TL ödemesi var', 'Bu hafta bakımı gelen müşteriler kim?'].map((o) => (
             <button key={o} style={s.ornek} onClick={() => gonder(o)}>“{o}”</button>
           ))}
         </div>
@@ -517,9 +487,10 @@ const s = {
   liste: { maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 2px 8px' },
   benBalon: { background: 'linear-gradient(145deg,#3b82f6,#1d4ed8)', color: '#fff', borderRadius: '16px 16px 4px 16px', padding: '9px 12px', fontSize: 14.5, maxWidth: '85%', lineHeight: 1.4, wordBreak: 'break-word' },
   asBalon: { background: '#fff', color: '#1e1b4b', border: '1px solid #e0e7ff', borderRadius: '16px 16px 16px 4px', padding: '9px 12px', fontSize: 14.5, maxWidth: '85%', lineHeight: 1.45, wordBreak: 'break-word', alignSelf: 'flex-start', whiteSpace: 'pre-wrap' },
-  onaySatir: { display: 'flex', gap: 8, margin: '4px 0 10px' },
-  onayBtn: { flex: 1, border: 'none', borderRadius: 12, padding: 11, background: 'linear-gradient(145deg,#22c55e,#16a34a)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer', fontFamily: 'inherit' },
-  iptalBtn: { border: '1px solid #e2e8f0', background: '#fff', borderRadius: 12, padding: '11px 16px', color: '#475569', fontWeight: 600, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' },
+  eylem: { display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between', maxWidth: '92%', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', borderRadius: 10, padding: '5px 6px 5px 10px', fontSize: 12.5, fontWeight: 600, lineHeight: 1.35 },
+  eylemGeri: { background: '#f8fafc', borderColor: '#e2e8f0', color: '#64748b', textDecoration: 'line-through' },
+  eylemNot: { fontSize: 11.5, fontWeight: 600, color: '#64748b', textDecoration: 'none', whiteSpace: 'nowrap', paddingRight: 4 },
+  geriBtn: { border: '1px solid #86efac', background: '#fff', color: '#15803d', borderRadius: 8, padding: '4px 9px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', flexShrink: 0 },
   hata: { background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: 12, padding: 10, fontSize: 13, margin: '4px 0 10px', wordBreak: 'break-word' },
   ornekler: { display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 },
   ornek: { textAlign: 'left', border: '1px dashed #c4b5fd', background: '#fff', borderRadius: 10, padding: '8px 10px', fontSize: 13, color: '#6d28d9', cursor: 'pointer', fontFamily: 'inherit', fontStyle: 'italic' },
