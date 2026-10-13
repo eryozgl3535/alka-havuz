@@ -1,8 +1,10 @@
 // Doğal Türkçe ses: asistanın cevabını Gemini'nin konuşma modeliyle okur, WAV olarak döner.
 // Tarayıcının yerleşik sesi Türkçe isimleri bozuk okuduğu için kullanılıyor; hata olursa tarayıcı eski sese döner.
-export const config = { maxDuration: 30 };
+export const config = { maxDuration: 20 };
 
-const MODELLER = [process.env.GEMINI_TTS_MODEL, 'gemini-2.5-flash-preview-tts', 'gemini-2.5-flash-tts'].filter(Boolean);
+// En hızlı ses modeli önce; kota dolarsa sıradakine geçilir. Eski 2.5 sesleri yeni projelere kapalı olduğu için en sonda.
+const MODELLER = [...new Set([process.env.GEMINI_TTS_MODEL, 'gemini-3.8-flash-lite-tts', 'gemini-3.8-flash-tts', 'gemini-2.5-flash-preview-tts'].filter(Boolean))];
+const DENEME_SURE = 9000;
 const SES = process.env.GEMINI_TTS_VOICE || 'Kore';
 
 function hata(res, kod, mesaj) {
@@ -30,22 +32,24 @@ export default async function handler(req, res) {
   const anahtar = (process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '').trim();
   if (!anahtar) return hata(res, 500, 'Gemini anahtarı yok');
   const { metin } = await govdeOku(req);
-  const t = String(metin || '').trim().slice(0, 900);
+  const t = String(metin || '').trim().slice(0, 600);
   if (!t) return hata(res, 400, 'Metin yok');
   let son = '';
+  const bas = Date.now();
   for (const model of MODELLER) {
+    if (Date.now() - bas > 10000) break;
     try {
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': anahtar },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: `Samimi, sıcak ve akıcı bir Türkçeyle, doğal hızda söyle: ${t}` }] }],
+          contents: [{ parts: [{ text: `Doğal, sıcak bir Türkçeyle söyle: ${t}` }] }],
           generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: SES } } } },
         }),
-        signal: AbortSignal.timeout(25000),
+        signal: AbortSignal.timeout(DENEME_SURE),
       });
       const v = await r.json().catch(() => null);
-      if (!r.ok) { son = `${model}: ${r.status} ${v?.error?.message || ''}`; if (r.status === 404 || r.status === 400) continue; break; }
+      if (!r.ok) { son = `${model}: ${r.status} ${v?.error?.message || ''}`; continue; }
       const parca = v?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
       if (!parca) { son = 'Ses gelmedi'; continue; }
       const hz = Number((parca.inlineData.mimeType || '').match(/rate=(\d+)/)?.[1]) || 24000;

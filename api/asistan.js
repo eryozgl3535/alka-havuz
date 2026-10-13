@@ -1,13 +1,26 @@
-// Asistan sunucusu (Gemini). Son güncelleme: 12 Ekim 2026
-// Yapay zeka asistanı için Gemini aracısı: tarayıcı Google'a doğrudan değil bu sunucu üzerinden bağlanır.
-// (Mobilde bazı ağ/reklam engelleyiciler googleapis adresini kesebiliyor; ayrıca anahtar tarayıcıya gitmez.)
-// İki kullanım:
-//  - tools ile: Gemini "araç çağırma" yapar; modelin cevabı (parçalarıyla birlikte) olduğu gibi döner,
-//    araçları tarayıcı çalıştırır ve sonucu bir sonraki istekte geri yollar.
-//  - tools olmadan: eski düz JSON cevap kullanımı.
+// Asistan sunucusu (Gemini). Son güncelleme: 13 Ekim 2026
+// Tarayıcı Google'a doğrudan değil bu sunucu üzerinden bağlanır (anahtar tarayıcıya gitmez,
+// mobildeki reklam engelleyiciler googleapis adresini kesemez).
+//
+// HIZ VE TAKILMA ÇÖZÜMÜ
+//  - Önce hızlı model (düşünme en az) denenir; kota dolarsa (429) ya da model meşgulse (503)
+//    otomatik olarak sıradaki modele geçilir. Her modelin ücretsiz kotası ayrıdır, böylece
+//    "1-2 mesajdan sonra tıkanma" (dakikalık kota dolması) kullanıcıya yansımaz.
+//  - Her deneme için kısa süre sınırı vardır; tek bir yavaş cevap tüm sohbeti kilitlemez.
 export const config = { maxDuration: 60 };
 
-const MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+// Sıra: hızlı ve yeterince akıllı → en hafif → en güçlü (yavaş). GEMINI_MODEL verilmişse en sona yedek olarak eklenir.
+const MODELLER = [
+  { ad: 'gemini-3.6-flash', dusunme: 'minimal' },
+  { ad: 'gemini-3.5-flash-lite', dusunme: 'minimal' },
+  { ad: 'gemini-3.8-flash', dusunme: 'low' },
+];
+if (process.env.GEMINI_MODEL && !MODELLER.some((m) => m.ad === process.env.GEMINI_MODEL)) {
+  MODELLER.push({ ad: process.env.GEMINI_MODEL, dusunme: 'low' });
+}
+
+const TOPLAM_SURE = 52000;   // Vercel 60 sn'de keser; ondan önce kendimiz bitirelim
+const DENEME_SURE = 22000;   // tek bir modele en fazla bu kadar beklenir
 
 function cevap(res, kod, veri) {
   res.statusCode = kod;
@@ -24,47 +37,83 @@ async function govdeOku(req) {
   try { return JSON.parse(Buffer.concat(parcalar).toString('utf8') || '{}'); } catch { return {}; }
 }
 
+async function modelCagir(anahtar, model, govde, dusunmeli, sure) {
+  const gc = { ...govde.generationConfig };
+  if (dusunmeli) gc.thinkingConfig = { thinkingLevel: model.dusunme };
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model.ad}:generateContent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': anahtar },
+    body: JSON.stringify({ ...govde, generationConfig: gc }),
+    signal: AbortSignal.timeout(sure),
+  });
+  const veri = await r.json().catch(() => null);
+  return { r, veri };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return cevap(res, 405, { hata: 'Sadece POST' });
   const anahtar = (process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '').trim();
   if (!anahtar) return cevap(res, 500, { hata: 'Gemini anahtarı Vercel ayarlarında yok.' });
+
+  const baslangic = Date.now();
   try {
-    const { sistem, contents, tools } = await govdeOku(req);
+    const { sistem, contents, tools, model: tercih } = await govdeOku(req);
     if (!Array.isArray(contents) || !contents.length) return cevap(res, 400, { hata: 'Mesaj yok.' });
     const aracli = Array.isArray(tools) && tools.length > 0;
 
-    // Hız: modelin uzun uzun "düşünmesini" kısıyoruz (günlük işler için gerekmiyor).
-    // Model bu ayarı tanımazsa ayarsız tekrar denenir.
-    const istek = (dusunmeKisa) => {
-      const kontrol = new AbortController();
-      const zaman = setTimeout(() => kontrol.abort(), 50000);
-      const gc = aracli ? { temperature: 0.4 } : { responseMimeType: 'application/json', temperature: 0.3 };
-      if (dusunmeKisa) gc.thinkingConfig = { thinkingLevel: 'low' };
-      return fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': anahtar },
-        body: JSON.stringify({
-          systemInstruction: sistem ? { parts: [{ text: String(sistem) }] } : undefined,
-          contents,
-          ...(aracli ? { tools: [{ functionDeclarations: tools }], toolConfig: { functionCallingConfig: { mode: 'AUTO' } } } : {}),
-          generationConfig: gc,
-        }),
-        signal: kontrol.signal,
-      }).finally(() => clearTimeout(zaman));
+    const govde = {
+      systemInstruction: sistem ? { parts: [{ text: String(sistem) }] } : undefined,
+      contents,
+      ...(aracli ? { tools: [{ functionDeclarations: tools }], toolConfig: { functionCallingConfig: { mode: 'AUTO' } } } : {}),
+      generationConfig: aracli
+        ? { temperature: 0.4, maxOutputTokens: 1024 }
+        : { responseMimeType: 'application/json', temperature: 0.3, maxOutputTokens: 1024 },
     };
-    let yanit = await istek(true);
-    let veri = await yanit.json().catch(() => null);
-    if (yanit.status === 400 && /think/i.test(veri?.error?.message || '')) {
-      yanit = await istek(false);
-      veri = await yanit.json().catch(() => null);
+
+    // Araç turunun devamında aynı modelde kalmak en sağlıklısı (düşünce imzaları o modele ait).
+    const sira = tercih ? [...MODELLER.filter((m) => m.ad === tercih), ...MODELLER.filter((m) => m.ad !== tercih)] : MODELLER;
+    const notlar = [];
+
+    for (const model of sira) {
+      const kalan = TOPLAM_SURE - (Date.now() - baslangic);
+      if (kalan < 4000) break;
+      const sure = Math.min(DENEME_SURE, kalan);
+      try {
+        let { r, veri } = await modelCagir(anahtar, model, govde, true, sure);
+        // Model düşünme ayarını tanımazsa ayarsız bir kez daha dene
+        if (r.status === 400 && /think/i.test(veri?.error?.message || '')) {
+          ({ r, veri } = await modelCagir(anahtar, model, govde, false, Math.min(DENEME_SURE, TOPLAM_SURE - (Date.now() - baslangic))));
+        }
+        if (r.ok) {
+          const aday = veri?.candidates?.[0];
+          const icerik = aday?.content || { role: 'model', parts: [] };
+          const metin = (icerik.parts || []).filter((p) => p.text && !p.thought).map((p) => p.text).join('');
+          // İçerik (düşünce imzaları dahil) değiştirilmeden döner: araç turunda aynen geri yollanmalı.
+          return cevap(res, 200, {
+            metin, icerik: { role: 'model', parts: icerik.parts || [] }, bitis: aday?.finishReason || null,
+            model: model.ad, sure: Date.now() - baslangic,
+          });
+        }
+        const mesaj = veri?.error?.message || 'bilinmeyen hata';
+        notlar.push(`${model.ad}: ${r.status}`);
+        // Kota / meşguliyet / model yok → sıradaki modele geç
+        if ([429, 500, 503, 504, 404].includes(r.status)) continue;
+        // Diğer 400'ler isteğin kendisinden (ör. eski geçmiş): tarayıcı geçmişi kısaltıp tekrar dener
+        return cevap(res, 400, { hata: `Gemini ${r.status}: ${mesaj}`, kod: 'istek', denenen: notlar });
+      } catch (e) {
+        notlar.push(`${model.ad}: ${e?.name === 'TimeoutError' || e?.name === 'AbortError' ? 'zaman aşımı' : e?.message}`);
+        continue;
+      }
     }
-    if (!yanit.ok) return cevap(res, 502, { hata: `Gemini ${yanit.status}: ${veri?.error?.message || 'bilinmeyen hata'}` });
-    const icerik = veri?.candidates?.[0]?.content || { role: 'model', parts: [] };
-    const metin = (icerik.parts || []).filter((p) => p.text && !p.thought).map((p) => p.text).join('');
-    // Model içeriği (düşünce imzaları dahil) değiştirilmeden geri döner: araç turunda aynen geri yollanmalı.
-    return cevap(res, 200, { metin, icerik: { role: 'model', parts: icerik.parts || [] }, bitis: veri?.candidates?.[0]?.finishReason || null });
+    const kotaMi = notlar.some((n) => / 429$/.test(n));
+    return cevap(res, kotaMi ? 429 : 504, {
+      hata: kotaMi
+        ? 'Yapay zekânın dakikalık ücretsiz kotası doldu. 30 saniye sonra tekrar dene.'
+        : 'Yapay zekâ şu an cevap vermiyor. Biraz sonra tekrar dene.',
+      kod: kotaMi ? 'kota' : 'zaman',
+      denenen: notlar,
+    });
   } catch (e) {
-    const mesaj = e?.name === 'AbortError' ? 'Gemini çok geç cevap verdi, tekrar dene.' : (e?.message || 'Sunucu hatası');
-    return cevap(res, 500, { hata: mesaj });
+    return cevap(res, 500, { hata: e?.message || 'Sunucu hatası' });
   }
 }
