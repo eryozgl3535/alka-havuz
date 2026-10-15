@@ -4,7 +4,7 @@ import { ARACLAR, YAZAN_ARACLAR, aracCalistir } from '../asistanAraclar';
 import { Ikon } from '../ikonlar';
 
 // Ana sayfadaki yapay zeka asistanı: normal bir sohbet gibi konuşur (yazarak ya da sesle),
-// arkada uygulamanın tamamına hâkimdir. Gemini hangi aracı kullanacağına kendi karar verir
+// arkada uygulamanın tamamına hâkimdir. Yapay zekâ (Claude) hangi aracı kullanacağına kendi karar verir
 // (müşteri ara, iş emri aç, hatırlatma kur, not ekle...). Onay sormaz; yaptığı her kaydın
 // altında "Geri al" düğmesi çıkar. Silme yetkisi yoktur.
 //
@@ -12,8 +12,8 @@ import { Ikon } from '../ikonlar';
 //  - Bitmiş konuşmalar modele sadece "soru + cevap" metni olarak geri gider; araç sonuçları
 //    (müşteri detayları vb.) her seferinde tekrar gönderilmez. Eskiden her mesajda geçmiş
 //    büyüyor, 1-2 mesaj sonra hem yavaşlıyor hem dakikalık kotayı dolduruyordu.
-//  - Sunucu kota dolunca kendiliğinden başka modele geçer; geçmiş yüzünden hata olursa
-//    sadece son soruyla bir kez daha denenir.
+//  - Geçmiş yüzünden hata olursa
+//    sadece son soruyla bir kez daha denenir (sunucu yoğunlukta kendisi bir kez daha dener).
 //  - Sesli okuma cevabı bekletmez; ses gelmezse en geç 10 sn'de telefonun kendi sesine geçer.
 const VAPID_PUBLIC = 'BJUQaPBgiZZBfiwUVprGm_uZvvPJyL1O8LRkSB7SA9-5ZteuaLGbskvnKIZ4cGfyd7oZq4Ye7Ge_edz6pfKfT6I';
 const TUR_BITTI = 'hatirlatma-bitti';

@@ -1,5 +1,5 @@
 // Yapay zeka asistanının "elleri": uygulamadaki verileri okuyan ve kayıt ekleyen/güncelleyen araçlar.
-// Gemini hangi aracı çağıracağına kendi karar verir; araçlar burada, giriş yapmış kullanıcının yetkisiyle çalışır.
+// Yapay zekâ hangi aracı çağıracağına kendi karar verir; araçlar burada, giriş yapmış kullanıcının yetkisiyle çalışır.
 // Yazan her araç bir "geriAl" fonksiyonu döndürür: asistan onay sormaz, yanlışsa ekranda tek dokunuşla geri alınır.
 // Kural: silme aracı YOK (silme işi sayfalardan elle yapılır).
 import { supabase } from './supabase';
@@ -24,7 +24,7 @@ function sonrakiTarih(t, tekrar) {
 const HAZIRLIK_VARSAYILAN = ['Havuz hazırlama (temizlik + kimyasal ayar)', 'Su vanalarını açma'];
 const DURUM_AD = { bekliyor: 'bekliyor', basladi: 'başlandı', tamamlandi: 'tamamlandı' };
 
-// ------------------------------------------------------------ Gemini'ye tanıtılan araçlar
+// ------------------------------------------------------------ yapay zekâya tanıtılan araçlar
 const S = (properties, required = []) => ({ type: 'OBJECT', properties, required });
 const str = (description) => ({ type: 'STRING', description });
 const num = (description) => ({ type: 'NUMBER', description });
