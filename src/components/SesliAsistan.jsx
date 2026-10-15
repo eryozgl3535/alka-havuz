@@ -14,7 +14,7 @@ import { Ikon } from '../ikonlar';
 //    büyüyor, 1-2 mesaj sonra hem yavaşlıyor hem dakikalık kotayı dolduruyordu.
 //  - Geçmiş yüzünden hata olursa
 //    sadece son soruyla bir kez daha denenir (sunucu yoğunlukta kendisi bir kez daha dener).
-//  - Sesli okuma cevabı bekletmez; ses gelmezse en geç 10 sn'de telefonun kendi sesine geçer.
+//  - Sesli okuma telefonun kendi sesiyle anında başlar (indirme yok, cızırtı yok, ses hep aynı).
 const VAPID_PUBLIC = 'BJUQaPBgiZZBfiwUVprGm_uZvvPJyL1O8LRkSB7SA9-5ZteuaLGbskvnKIZ4cGfyd7oZq4Ye7Ge_edz6pfKfT6I';
 const TUR_BITTI = 'hatirlatma-bitti';
 const AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
@@ -42,69 +42,49 @@ function base64Uint8(b64) {
 const pushDestek = () => typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 const iosMu = () => typeof navigator !== 'undefined' && /iphone|ipad|ipod/i.test(navigator.userAgent);
 const yukluMu = () => typeof window !== 'undefined' && (window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true);
-const bekle = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ------------------------------------------------------------ ses
-// iPhone/Android: ses ancak kullanıcı dokunuşuyla açılır; ilk dokunuşta sessiz bir çalma ile kilidi aç.
-const SESSIZ = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
-const oynatici = typeof Audio !== 'undefined' ? new Audio() : null;
+// Tek ses kaynağı: telefonun kendi Türkçe sesi. İnternetten ses indirilmez, bu yüzden
+//  - yazı çıktığı anda konuşmaya başlar (bekleme yok),
+//  - ses dosyası bitişindeki cızırtı olmaz,
+//  - oturum boyunca hep AYNI ses kullanılır (bir kez seçilip kilitlenir; kadın sesi tercih edilir).
+// iPhone'da ses ancak bir dokunuştan sonra açılır: ilk dokunuşta sessiz bir söz söyletilir.
 let sesKilidiAcik = false;
 function sesKilidiAc() {
-  if (sesKilidiAcik || typeof window === 'undefined') return;
+  if (sesKilidiAcik || typeof window === 'undefined' || !window.speechSynthesis) return;
   sesKilidiAcik = true;
-  try { if (window.speechSynthesis) { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; window.speechSynthesis.speak(u); } } catch { /* yok */ }
-  try { if (oynatici) { oynatici.src = SESSIZ; oynatici.play().catch(() => {}); } } catch { /* yok */ }
+  try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; window.speechSynthesis.speak(u); } catch { /* yok */ }
 }
-// Doğal ses arka arkaya 3 kez gelmezse (ör. kota) bu oturumda hep telefonun sesiyle devam edilir;
-// böylece ses tonu cümleden cümleye gidip gelmez.
-let dogalSesBozuk = false;
-let sesHataSayac = 0;
-let sesSira = 0;
-// Doğal sesle oku; bitince döner. Ses alınamazsa false döner (telefonun kendi sesi kullanılır).
-async function dogalSesle(metin) {
-  if (!oynatici || dogalSesBozuk) return false;
-  const benim = ++sesSira;
-  let url;
-  try {
-    const r = await fetch('/api/ses', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ metin }),
-      signal: AbortSignal.timeout ? AbortSignal.timeout(10000) : undefined,
-    });
-    if (!r.ok) throw new Error('ses ' + r.status);
-    url = URL.createObjectURL(await r.blob());
-    sesHataSayac = 0;
-  } catch {
-    sesHataSayac += 1;
-    if (sesHataSayac >= 3) dogalSesBozuk = true;
-    return benim !== sesSira; // bu arada başka konuşma başladıysa sorun yok
-  }
-  if (benim !== sesSira) { URL.revokeObjectURL(url); return true; }
-  try {
-    try { window.speechSynthesis?.cancel(); } catch { /* yok */ }
-    oynatici.pause();
-    oynatici.src = url;
-    // Bazı telefonlarda play() hiç cevap vermeyebiliyor: 4 sn'de vazgeç
-    await Promise.race([oynatici.play(), bekle(4000).then(() => { throw new Error('play'); })]);
-    await new Promise((bitti) => {
-      const son = () => { oynatici.onended = null; oynatici.onerror = null; bitti(); };
-      oynatici.onended = son; oynatici.onerror = son;
-      setTimeout(son, Math.min(60000, 2500 + metin.length * 110));
-    });
-    return true;
-  } catch {
-    return benim !== sesSira;
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+
+const ERKEK = /\b(cem|tolga|emre|ahmet|mehmet|male|erkek)\b/i;
+let seciliSes = null;   // bir kez seçilince oturum boyunca değişmez
+function sesSec() {
+  if (seciliSes || typeof window === 'undefined' || !window.speechSynthesis) return seciliSes;
+  const tr = window.speechSynthesis.getVoices().filter((v) => v.lang && v.lang.toLowerCase().replace('_', '-').startsWith('tr'));
+  if (!tr.length) return null;
+  const kadin = tr.filter((v) => !ERKEK.test(v.name));
+  const kaliteli = (l) => l.find((v) => /premium|enhanced|geli[sş]mi[sş]|natural|neural/i.test(v.name));
+  seciliSes = kaliteli(kadin.filter((v) => /yelda/i.test(v.name))) || kadin.find((v) => /yelda/i.test(v.name))
+    || kaliteli(kadin) || kadin.find((v) => /google/i.test(v.name)) || kadin[0] || tr[0];
+  return seciliSes;
 }
+if (typeof window !== 'undefined' && window.speechSynthesis) {
+  try { sesSec(); window.speechSynthesis.addEventListener?.('voiceschanged', sesSec); } catch { /* yok */ }
+}
+
 function sesiSustur() {
-  sesSira++;
-  try { oynatici?.pause(); } catch { /* yok */ }
   try { window.speechSynthesis?.cancel(); } catch { /* yok */ }
 }
-function enIyiTrSes() {
-  const tr = (window.speechSynthesis?.getVoices() || []).filter((v) => v.lang && v.lang.toLowerCase().startsWith('tr'));
-  return tr.find((v) => /premium|enhanced|geli[sş]mi[sş]|natural|neural|google/i.test(v.name)) || tr.find((v) => /yelda|cem/i.test(v.name)) || tr[0] || null;
+
+// Uzun metni cümlelere böler (bazı tarayıcılar uzun konuşmayı yarıda kesiyor)
+function cumleler(metin) {
+  const parca = String(metin).replace(/\s+/g, ' ').match(/[^.!?…]+[.!?…]*/g) || [metin];
+  const sonuc = [];
+  for (const c of parca.map((x) => x.trim()).filter(Boolean)) {
+    if (sonuc.length && (sonuc[sonuc.length - 1] + ' ' + c).length < 160) sonuc[sonuc.length - 1] += ' ' + c;
+    else sonuc.push(c);
+  }
+  return sonuc;
 }
 
 // ------------------------------------------------------------ model
@@ -261,25 +241,31 @@ export default function SesliAsistan({ ad, onDegisti }) {
   }
 
   // Sesle sorulan soruya her zaman sesli cevap verilir; yazıyla sorulanda hoparlör düğmesine bakılır.
-  async function konus(metin, zorla) {
-    if ((!sesAcik && !zorla) || !metin || typeof window === 'undefined') { sonraDinle(); return; }
+  function konus(metin, zorla) {
+    const ss = typeof window !== 'undefined' ? window.speechSynthesis : null;
+    if ((!sesAcik && !zorla) || !metin || !ss) { sonraDinle(); return; }
     setKonusuyor(true);
-    if (await dogalSesle(metin)) { sonraDinle(); return; }
-    if (!window.speechSynthesis) { sonraDinle(); return; }
     try {
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(metin);
-      u.lang = 'tr-TR';
-      const ses = enIyiTrSes();
-      if (ses) u.voice = ses;
-      u.rate = 1.05;
+      ss.cancel();
+      const ses = sesSec();
+      const liste = cumleler(metin);
       let bitti = false;
       const devam = () => { if (bitti) return; bitti = true; sonraDinle(); };
-      u.onend = devam;
-      u.onerror = devam;
-      setTimeout(devam, Math.min(45000, 1500 + metin.length * 85));
-      sozRef.current = u;
-      window.speechSynthesis.speak(u);
+      // Bazı telefonlarda "bitti" olayı gelmiyor: tahmini süre dolunca yine de devam et
+      const emniyet = setTimeout(devam, Math.min(60000, 2000 + metin.length * 90));
+      liste.forEach((c, k) => {
+        const u = new SpeechSynthesisUtterance(c);
+        u.lang = 'tr-TR';
+        if (ses) u.voice = ses;
+        u.rate = 1.02;
+        u.pitch = 1;
+        if (k === liste.length - 1) {
+          u.onend = () => { clearTimeout(emniyet); devam(); };
+          u.onerror = () => { clearTimeout(emniyet); devam(); };
+        }
+        sozRef.current = u; // Chrome konuşmayı yarıda unutmasın
+        ss.speak(u);
+      });
     } catch { sonraDinle(); }
   }
 
