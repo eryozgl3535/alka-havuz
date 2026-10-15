@@ -55,7 +55,10 @@ function sesKilidiAc() {
   try { if (window.speechSynthesis) { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; window.speechSynthesis.speak(u); } } catch { /* yok */ }
   try { if (oynatici) { oynatici.src = SESSIZ; oynatici.play().catch(() => {}); } } catch { /* yok */ }
 }
-let dogalSesBozuk = false;   // sunucu sesi bir kez başarısız olursa bu oturumda telefonun sesine geç
+// Doğal ses arka arkaya 3 kez gelmezse (ör. kota) bu oturumda hep telefonun sesiyle devam edilir;
+// böylece ses tonu cümleden cümleye gidip gelmez.
+let dogalSesBozuk = false;
+let sesHataSayac = 0;
 let sesSira = 0;
 // Doğal sesle oku; bitince döner. Ses alınamazsa false döner (telefonun kendi sesi kullanılır).
 async function dogalSesle(metin) {
@@ -69,8 +72,10 @@ async function dogalSesle(metin) {
     });
     if (!r.ok) throw new Error('ses ' + r.status);
     url = URL.createObjectURL(await r.blob());
+    sesHataSayac = 0;
   } catch {
-    dogalSesBozuk = true;
+    sesHataSayac += 1;
+    if (sesHataSayac >= 3) dogalSesBozuk = true;
     return benim !== sesSira; // bu arada başka konuşma başladıysa sorun yok
   }
   if (benim !== sesSira) { URL.revokeObjectURL(url); return true; }

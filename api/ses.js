@@ -1,10 +1,12 @@
 // Doğal Türkçe ses: asistanın cevabını Gemini'nin konuşma modeliyle okur, WAV olarak döner.
-// Tarayıcının yerleşik sesi Türkçe isimleri bozuk okuduğu için kullanılıyor; hata olursa tarayıcı eski sese döner.
-export const config = { maxDuration: 20 };
+// Tarayıcının yerleşik sesi Türkçe isimleri bozuk okuduğu için kullanılıyor.
+export const config = { maxDuration: 15 };
 
-// En hızlı ses modeli önce; kota dolarsa sıradakine geçilir. Eski 2.5 sesleri yeni projelere kapalı olduğu için en sonda.
-const MODELLER = [...new Set([process.env.GEMINI_TTS_MODEL, 'gemini-3.8-flash-lite-tts', 'gemini-3.8-flash-tts', 'gemini-2.5-flash-preview-tts'].filter(Boolean))];
-const DENEME_SURE = 9000;
+// TEK ses modeli ve TEK ses: model değişince konuşma tonu da değişiyordu. Meşgulse aynı modelle bir kez daha denenir.
+const MODEL = process.env.GEMINI_TTS_MODEL || 'gemini-3.8-flash-tts';
+const TOPLAM_SURE = 9000;
+// Her cümlede aynı karakter için sabit üslup tarifi
+const USLUP = 'Sakin, sıcak ve güven veren, her zaman aynı tonda, orta hızda, doğal Türkçe konuş. Abartılı vurgu yapma. Şunu söyle: ';
 const SES = process.env.GEMINI_TTS_VOICE || 'Kore';
 
 function hata(res, kod, mesaj) {
@@ -36,20 +38,22 @@ export default async function handler(req, res) {
   if (!t) return hata(res, 400, 'Metin yok');
   let son = '';
   const bas = Date.now();
-  for (const model of MODELLER) {
-    if (Date.now() - bas > 10000) break;
+  for (let deneme = 0; deneme < 2; deneme++) {
+    const kalan = TOPLAM_SURE - (Date.now() - bas);
+    if (kalan < 2500) break;
+    if (deneme) await new Promise((r) => setTimeout(r, 800));
     try {
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': anahtar },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: `Doğal, sıcak bir Türkçeyle söyle: ${t}` }] }],
+          contents: [{ parts: [{ text: USLUP + t }] }],
           generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: SES } } } },
         }),
-        signal: AbortSignal.timeout(DENEME_SURE),
+        signal: AbortSignal.timeout(kalan),
       });
       const v = await r.json().catch(() => null);
-      if (!r.ok) { son = `${model}: ${r.status} ${v?.error?.message || ''}`; continue; }
+      if (!r.ok) { son = `${r.status} ${v?.error?.message || ''}`; if ([429, 500, 503, 504].includes(r.status)) continue; break; }
       const parca = v?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
       if (!parca) { son = 'Ses gelmedi'; continue; }
       const hz = Number((parca.inlineData.mimeType || '').match(/rate=(\d+)/)?.[1]) || 24000;

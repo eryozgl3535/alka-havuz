@@ -1,4 +1,7 @@
-// Asistan sunucusu (Gemini). Son güncelleme: 13 Ekim 2026
+// Asistan sunucusu. Son güncelleme: 15 Ekim 2026
+// ANTHROPIC_API_KEY varsa Claude Haiku 5.5 kullanılır (ücretli kredi: kota takılması yok, hızlı).
+// Yoksa (ya da Claude geçici olarak cevap veremezse) eskisi gibi Gemini ile çalışır.
+// Tarayıcı tarafı tek bir biçim bilir (Gemini biçimi); Claude'a çeviri burada yapılır.
 // Tarayıcı Google'a doğrudan değil bu sunucu üzerinden bağlanır (anahtar tarayıcıya gitmez,
 // mobildeki reklam engelleyiciler googleapis adresini kesemez).
 //
@@ -50,15 +53,139 @@ async function modelCagir(anahtar, model, govde, dusunmeli, sure) {
   return { r, veri };
 }
 
+// ------------------------------------------------------------ Claude
+const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-haiku-5-5';
+
+// Gemini araç şeması (type: 'OBJECT', 'STRING'...) → JSON Schema (küçük harf)
+function semaCevir(x) {
+  if (Array.isArray(x)) return x.map(semaCevir);
+  if (!x || typeof x !== 'object') return x;
+  const o = {};
+  for (const [k, v] of Object.entries(x)) o[k] = k === 'type' && typeof v === 'string' ? v.toLowerCase() : semaCevir(v);
+  return o;
+}
+
+// Gemini biçimli sohbet → Claude mesajları. Araç çağrılarına kimlik verilir, ardışık aynı roller birleştirilir.
+function mesajCevir(contents) {
+  const mesajlar = [];
+  let sayac = 0;
+  const bekleyen = []; // kimliği olmayan araç çağrıları için sıra
+  for (const c of contents) {
+    const role = c.role === 'model' ? 'assistant' : 'user';
+    const bloklar = [];
+    for (const p of c.parts || []) {
+      if (p.text && p.text.trim()) bloklar.push({ type: 'text', text: p.text });
+      else if (p.functionCall) {
+        const id = p.functionCall.id || `toolu_alka_${++sayac}`;
+        if (!p.functionCall.id) bekleyen.push(id);
+        bloklar.push({ type: 'tool_use', id, name: p.functionCall.name, input: p.functionCall.args || {} });
+      } else if (p.functionResponse) {
+        const id = p.functionResponse.id || bekleyen.shift() || `toolu_alka_${++sayac}`;
+        const icerik = p.functionResponse.response?.sonuc ?? p.functionResponse.response;
+        bloklar.push({ type: 'tool_result', tool_use_id: id, content: typeof icerik === 'string' ? icerik : JSON.stringify(icerik ?? '') });
+      }
+    }
+    if (!bloklar.length) continue;
+    const son = mesajlar[mesajlar.length - 1];
+    if (son && son.role === role) son.content.push(...bloklar);
+    else mesajlar.push({ role, content: bloklar });
+  }
+  while (mesajlar.length && mesajlar[0].role !== 'user') mesajlar.shift();
+  return mesajlar;
+}
+
+async function claudeCagir(anahtar, govde, sure) {
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': anahtar, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify(govde),
+    signal: AbortSignal.timeout(sure),
+  });
+  const veri = await r.json().catch(() => null);
+  return { r, veri };
+}
+
+// Başarılıysa cevabı yollar ve true döner; geçici hatada false döner (Gemini yedeğine geçilebilir).
+async function claudeIle(res, anahtar, { sistem, contents, tools }, baslangic) {
+  const aracli = Array.isArray(tools) && tools.length > 0;
+  const araclar = aracli ? tools.map((t) => ({
+    name: t.name, description: t.description || '',
+    input_schema: t.parameters ? semaCevir(t.parameters) : { type: 'object', properties: {} },
+  })) : undefined;
+  // Sabit kısımlar (talimat + müşteri listesi + araçlar) önbelleğe alınır: her soruda tekrar ödenmez, daha hızlı okunur
+  if (araclar?.length) araclar[araclar.length - 1].cache_control = { type: 'ephemeral' };
+  const govde = {
+    model: CLAUDE_MODEL,
+    max_tokens: 1024,
+    thinking: { type: 'disabled' },  // günlük işler için uzun düşünmeye gerek yok: en hızlı cevap
+    system: sistem ? [{ type: 'text', text: String(sistem), cache_control: { type: 'ephemeral' } }] : undefined,
+    messages: mesajCevir(contents),
+    ...(araclar ? { tools: araclar } : {}),
+  };
+  if (!govde.messages.length) { cevap(res, 400, { hata: 'Mesaj yok.' }); return true; }
+
+  let son = '';
+  for (let deneme = 0; deneme < 2; deneme++) {
+    const kalan = TOPLAM_SURE - (Date.now() - baslangic);
+    if (kalan < 5000) break;
+    if (deneme) await new Promise((r) => setTimeout(r, 1500));
+    try {
+      const { r, veri } = await claudeCagir(anahtar, govde, Math.min(30000, kalan));
+      if (r.ok) {
+        const bloklar = veri?.content || [];
+        const parts = [];
+        for (const b of bloklar) {
+          if (b.type === 'text' && b.text) parts.push({ text: b.text });
+          else if (b.type === 'tool_use') parts.push({ functionCall: { id: b.id, name: b.name, args: b.input || {} } });
+        }
+        const metin = bloklar.filter((b) => b.type === 'text').map((b) => b.text).join('');
+        cevap(res, 200, { metin, icerik: { role: 'model', parts }, bitis: veri?.stop_reason || null, model: CLAUDE_MODEL, sure: Date.now() - baslangic });
+        return true;
+      }
+      son = `Claude ${r.status}: ${veri?.error?.message || ''}`;
+      if (r.status === 400 && !/credit|balance|billing/i.test(son)) { cevap(res, 400, { hata: son, kod: 'istek' }); return true; }
+      if (r.status === 401 || r.status === 403) { console.error(son); return 'anahtar'; }   // anahtar sorunu: Gemini'ye geç
+      if (r.status === 402 || /credit|balance|billing/i.test(son)) { console.error(son); return 'kredi'; } // kredi bitti
+      // 429 / 500 / 529 (yoğunluk): kısa bekleyip bir kez daha dene
+    } catch (e) {
+      son = e?.name === 'TimeoutError' ? 'Claude zaman aşımı' : (e?.message || 'Claude hatası');
+    }
+  }
+  console.error(son);
+  return false;
+}
+
+// ------------------------------------------------------------ giriş
 export default async function handler(req, res) {
   if (req.method !== 'POST') return cevap(res, 405, { hata: 'Sadece POST' });
-  const anahtar = (process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '').trim();
-  if (!anahtar) return cevap(res, 500, { hata: 'Gemini anahtarı Vercel ayarlarında yok.' });
-
   const baslangic = Date.now();
+  const govdeVeri = await govdeOku(req);
+  if (!Array.isArray(govdeVeri.contents) || !govdeVeri.contents.length) return cevap(res, 400, { hata: 'Mesaj yok.' });
+
+  const claudeAnahtar = (process.env.ANTHROPIC_API_KEY || '').trim();
+  const geminiAnahtar = (process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '').trim();
+  const aracParcasi = govdeVeri.contents.some((c) => (c.parts || []).some((p) => p.functionCall || p.functionResponse));
+  const claudeTuru = String(govdeVeri.model || '').startsWith('claude');
+
+  if (claudeAnahtar && (!govdeVeri.model || claudeTuru)) {
+    const sonuc = await claudeIle(res, claudeAnahtar, govdeVeri, baslangic);
+    if (sonuc === true) return;
+    // Claude'un başlattığı bir araç turu Gemini'de sürdürülemez (kimlikler farklı)
+    if (aracParcasi || !geminiAnahtar) {
+      const hata = sonuc === 'kredi' ? 'Claude kredisi bitmiş. platform.claude.com üzerinden kredi yükle.'
+        : sonuc === 'anahtar' ? 'Claude anahtarı geçersiz. Vercel\'deki ANTHROPIC_API_KEY değerini kontrol et.'
+        : 'Yapay zekâ şu an cevap veremedi. Birkaç saniye sonra tekrar dene.';
+      return cevap(res, 503, { hata, kod: 'zaman' });
+    }
+  }
+  return geminiIle(res, geminiAnahtar, govdeVeri, baslangic);
+}
+
+// ------------------------------------------------------------ Gemini (yedek)
+async function geminiIle(res, anahtar, govdeVeri, baslangic) {
+  if (!anahtar) return cevap(res, 500, { hata: 'Yapay zekâ anahtarı Vercel ayarlarında yok.' });
   try {
-    const { sistem, contents, tools, model: tercih } = await govdeOku(req);
-    if (!Array.isArray(contents) || !contents.length) return cevap(res, 400, { hata: 'Mesaj yok.' });
+    const { sistem, contents, tools, model: tercih } = govdeVeri;
     const aracli = Array.isArray(tools) && tools.length > 0;
 
     const govde = {
