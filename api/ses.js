@@ -5,8 +5,6 @@ export const config = { maxDuration: 15 };
 // TEK ses modeli ve TEK ses: model değişince konuşma tonu da değişiyordu. Meşgulse aynı modelle bir kez daha denenir.
 const MODEL = process.env.GEMINI_TTS_MODEL || 'gemini-3.8-flash-tts';
 const TOPLAM_SURE = 9000;
-// Her cümlede aynı karakter için sabit üslup tarifi
-const USLUP = 'Sakin, sıcak ve güven veren, her zaman aynı tonda, orta hızda, doğal Türkçe konuş. Abartılı vurgu yapma. Şunu söyle: ';
 const SES = process.env.GEMINI_TTS_VOICE || 'Kore';
 
 function hata(res, kod, mesaj) {
@@ -47,7 +45,7 @@ export default async function handler(req, res) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': anahtar },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: USLUP + t }] }],
+          contents: [{ parts: [{ text: t }] }],
           generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: SES } } } },
         }),
         signal: AbortSignal.timeout(kalan),

@@ -289,24 +289,9 @@ export default function SesliAsistan({ ad, onDegisti }) {
     hataSayac.current = 0;
     sohbetRef.current = true;
     setSohbet(true);
-    const bugun = yerel(new Date());
-    const acik = hatirlatmalar.filter((h) => h.tur !== TUR_BITTI && h.v.tarih);
-    const bugunku = acik.filter((h) => h.v.tarih === bugun);
-    const geciken = acik.filter((h) => h.v.tarih < bugun);
+    // Uzun selamlama yok: direkt dinlemeye geçer
     const isim = String(ad || '').split(' ')[0];
-    const saat = new Date().getHours();
-    const selam = saat < 12 ? 'Günaydın' : saat < 18 ? 'Merhaba' : 'İyi akşamlar';
-    let metin = `${selam}${isim ? ' ' + isim : ''}. `;
-    if (bugunku.length) {
-      const adlar = bugunku.slice(0, 3).map((h) => h.v.baslik + (h.v.tutar ? ', ' + Number(h.v.tutar).toLocaleString('tr-TR') + ' lira' : '')).join('. ');
-      metin += `Bugün ${bugunku.length} hatırlatman var. ${adlar}. `;
-      if (bugunku.length > 3) metin += `Ve ${bugunku.length - 3} tane daha. `;
-    } else {
-      metin += 'Bugün için hatırlatman yok. ';
-    }
-    if (geciken.length) metin += `Ayrıca ${geciken.length} gecikmiş hatırlatma var. `;
-    metin += 'Seni dinliyorum.';
-    asistanDer(metin);
+    asistanDer(`Buyur${isim ? ' ' + isim : ''}, dinliyorum.`);
   }
 
   function sohbetBitir(sesli) {
