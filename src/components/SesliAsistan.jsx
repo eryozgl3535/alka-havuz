@@ -260,8 +260,9 @@ export default function SesliAsistan({ ad, onDegisti }) {
     setTimeout(() => { if (sohbetRef.current && dinleRef.current) dinleRef.current(true); }, 300);
   }
 
-  async function konus(metin) {
-    if (!sesAcik || !metin || typeof window === 'undefined') { sonraDinle(); return; }
+  // Sesle sorulan soruya her zaman sesli cevap verilir; yazıyla sorulanda hoparlör düğmesine bakılır.
+  async function konus(metin, zorla) {
+    if ((!sesAcik && !zorla) || !metin || typeof window === 'undefined') { sonraDinle(); return; }
     setKonusuyor(true);
     if (await dogalSesle(metin)) { sonraDinle(); return; }
     if (!window.speechSynthesis) { sonraDinle(); return; }
@@ -325,9 +326,9 @@ export default function SesliAsistan({ ad, onDegisti }) {
     setMesajlar((l) => [...l, { kim, yazi, ...ek }].slice(-30));
   }
 
-  function asistanDer(yazi, ek) {
+  function asistanDer(yazi, ek, sesli) {
     ekle('asistan', yazi, ek);
-    konus(yazi);
+    konus(yazi, sesli || sohbetRef.current);
   }
 
   async function geriAl(mesajNo, eylemNo) {
@@ -374,7 +375,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
     return '';
   }
 
-  async function gonder(metin) {
+  async function gonder(metin, sesle = false) {
     const t = String(metin || '').trim();
     if (!t || mesgulRef.current) return;
     setHata('');
@@ -406,7 +407,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
         { role: 'model', parts: [{ text: son + (eylemler.length ? ` [Yapılanlar: ${eylemler.map((x) => x.yazi).join('; ')}]` : '') }] },
       ].slice(-MAX_SOHBET * 2);
       hataSayac.current = 0;
-      asistanDer(son, eylemler.length ? { eylemler } : {});
+      asistanDer(son, eylemler.length ? { eylemler } : {}, sesle);
       if (eylemler.length) { await veriYukle(); onDegisti && onDegisti(); }
     } catch (e) {
       if (eylemler.length) ekle('asistan', 'İşlem yarıda kaldı ama şunları yaptım:', { eylemler });
@@ -414,7 +415,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
       hataSayac.current += 1;
       if (sohbetRef.current) {
         if (hataSayac.current >= 2) { sohbetRef.current = false; setSohbet(false); }
-        else konus('Bir aksilik oldu, tekrar söyler misin?');
+        else konus('Bir aksilik oldu, tekrar söyler misin?', true);
       }
     } finally {
       mesgulRef.current = false;
@@ -457,7 +458,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
       setAraMetin('');
       const m = sonMetin.current;
       sonMetin.current = '';
-      if (m.trim()) gonder(m);
+      if (m.trim()) gonder(m, true);
     };
     tanima.current = r;
     r._aktif = true;
