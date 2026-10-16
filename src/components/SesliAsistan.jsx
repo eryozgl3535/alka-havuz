@@ -47,7 +47,7 @@ const yukluMu = () => typeof window !== 'undefined' && (window.matchMedia?.('(di
 // Tek ses kaynağı: telefonun kendi Türkçe sesi. İnternetten ses indirilmez, bu yüzden
 //  - yazı çıktığı anda konuşmaya başlar (bekleme yok),
 //  - ses dosyası bitişindeki cızırtı olmaz,
-//  - oturum boyunca hep AYNI ses kullanılır (bir kez seçilip kilitlenir; kadın sesi tercih edilir).
+//  - oturum boyunca hep AYNI ses kullanılır (bir kez seçilip kilitlenir; erkek ses Cem tercih edilir).
 // iPhone'da ses ancak bir dokunuştan sonra açılır: ilk dokunuşta sessiz bir söz söyletilir.
 let sesKilidiAcik = false;
 function sesKilidiAc() {
@@ -56,16 +56,17 @@ function sesKilidiAc() {
   try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; window.speechSynthesis.speak(u); } catch { /* yok */ }
 }
 
+// Eray'ın tercihi: erkek ses "Cem". Telefonda Cem yoksa diğer Türkçe erkek sesler, o da yoksa herhangi bir Türkçe ses.
 const ERKEK = /\b(cem|tolga|emre|ahmet|mehmet|male|erkek)\b/i;
 let seciliSes = null;   // bir kez seçilince oturum boyunca değişmez
 function sesSec() {
   if (seciliSes || typeof window === 'undefined' || !window.speechSynthesis) return seciliSes;
   const tr = window.speechSynthesis.getVoices().filter((v) => v.lang && v.lang.toLowerCase().replace('_', '-').startsWith('tr'));
   if (!tr.length) return null;
-  const kadin = tr.filter((v) => !ERKEK.test(v.name));
   const kaliteli = (l) => l.find((v) => /premium|enhanced|geli[sş]mi[sş]|natural|neural/i.test(v.name));
-  seciliSes = kaliteli(kadin.filter((v) => /yelda/i.test(v.name))) || kadin.find((v) => /yelda/i.test(v.name))
-    || kaliteli(kadin) || kadin.find((v) => /google/i.test(v.name)) || kadin[0] || tr[0];
+  const cem = tr.filter((v) => /\bcem\b/i.test(v.name));
+  const erkek = tr.filter((v) => ERKEK.test(v.name));
+  seciliSes = kaliteli(cem) || cem[0] || kaliteli(erkek) || erkek[0] || kaliteli(tr) || tr[0];
   return seciliSes;
 }
 if (typeof window !== 'undefined' && window.speechSynthesis) {
