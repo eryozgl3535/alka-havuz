@@ -44,7 +44,11 @@ export const ARACLAR = [
   { name: 'bakimlar', description: 'Bakım takvimi: tarihi gelmiş/gecikmiş ve önümüzdeki günlerde yapılacak bakımlar (müşteri ve cihazıyla).', parameters: S({ gun: num('Kaç gün ilerisine bakılsın (varsayılan 30)') }) },
   { name: 'hatirlatmalar', description: 'Hatırlatmaları (ödeme, tahsilat, yapılacak iş) listeler.', parameters: S({ durum: en('Hangileri', ['acik', 'tamamlanan', 'tumu']) }) },
   { name: 'gelisler', description: 'Müşteri geliş/ayrılış planları (yazlıkçıların gelişi).', parameters: S({ baslangic: str('YYYY-MM-DD, varsayılan bugün'), bitis: str('YYYY-MM-DD') }) },
-  { name: 'notlar', description: 'Ekibin ortak notları.', parameters: S({ ara: str('Notlarda geçen kelime (isteğe bağlı)') }) },
+  { name: 'notlar', description: 'Ekibin ortak notları (id ile).', parameters: S({ ara: str('Notlarda geçen kelime (isteğe bağlı)'), bitenler: bool('Tamamlanmış notlar da gelsin') }) },
+  { name: 'mesaj_gecmisi', description: 'Müşterilere gönderilmiş mesaj kayıtları (WhatsApp/SMS bilgilendirme, bakım hatırlatması) id ile.', parameters: S({ musteri_id: str('Sadece bu müşteri (isteğe bağlı)') }) },
+
+  // --- silme (ONAYLI): bu araç silmez, sadece kullanıcıdan onay ister; onaydan sonra uygulama siler
+  { name: 'kayit_sil', description: 'Bir notu, hatırlatmayı/ödemeyi ya da mesaj kaydını silmek için KULLANICIDAN ONAY İSTER. Kaydı hemen silmez: uygulama kullanıcıya "emin misin?" diye sorar, kullanıcı evet derse uygulama siler. Önce notlar / hatirlatmalar / mesaj_gecmisi araçlarıyla doğru kaydın id\'sini bul; birden fazla aday varsa önce hangisi olduğunu sor.', parameters: S({ id: str('Silinecek kaydın id\'si') }, ['id']) },
 
   // --- yazma (hepsi geri alınabilir)
   { name: 'musteri_ekle', description: 'Yeni müşteri ekler. Önce aynı isimde müşteri var mı diye müşteri listesine bak.', parameters: S({ ad: str('Ad soyad'), telefon: str('Telefon'), adres: str('Adres / site / bölge'), not: str('Not') }, ['ad']) },
@@ -181,12 +185,46 @@ const CALISTIR = {
     return { sonuc: (data || []).map((g) => ({ id: g.id, musteri: g.customers?.name, musteri_id: g.customers?.id, gelis: g.gelis_tarihi, ayrilis: g.ayrilis_tarihi, durum: g.durum, istekler: g.istekler, not: g.notlar })) };
   },
 
-  async notlar({ ara } = {}) {
-    let q = supabase.from('mesaj_kayitlari').select('id, tur, mesaj, gonderen, created_at, customers(name)').in('tur', ['not', 'not-sabit']);
+  async notlar({ ara, bitenler } = {}) {
+    let q = supabase.from('mesaj_kayitlari').select('id, tur, mesaj, gonderen, created_at, customers(name)').in('tur', bitenler ? ['not', 'not-sabit', 'not-bitti'] : ['not', 'not-sabit']);
     if (ara) q = q.ilike('mesaj', `%${String(ara).replace(/[%]/g, '')}%`);
     const { data, error } = await q.order('created_at', { ascending: false }).limit(30);
     hataVer(error);
-    return { sonuc: (data || []).map((n) => ({ id: n.id, not: kisalt(n.mesaj, 300), yazan: n.gonderen, tarih: String(n.created_at).slice(0, 10), sabit: n.tur === 'not-sabit', musteri: n.customers?.name })) };
+    return { sonuc: (data || []).map((n) => ({ id: n.id, not: kisalt(n.mesaj, 300), yazan: n.gonderen, tarih: String(n.created_at).slice(0, 10), sabit: n.tur === 'not-sabit', tamamlandi: n.tur === 'not-bitti' || undefined, musteri: n.customers?.name })) };
+  },
+
+  async mesaj_gecmisi({ musteri_id } = {}) {
+    let q = supabase.from('mesaj_kayitlari').select('id, tur, kanal, baslik, mesaj, gonderen, created_at, customers(id, name)')
+      .not('tur', 'like', 'not%').not('tur', 'like', 'hatirlatma%');
+    if (musteri_id) q = q.eq('customer_id', musteri_id);
+    const { data, error } = await q.order('created_at', { ascending: false }).limit(40);
+    hataVer(error);
+    return { sonuc: (data || []).map((m) => ({ id: m.id, baslik: m.baslik, kanal: m.kanal, musteri: m.customers?.name, tarih: String(m.created_at).slice(0, 10), mesaj: kisalt(m.mesaj, 120) })) };
+  },
+
+  // ---------------- silme onayı (silmez; uygulama kullanıcıya sorar)
+  async kayit_sil({ id }) {
+    if (!id) throw new Error('Silinecek kaydın id\'si yok.');
+    const { data: satir, error } = await supabase.from('mesaj_kayitlari').select('*, customers(name)').eq('id', id).maybeSingle();
+    hataVer(error);
+    if (!satir) return { sonuc: { hata: 'Bu id ile kayıt bulunamadı. Önce listeleme aracıyla doğru kaydı bul.' } };
+    const musteri = satir.customers?.name;
+    const tur = String(satir.tur || '');
+    let aciklama;
+    if (tur.startsWith('hatirlatma')) {
+      const v = json(satir.mesaj);
+      aciklama = `"${v.baslik || 'Hatırlatma'}" hatırlatması` + (v.tutar ? ` (${Number(v.tutar).toLocaleString('tr-TR')} TL` + (v.tarih ? `, ${trTarih(v.tarih)})` : ')') : (v.tarih ? ` (${trTarih(v.tarih)})` : ''));
+    } else if (tur.startsWith('not')) {
+      aciklama = `"${kisalt(satir.mesaj, 60)}" notu`;
+    } else {
+      aciklama = `${musteri ? musteri + ' için ' : ''}"${kisalt(satir.baslik || satir.mesaj, 50)}" mesaj kaydı`;
+    }
+    if (musteri && !aciklama.includes(musteri)) aciklama += ` — ${musteri}`;
+    const { customers, ...ham } = satir; // geri almak için kaydın kendisi saklanır
+    return {
+      sonuc: `ONAY BEKLENİYOR, HENÜZ SİLİNMEDİ: ${aciklama}. Kullanıcıya tek cümleyle "${aciklama} siliniyor, emin misin?" diye sor. Kendin "sildim" deme; kullanıcı onaylarsa uygulama siler.`,
+      silOnay: { id, aciklama, satir: ham },
+    };
   },
 
   // ---------------- yazanlar

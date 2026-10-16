@@ -28,6 +28,9 @@ function veriCoz(mesaj) {
 
 const kucuk = (x) => String(x || '').toLocaleLowerCase('tr-TR').trim();
 const BITIR = /^(g[öo]r[üu][şs][üu]r[üu]z|kapat|bitir|sohbeti bitir|tamam bu kadar|bu kadar|ho[şs][çc]a kal|g[üu]le g[üu]le|ba[şs]ka bir [şs]ey yok)\b/;
+const SON = '(?=\\s|$)';
+const EVET = new RegExp('^(evet|eve|aynen|onayl[ıi]yorum|onayla|onay|sil|evet sil|tamam|tamam sil|olur|olur sil|emin[ıi]m|kesinlikle|do[ğg]ru)' + SON);
+const HAYIR = new RegExp('^(hay[ıi]r|yok|vazge[çc]|iptal|silme|dur|bekle|istemiyorum|olmaz)' + SON);
 const MAX_TUR = 5;          // bir mesajda en fazla kaç araç turu
 const MAX_SOHBET = 10;      // modele hatırlatılan en fazla önceki soru-cevap sayısı
 
@@ -143,7 +146,8 @@ UYGULAMAYA HÂKİMSİN
 - Müşteri id'sini aşağıdaki listeden bul; emin değilsen musteri_ara kullan. Yeni müşteri eklemeden önce listede aynı kişi var mı bak.
 - Tarih: "20'sinde" → bu ayın 20'si, geçtiyse gelecek ayın. "yarın", "cuma", "haftaya" bugüne göre. "30 bin" = 30000.
 - Birden fazla iş istenirse hepsini yap; araçları mümkünse aynı turda birlikte çağır.
-- Silme yetkin yok; silmek isterse ilgili sayfadan silebileceğini söyle.
+- SİLME: Not, hatırlatma/ödeme ve mesaj kaydı silebilirsin ama SADECE kayit_sil aracıyla. Önce notlar / hatirlatmalar / mesaj_gecmisi ile doğru kaydı bul; birden fazla aday varsa hangisi olduğunu sor. kayit_sil kaydı hemen silmez, kullanıcıdan onay ister: sen de "… siliniyor, emin misin?" diye sor. Kullanıcı onaylamadan ASLA "sildim" deme. Müşteri, iş emri, cihaz gibi diğer kayıtları silemezsin; onlar için ilgili sayfayı söyle.
+- "Ödemesi yapıldı / alındı" denirse bunu silme olarak değil, hatirlatma_tamamla ile tamamlandı olarak işle; kullanıcı açıkça "sil" derse kayit_sil kullan.
 
 MÜŞTERİ LİSTESİ (id|ad):
 ${liste}`;
@@ -176,6 +180,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
   const dinleRef = useRef(null);
   const sozRef = useRef(null);
   const hataSayac = useRef(0);
+  const bekleyenSil = useRef(null);   // { id, aciklama, satir } — kullanıcı onayı bekleyen silme
   const sessizSayac = useRef(0);   // sohbette art arda kaç kez ses gelmedi
   const mesgulRef = useRef(false);
 
@@ -349,12 +354,36 @@ export default function SesliAsistan({ ad, onDegisti }) {
       const cevaplar = cagrilar.map((p, k) => {
         const { name, id } = p.functionCall, sonuc = sonuclar[k];
         if (sonuc.geriAl) eylemler.push({ yazi: sonuc.eylem || name, geriAl: sonuc.geriAl, durum: '' });
+        if (sonuc.silOnay) bekleyenSil.current = sonuc.silOnay;
         return { functionResponse: { ...(id ? { id } : {}), name, response: { sonuc: sonuc.sonuc } } };
       });
       gecmis = [...gecmis, { role: 'user', parts: cevaplar }];
       setDurumYazi('Cevabı hazırlıyorum');
     }
     return '';
+  }
+
+  // Onaylanan silme: kaydı siler, "Geri al" ile aynı kaydı geri koyar
+  async function silmeyiUygula(onay, sesle) {
+    const b = bekleyenSil.current;
+    bekleyenSil.current = null;
+    setMesajlar((l) => l.map((m) => (m.silOnay && m.silOnay.id === b?.id ? { ...m, silOnay: { ...m.silOnay, durum: onay ? 'silindi' : 'iptal' } } : m)));
+    if (!b) return;
+    if (!onay) {
+      gecmisRef.current = [...gecmisRef.current, { role: 'user', parts: [{ text: 'Hayır, silme.' }] }, { role: 'model', parts: [{ text: `Tamam, ${b.aciklama} silinmedi.` }] }].slice(-MAX_SOHBET * 2);
+      asistanDer('Tamam, silmedim.', {}, sesle);
+      return;
+    }
+    const { error } = await supabase.from('mesaj_kayitlari').delete().eq('id', b.id);
+    if (error) { setHata('Silinemedi: ' + error.message); asistanDer('Silemedim, bir hata oldu.', {}, sesle); return; }
+    const eylem = { yazi: `Silindi: ${b.aciklama}`, durum: '', geriAl: async () => {
+      const { error: e2 } = await supabase.from('mesaj_kayitlari').insert([b.satir]);
+      if (e2) throw new Error(e2.message);
+    } };
+    gecmisRef.current = [...gecmisRef.current, { role: 'user', parts: [{ text: 'Evet, sil.' }] }, { role: 'model', parts: [{ text: `Sildim: ${b.aciklama}.` }] }].slice(-MAX_SOHBET * 2);
+    asistanDer('Sildim.', { eylemler: [eylem] }, sesle);
+    await veriYukle();
+    onDegisti && onDegisti();
   }
 
   async function gonder(metin, sesle = false) {
@@ -364,6 +393,17 @@ export default function SesliAsistan({ ad, onDegisti }) {
     ekle('ben', t, sesle ? { sesle: true } : {});
 
     if (sohbetRef.current && BITIR.test(kucuk(t))) { sohbetBitir(true); return; }
+
+    // Silme onayı bekleniyorsa: "evet" → sil, "hayır" → vazgeç (yapay zekâya sorulmadan, kesin)
+    if (bekleyenSil.current) {
+      const k = kucuk(t).replace(/[.,!?]/g, ' ').trim();
+      if (HAYIR.test(k)) { silmeyiUygula(false, sesle); return; }
+      if (EVET.test(k)) { silmeyiUygula(true, sesle); return; }
+      // başka bir şey söylendi: bekleyen silme iptal
+      setMesajlar((l) => l.map((m) => (m.silOnay && m.silOnay.id === bekleyenSil.current.id ? { ...m, silOnay: { ...m.silOnay, durum: 'iptal' } } : m)));
+      notRef.current += `(Bilgi: bekleyen "${bekleyenSil.current.aciklama}" silme işlemi onaylanmadı ve iptal edildi.) `;
+      bekleyenSil.current = null;
+    }
 
     mesgulRef.current = true;
     setDusunuyor(true);
@@ -389,7 +429,9 @@ export default function SesliAsistan({ ad, onDegisti }) {
         { role: 'model', parts: [{ text: son + (eylemler.length ? ` [Yapılanlar: ${eylemler.map((x) => x.yazi).join('; ')}]` : '') }] },
       ].slice(-MAX_SOHBET * 2);
       hataSayac.current = 0;
-      asistanDer(son, eylemler.length ? { eylemler } : {}, sesle);
+      const ek = eylemler.length ? { eylemler } : {};
+      if (bekleyenSil.current) ek.silOnay = { ...bekleyenSil.current };
+      asistanDer(son, ek, sesle);
       if (eylemler.length) { await veriYukle(); onDegisti && onDegisti(); }
     } catch (e) {
       if (eylemler.length) ekle('asistan', 'İşlem yarıda kaldı ama şunları yaptım:', { eylemler });
@@ -538,6 +580,19 @@ export default function SesliAsistan({ ad, onDegisti }) {
                 <div style={s.duyulan}><Ikon ad="mikrofon" boyut={12} renk="#64748b" kalin={2.2} /> Duyduğum</div>
               )}
               <div style={m.kim === 'ben' ? s.benBalon : s.asBalon}>{m.yazi}</div>
+              {m.silOnay && (
+                <div style={{ ...s.silKart, ...(m.silOnay.durum ? { opacity: 0.6 } : {}) }}>
+                  <div style={s.silBaslik}><Ikon ad="kapat" boyut={14} renk="#b91c1c" kalin={2.4} /> {m.silOnay.aciklama}</div>
+                  {m.silOnay.durum ? (
+                    <div style={s.silDurum}>{m.silOnay.durum === 'silindi' ? 'Silindi' : 'Silinmedi'}</div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button style={s.silEvet} onClick={() => silmeyiUygula(true, false)}>Evet, sil</button>
+                      <button style={s.silHayir} onClick={() => silmeyiUygula(false, false)}>Vazgeç</button>
+                    </div>
+                  )}
+                </div>
+              )}
               {(m.eylemler || []).map((e, j) => {
                 const geri = e.durum === 'geri alındı';
                 return (
@@ -650,6 +705,11 @@ const s = {
   baslik: { fontSize: 16.5, fontWeight: 800, color: '#0b1730', letterSpacing: -0.2 },
   durum: { fontSize: 12.5, color: '#64748b', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   ikonBtn: { width: 36, height: 36, borderRadius: 11, border: '1px solid #e6ecf3', background: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, padding: 0 },
+  silKart: { display: 'flex', flexDirection: 'column', gap: 8, maxWidth: '92%', background: '#fff7f7', border: '1px solid #fecaca', borderRadius: 14, padding: '10px 12px' },
+  silBaslik: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 13.5, fontWeight: 700, color: '#7f1d1d', lineHeight: 1.35 },
+  silDurum: { fontSize: 12.5, fontWeight: 700, color: '#64748b' },
+  silEvet: { border: 'none', background: '#dc2626', color: '#fff', borderRadius: 10, padding: '8px 14px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' },
+  silHayir: { border: '1px solid #e2e8f0', background: '#fff', color: '#334155', borderRadius: 10, padding: '8px 14px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' },
   duyulan: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 600, color: '#64748b', marginBottom: -2 },
   konusBtn: { display: 'flex', alignItems: 'center', gap: 14, width: '100%', border: 'none', borderRadius: 20, padding: '12px 18px 12px 12px', marginBottom: 12, cursor: 'pointer', fontFamily: 'inherit', color: '#fff', background: 'linear-gradient(135deg,#0b2a4a 0%,#123e6b 60%,#1d4ed8 140%)', boxShadow: '0 10px 24px rgba(11,42,74,.28)' },
   konusKure: { display: 'inline-flex', flexShrink: 0 },
