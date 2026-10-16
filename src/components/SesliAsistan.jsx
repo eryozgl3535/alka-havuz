@@ -137,11 +137,6 @@ ${liste}`;
 }
 
 // ------------------------------------------------------------ bileşen
-const ORNEKLER = [
-  { ik: 'pano', yazi: 'Bugün ne var?' },
-  { ik: 'takvim', yazi: 'Bu hafta bakımı gelen müşteriler kim?' },
-  { ik: 'zil', yazi: 'İhsan Köstekçi\'nin 20\'sinde 30 bin TL ödemesi var' },
-];
 
 export default function SesliAsistan({ ad, onDegisti }) {
   const [mesajlar, setMesajlar] = useState([]);
@@ -168,6 +163,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
   const dinleRef = useRef(null);
   const sozRef = useRef(null);
   const hataSayac = useRef(0);
+  const sessizSayac = useRef(0);   // sohbette art arda kaç kez ses gelmedi
   const mesgulRef = useRef(false);
 
   mesajRef.current = mesajlar;
@@ -274,6 +270,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
     sesKilidiAc();
     setHata(''); setBilgi('');
     hataSayac.current = 0;
+    sessizSayac.current = 0;
     sohbetRef.current = true;
     setSohbet(true);
     // Uzun selamlama yok: direkt dinlemeye geçer
@@ -419,7 +416,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
     r.onerror = (e) => {
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { setHata('Mikrofon izni verilmedi. Tarayıcı ayarlarından bu siteye mikrofon izni ver.'); sohbetRef.current = false; setSohbet(false); }
       else if (e.error === 'no-speech') {
-        if (sohbetRef.current) { sohbetRef.current = false; setSohbet(false); setBilgi('Bir süre ses gelmedi, sesli sohbeti durdurdum.'); }
+        if (sohbetRef.current) sessizSayac.current += 1;   // sohbette sessizlik normal: onend tekrar dinler
         else setHata('Ses duyulmadı, tekrar dene.');
       }
       else if (e.error !== 'aborted') setHata('Ses tanıma hatası: ' + e.error);
@@ -430,12 +427,23 @@ export default function SesliAsistan({ ad, onDegisti }) {
       setAraMetin('');
       const m = sonMetin.current;
       sonMetin.current = '';
-      if (m.trim()) gonder(m, true);
+      if (m.trim()) { sessizSayac.current = 0; gonder(m, true); return; }
+      // Sohbetteyken hiçbir şey söylenmediyse bir süre daha dinlemeye devam et (yaklaşık yarım dakika)
+      if (sohbetRef.current) {
+        if (sessizSayac.current < 4) setTimeout(() => { if (sohbetRef.current && dinleRef.current) dinleRef.current(true); }, 250);
+        else { sohbetBitir(false); setBilgi('Bir süredir ses gelmedi, sohbeti kapattım. Devam etmek için tekrar Konuş\'a bas.'); }
+      }
     };
     tanima.current = r;
     r._aktif = true;
     setDinliyor(true);
     try { r.start(); } catch { r._aktif = false; setDinliyor(false); }
+  }
+
+  function kureDokun() {
+    if (!sohbetRef.current) { sohbetBaslat(); return; }
+    if (konusuyor) { sesiSustur(); setKonusuyor(false); sessizSayac.current = 0; setTimeout(() => dinle(true), 150); return; }
+    if (dinliyor) { try { tanima.current?.stop(); } catch { /* yok */ } }
   }
 
   function sesDegis() {
@@ -454,47 +462,56 @@ export default function SesliAsistan({ ad, onDegisti }) {
   }
 
   dinleRef.current = dinle;
-  const bos = mesajlar.length === 0 && !dinliyor && !dusunuyor;
   const durum = dinliyor ? 'dinliyor' : dusunuyor ? 'dusunuyor' : konusuyor ? 'konusuyor' : 'hazir';
-  const durumMetin = { dinliyor: 'Dinliyorum', dusunuyor: durumYazi || 'Düşünüyorum', konusuyor: 'Konuşuyor', hazir: 'Yaz ya da konuş' }[durum];
   const yaziVar = yaziMetin.trim().length > 0;
+
+  const sohbetYazi = dinliyor ? (araMetin || 'Dinliyorum…') : dusunuyor ? `${durumYazi || 'Düşünüyorum'}…` : konusuyor ? 'Konuşuyorum…' : 'Hazırım';
+  const sohbetIpucu = dinliyor ? 'Konuş, bitince ben cevap veririm' : konusuyor ? 'Sözümü kesmek için küreye dokun' : dusunuyor ? '' : 'Konuşmak için küreye dokun';
 
   return (
     <section style={s.kart} aria-label="Yapay zeka asistanı">
       <style>{ASISTAN_CSS}</style>
 
       <div style={s.ust}>
-        <Kure durum={durum} boyut={42} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={s.baslik}>Asistan</div>
-          <div style={s.durum} aria-live="polite">{durumMetin}{durum !== 'hazir' && <span className="as-nokta" />}</div>
+          <div style={s.durum} aria-live="polite">
+            {sohbet ? 'Sesli sohbet açık' : dusunuyor ? `${durumYazi || 'Düşünüyorum'}…` : 'Sor, söyle, kaydetsin'}
+          </div>
         </div>
-        <button className="as-ikonbtn" style={s.ikonBtn} onClick={bildirimAc}
-          title={bildirim === 'acik' ? 'Bildirimler açık (10:00 ve 21:00)' : 'Hatırlatma bildirimlerini aç'}
-          aria-label={bildirim === 'acik' ? 'Bildirimler açık' : 'Bildirimleri aç'}>
-          <Ikon ad={bildirim === 'acik' ? 'zil' : 'zilKapali'} boyut={18} renk={bildirim === 'acik' ? '#0b2a4a' : '#94a3b8'} />
-        </button>
         <button className="as-ikonbtn" style={s.ikonBtn} onClick={sesDegis}
-          title={sesAcik ? 'Sesli okumayı kapat' : 'Sesli okumayı aç'} aria-label={sesAcik ? 'Sesli okumayı kapat' : 'Sesli okumayı aç'}>
+          title={sesAcik ? 'Yazılı cevapları sesli okuma: açık' : 'Yazılı cevapları sesli okuma: kapalı'}
+          aria-label={sesAcik ? 'Sesli okumayı kapat' : 'Sesli okumayı aç'}>
           <Ikon ad={sesAcik ? 'sesAcik' : 'sesKapali'} boyut={18} renk={sesAcik ? '#0b2a4a' : '#94a3b8'} />
         </button>
       </div>
 
-      {sohbet && (
+      {sohbet ? (
         <div style={s.sohbetAlan}>
-          <Kure durum={durum} boyut={92} buyuk />
-          <div style={s.sohbetDurum}>
-            {dinliyor ? (araMetin || 'Dinliyorum…') : dusunuyor ? `${durumYazi || 'Düşünüyorum'}…` : konusuyor ? 'Konuşuyor…' : 'Hazır'}
-          </div>
+          <button type="button" className="as-kurebtn" onClick={kureDokun} aria-label={konusuyor ? 'Sözünü kes ve dinle' : 'Konuş'} style={s.kureBtn}>
+            <Kure durum={durum} boyut={112} buyuk />
+            <span style={s.kureMik}><Ikon ad="mikrofon" boyut={30} renk="#fff" kalin={2} /></span>
+          </button>
+          <div style={s.sohbetDurum} aria-live="polite">{sohbetYazi}</div>
+          {sohbetIpucu && <div style={s.sohbetIpucu}>{sohbetIpucu}</div>}
           <button className="as-bitir" style={s.bitirBtn} onClick={() => sohbetBitir(false)}>
-            <Ikon ad="kapat" boyut={16} kalin={2.4} /> Sesli sohbeti bitir
+            <Ikon ad="kapat" boyut={15} kalin={2.4} /> Bitir
           </button>
         </div>
-      )}
+      ) : SR ? (
+        <button type="button" className="as-konus" style={s.konusBtn} onClick={sohbetBaslat} disabled={dusunuyor}>
+          <span style={s.konusKure}><Kure durum="hazir" boyut={46} /></span>
+          <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+            <span style={s.konusBaslik}>Konuş</span>
+            <span style={s.konusAlt}>Bir kez bas, karşılıklı konuşalım</span>
+          </span>
+          <Ikon ad="mikrofon" boyut={22} renk="#fff" kalin={2.2} />
+        </button>
+      ) : null}
 
       {bilgi && <div style={s.bilgi}>{bilgi}</div>}
 
-      {!bos && (
+      {mesajlar.length > 0 && (
         <div ref={listeRef} style={s.liste}>
           {mesajlar.map((m, i) => (
             <div key={i} className="as-giris" style={{ display: 'flex', flexDirection: 'column', alignItems: m.kim === 'ben' ? 'flex-end' : 'flex-start', gap: 6 }}>
@@ -513,15 +530,9 @@ export default function SesliAsistan({ ad, onDegisti }) {
               })}
             </div>
           ))}
-          {dinliyor && !sohbet && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <div style={{ ...s.benBalon, opacity: 0.6 }}>{araMetin || 'Dinliyorum…'}</div>
-            </div>
-          )}
-          {dusunuyor && (
+          {dusunuyor && !sohbet && (
             <div style={s.yaziyor} aria-label={durumYazi || 'Düşünüyorum'}>
               <span className="as-dot" /><span className="as-dot" /><span className="as-dot" />
-              <span style={{ marginLeft: 8, color: '#64748b', fontSize: 13 }}>{durumYazi || 'Düşünüyorum'}</span>
             </div>
           )}
         </div>
@@ -534,43 +545,28 @@ export default function SesliAsistan({ ad, onDegisti }) {
         </div>
       )}
 
-      {bos && (
-        <div style={s.ornekler}>
-          {ORNEKLER.map((o) => (
-            <button key={o.yazi} className="as-ornek" style={s.ornek} onClick={() => { sesKilidiAc(); gonder(o.yazi); }}>
-              <Ikon ad={o.ik} boyut={16} renk="#2563eb" />
-              <span style={{ flex: 1, minWidth: 0 }}>{o.yazi}</span>
-              <Ikon ad="sag" boyut={16} renk="#cbd5e1" />
+      {!sohbet && (
+        <form onSubmit={yaziGonder} style={s.yazmaAlan} className="as-yazma">
+          <input
+            style={s.input}
+            value={yaziMetin}
+            onChange={(e) => setYaziMetin(e.target.value)}
+            placeholder="veya buraya yaz…"
+            disabled={dusunuyor}
+            aria-label="Asistana yaz"
+            enterKeyHint="send"
+          />
+          {yaziVar && (
+            <button type="submit" className="as-anabtn" style={s.anaBtn} disabled={dusunuyor} aria-label="Gönder">
+              <Ikon ad="yukari" boyut={18} renk="#fff" kalin={2.5} />
             </button>
-          ))}
-        </div>
+          )}
+        </form>
       )}
 
-      <form onSubmit={yaziGonder} style={s.yazmaAlan} className="as-yazma">
-        <input
-          style={s.input}
-          value={yaziMetin}
-          onChange={(e) => setYaziMetin(e.target.value)}
-          placeholder={dinliyor ? 'Dinliyorum…' : 'Asistana yaz…'}
-          disabled={dusunuyor}
-          aria-label="Asistana mesaj"
-          enterKeyHint="send"
-        />
-        {yaziVar ? (
-          <button type="submit" className="as-anabtn" style={s.anaBtn} disabled={dusunuyor} aria-label="Gönder">
-            <Ikon ad="yukari" boyut={20} renk="#fff" kalin={2.5} />
-          </button>
-        ) : (
-          <button type="button" className="as-anabtn" style={{ ...s.anaBtn, ...(dinliyor && !sohbet ? s.anaBtnAktif : {}) }}
-            onClick={() => dinle(false)} disabled={dusunuyor || sohbet} aria-label={dinliyor ? 'Dinlemeyi durdur' : 'Sesle sor'}>
-            <Ikon ad={dinliyor && !sohbet ? 'durdur' : 'mikrofon'} boyut={20} renk="#fff" kalin={2.2} dolgu={dinliyor && !sohbet ? '#fff' : 'none'} />
-          </button>
-        )}
-      </form>
-
-      {SR && !sohbet && (
-        <button className="as-sohbetbtn" style={s.sohbetBtn} onClick={sohbetBaslat} disabled={dusunuyor}>
-          <Ikon ad="dalga" boyut={17} renk="#0b2a4a" /> Eller serbest sesli sohbet
+      {!sohbet && bildirim === 'kapali' && (
+        <button className="as-link" style={s.bildirimLink} onClick={bildirimAc}>
+          <Ikon ad="zil" boyut={14} renk="#2563eb" /> Hatırlatmalar telefonuma bildirim olarak gelsin
         </button>
       )}
     </section>
@@ -616,7 +612,9 @@ const ASISTAN_CSS = `
 .as-ornek:hover{border-color:#bfdbfe!important;background:#f8fbff!important}
 .as-anabtn:hover:not(:disabled){filter:brightness(1.08)}
 .as-anabtn:disabled{opacity:.5;cursor:default}
-.as-sohbetbtn:hover:not(:disabled){background:#e8eef6!important}
+.as-konus:hover:not(:disabled){filter:brightness(1.08)}
+.as-konus:disabled{opacity:.6;cursor:default}
+.as-konus:active,.as-kurebtn:active{transform:scale(.98)}
 .as-yazma:focus-within{border-color:#93c5fd!important;box-shadow:0 0 0 3px rgba(59,130,246,.15)}
 .as-kure+div,.as-geri,.as-bitir{font-family:inherit}
 section[aria-label="Yapay zeka asistanı"] button:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
@@ -630,7 +628,15 @@ const s = {
   baslik: { fontSize: 16.5, fontWeight: 800, color: '#0b1730', letterSpacing: -0.2 },
   durum: { fontSize: 12.5, color: '#64748b', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   ikonBtn: { width: 36, height: 36, borderRadius: 11, border: '1px solid #e6ecf3', background: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, padding: 0 },
-  sohbetAlan: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '18px 8px 16px', marginBottom: 12, borderRadius: 18, background: 'linear-gradient(180deg,#f0f7ff,#ffffff)', border: '1px solid #e0ecfa' },
+  konusBtn: { display: 'flex', alignItems: 'center', gap: 14, width: '100%', border: 'none', borderRadius: 20, padding: '12px 18px 12px 12px', marginBottom: 12, cursor: 'pointer', fontFamily: 'inherit', color: '#fff', background: 'linear-gradient(135deg,#0b2a4a 0%,#123e6b 60%,#1d4ed8 140%)', boxShadow: '0 10px 24px rgba(11,42,74,.28)' },
+  konusKure: { display: 'inline-flex', flexShrink: 0 },
+  konusBaslik: { display: 'block', fontSize: 18, fontWeight: 800, letterSpacing: -0.2 },
+  konusAlt: { display: 'block', fontSize: 13, opacity: 0.8, marginTop: 2 },
+  kureBtn: { position: 'relative', border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', borderRadius: '50%', display: 'inline-flex' },
+  kureMik: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', opacity: 0.9 },
+  sohbetIpucu: { fontSize: 12.5, color: '#64748b', marginTop: -4 },
+  bildirimLink: { display: 'flex', alignItems: 'center', gap: 6, margin: '10px auto 0', border: 'none', background: 'transparent', color: '#2563eb', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: 4 },
+  sohbetAlan: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '22px 8px 16px', marginBottom: 12, borderRadius: 18, background: 'linear-gradient(180deg,#f0f7ff,#ffffff)', border: '1px solid #e0ecfa' },
   sohbetDurum: { fontSize: 15, fontWeight: 600, color: '#0b1730', textAlign: 'center', minHeight: 22, maxWidth: '100%', padding: '0 8px', lineHeight: 1.4 },
   bitirBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, border: '1px solid #fecaca', background: '#fff', color: '#b91c1c', borderRadius: 999, padding: '9px 16px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer' },
   bilgi: { background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', borderRadius: 12, padding: '9px 11px', fontSize: 13, margin: '0 0 10px', lineHeight: 1.45 },
