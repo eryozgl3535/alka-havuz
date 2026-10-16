@@ -83,7 +83,7 @@ async function claudeIle(res, anahtar, { sistem, contents, tools }, baslangic) {
   if (araclar?.length) araclar[araclar.length - 1].cache_control = { type: 'ephemeral' };
   const govde = {
     model: CLAUDE_MODEL,
-    max_tokens: 1024,
+    max_tokens: 500,       // cevaplar kısa olmalı; araç çağrıları için de yeterli
     thinking: { type: 'disabled' },  // günlük işler için uzun düşünmeye gerek yok: en hızlı cevap
     system: sistem ? [{ type: 'text', text: String(sistem), cache_control: { type: 'ephemeral' } }] : undefined,
     messages: mesajCevir(contents),
@@ -95,9 +95,10 @@ async function claudeIle(res, anahtar, { sistem, contents, tools }, baslangic) {
   for (let deneme = 0; deneme < 2; deneme++) {
     const kalan = TOPLAM_SURE - (Date.now() - baslangic);
     if (kalan < 5000) break;
-    if (deneme) await new Promise((r) => setTimeout(r, 1500));
+    if (deneme) await new Promise((r) => setTimeout(r, 600));
     try {
-      const { r, veri } = await claudeCagir(anahtar, govde, Math.min(30000, kalan));
+      // Tek deneme en fazla 20 sn; takılırsa ikinci deneme için zaman kalsın
+      const { r, veri } = await claudeCagir(anahtar, govde, Math.min(deneme ? 25000 : 20000, kalan));
       if (r.ok) {
         const bloklar = veri?.content || [];
         const parts = [];

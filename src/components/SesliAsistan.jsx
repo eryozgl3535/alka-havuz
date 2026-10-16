@@ -113,23 +113,36 @@ function sistemMetni(musteriler, ad, sesli) {
   const ilkAd = String(ad || '').split(' ')[0];
   const hitap = /^volkan/i.test(ilkAd) ? 'Volkan abi' : ilkAd || 'ekip arkadaşım';
   const liste = musteriler.slice(0, 600).map((m) => `${m.id}|${m.name}`).join('\n') || '(henüz müşteri yok)';
-  return `Sen ALKA Mekanik ve Havuz Sistemleri'nin yapay zeka asistanısın. Çeşme/İzmir'de havuz, kuyu, hidrofor, sulama, tesisat ve elektrik servisi veren bir firma; yazlık villalara bakım ve servis yapıyor.
-Konuştuğun kişi: ${ad || 'ekip üyesi'} (ona "${hitap}" diye hitap et). Bugün: ${bugun}. Saat dilimi İstanbul.
+  return `Sen ALKA Mekanik ve Havuz Sistemleri'nin asistanısın. ALKA, Çeşme/İzmir'de yazlık villalara havuz, kuyu pompası, hidrofor, sulama, tesisat ve elektrik bakım-servisi yapan bir firma. Bu uygulama firmanın iş takip sistemi; sen de içindeki verilere erişen bir çalışma arkadaşısın.
+Konuştuğun kişi: ${ad || 'ekip üyesi'} (ona "${hitap}" de). Bugün: ${bugun}. Saat dilimi İstanbul.
+
+UYGULAMADAKİ KAVRAMLAR
+- Müşteri: villa sahibi ya da site (ad, telefon, adres/bölge: Alaçatı, Ilıca, Reisdere, Dalyan vb.).
+- Cihaz: müşterideki ekipman (havuz pompası, kum filtresi, hidrofor, kuyu pompası, ısı pompası, pano, sulama).
+- Bakım: cihazın periyodik bakımı; her bakımın bir sonraki tarihi var (gecikmiş / yaklaşan).
+- İş emri: yapılacak somut iş (arıza, montaj, bakım ziyareti); durumu bekliyor / başladı / tamamlandı; işçilik ve tahsilat tutulur.
+- Hatırlatma: tarihli hatırlatma, çoğunlukla ödeme/tahsilat ("X'in 20'sinde 30 bin ödemesi var"); tekrarlı olabilir.
+- Not: ekibin ortak not defteri. Geliş: yazlıkçının villaya geliş tarihi; öncesinde hazırlık işi açılır.
+- Araçların: genel_ozet (bugün/durum), musteri_ara, musteri_detay, is_emirleri, bakimlar, hatirlatmalar, gelisler, notlar; kayıt için musteri_ekle/guncelle, cihaz_ekle, hatirlatma_ekle/tamamla, is_emri_ac/guncelle, tahsilat_ekle, not_ekle, gelis_ekle.
 
 NASIL KONUŞURSUN
-- İşi bilen bir çalışma arkadaşı gibi kısa, doğal, samimi Türkçe.
-- ${sesli ? 'Cevapların sesli okunuyor: 1-2 cümle, liste yapma.' : 'Cevaplar ekranda okunuyor: kısa ve net, gerekirse satır satır.'}
-- Markdown, yıldız, madde işareti, emoji kullanma. Tutarları "30 bin lira", tarihleri "20 Ekim Salı" gibi söyle.
+- ${sesli ? 'Cevabın sesli okunuyor: EN FAZLA 1-2 KISA CÜMLE. Liste yok, giriş cümlesi yok, tekrar yok. Bir sayı ya da isim yeterliyse sadece onu söyle.' : 'Cevap ekranda okunuyor: kısa ve net; en fazla birkaç satır.'}
+- "Tabii", "Hemen bakıyorum", "Merak etme" gibi dolgu sözler kullanma; doğrudan cevap ver.
+- Markdown, yıldız, madde işareti, emoji yok. Tutarlar "30 bin lira", tarihler "20 Ekim Salı" gibi.
 - Önceki konuşmayı bağlamdan anla ("onun telefonu", "aynısını Ahmet Bey'e de yap").
-- Havuz kimyası, pompa, hidrofor, tesisat, elektrik, müşteri mesajı taslağı gibi genel sorulara araç kullanmadan pratik cevap ver.
+- Havuz kimyası, pompa, hidrofor, tesisat, elektrik gibi teknik sorulara araç kullanmadan pratik, kısa cevap ver.
+
+SESLİ KOMUTLAR (ÖNEMLİ)
+- Kullanıcının sözü telefonun ses tanımasıyla yazıya çevriliyor; kelimeler yanlış duyulmuş olabilir. İsimleri ve terimleri SESÇE en yakın anlama göre yorumla (ör. "hidro for" → hidrofor, "Köstek çi" → Köstekçi); müşteri adını listedeki en yakın isimle eşleştir.
+- Cümle anlamsız, yarım ya da işle alakasız görünüyorsa TAHMİNLE İŞ YAPMA: "Tam anlayamadım, tekrar söyler misin?" de.
+- Kayıt yapan işlerde (ekle/aç/tamamla) duyduğun isim listede yoksa ya da birden fazla adaya uyuyorsa önce kısaca sor.
 
 UYGULAMAYA HÂKİMSİN
-- Firmanın verileriyle ilgili her soruda araçları kullan; tahmin etme, uydurma. Bulamazsan "kayıtlarda yok" de.
-- Bir şey yapmanı isterse (müşteri ekle, hatırlatma kur, iş emri aç, ödeme işle, not al, geliş kaydet) bilgi yeterliyse ONAY SORMADAN hemen yap, sonra ne yaptığını tek cümleyle söyle.
-- Sadece gerçekten eksik bilgi varsa sor (tarih hiç yok, aynı isimde iki müşteri var gibi).
-- Müşteri id'sini aşağıdaki listeden bul; emin değilsen musteri_ara aracını kullan. Yeni müşteri eklemeden önce listede aynı kişi var mı bak.
+- Firma verisiyle ilgili her soruda araçları kullan; tahmin etme, uydurma. Bulamazsan "kayıtlarda yok" de.
+- Bir şey yapmanı isterse ve bilgi yeterliyse ONAY SORMADAN yap, sonra tek cümleyle ne yaptığını söyle.
+- Müşteri id'sini aşağıdaki listeden bul; emin değilsen musteri_ara kullan. Yeni müşteri eklemeden önce listede aynı kişi var mı bak.
 - Tarih: "20'sinde" → bu ayın 20'si, geçtiyse gelecek ayın. "yarın", "cuma", "haftaya" bugüne göre. "30 bin" = 30000.
-- Birden fazla iş istenirse hepsini yap; mümkünse araçları aynı turda birlikte çağır.
+- Birden fazla iş istenirse hepsini yap; araçları mümkünse aynı turda birlikte çağır.
 - Silme yetkin yok; silmek isterse ilgili sayfadan silebileceğini söyle.
 
 MÜŞTERİ LİSTESİ (id|ad):
@@ -348,7 +361,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
     const t = String(metin || '').trim();
     if (!t || mesgulRef.current) return;
     setHata('');
-    ekle('ben', t);
+    ekle('ben', t, sesle ? { sesle: true } : {});
 
     if (sohbetRef.current && BITIR.test(kucuk(t))) { sohbetBitir(true); return; }
 
@@ -407,11 +420,16 @@ export default function SesliAsistan({ ad, onDegisti }) {
     r.continuous = false;
     r.maxAlternatives = 1;
     sonMetin.current = '';
+    // Telefonun kendi "konuşma bitti" algısı geç kalabiliyor: söz kesildikten ~1.2 sn sonra biz bitiriyoruz
+    let susmaZamani = null;
+    const susmaBekle = (ms) => { clearTimeout(susmaZamani); susmaZamani = setTimeout(() => { try { r.stop(); } catch { /* yok */ } }, ms); };
     r.onresult = (e) => {
       let metin = '';
-      for (let i = 0; i < e.results.length; i++) metin += e.results[i][0].transcript;
+      let tamam = true;
+      for (let i = 0; i < e.results.length; i++) { metin += e.results[i][0].transcript; if (!e.results[i].isFinal) tamam = false; }
       sonMetin.current = metin;
       setAraMetin(metin);
+      if (metin.trim()) susmaBekle(tamam ? 700 : 1200);
     };
     r.onerror = (e) => {
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { setHata('Mikrofon izni verilmedi. Tarayıcı ayarlarından bu siteye mikrofon izni ver.'); sohbetRef.current = false; setSohbet(false); }
@@ -422,6 +440,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
       else if (e.error !== 'aborted') setHata('Ses tanıma hatası: ' + e.error);
     };
     r.onend = () => {
+      clearTimeout(susmaZamani);
       r._aktif = false;
       setDinliyor(false);
       setAraMetin('');
@@ -515,6 +534,9 @@ export default function SesliAsistan({ ad, onDegisti }) {
         <div ref={listeRef} style={s.liste}>
           {mesajlar.map((m, i) => (
             <div key={i} className="as-giris" style={{ display: 'flex', flexDirection: 'column', alignItems: m.kim === 'ben' ? 'flex-end' : 'flex-start', gap: 6 }}>
+              {m.sesle && (
+                <div style={s.duyulan}><Ikon ad="mikrofon" boyut={12} renk="#64748b" kalin={2.2} /> Duyduğum</div>
+              )}
               <div style={m.kim === 'ben' ? s.benBalon : s.asBalon}>{m.yazi}</div>
               {(m.eylemler || []).map((e, j) => {
                 const geri = e.durum === 'geri alındı';
@@ -628,6 +650,7 @@ const s = {
   baslik: { fontSize: 16.5, fontWeight: 800, color: '#0b1730', letterSpacing: -0.2 },
   durum: { fontSize: 12.5, color: '#64748b', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   ikonBtn: { width: 36, height: 36, borderRadius: 11, border: '1px solid #e6ecf3', background: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, padding: 0 },
+  duyulan: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, fontWeight: 600, color: '#64748b', marginBottom: -2 },
   konusBtn: { display: 'flex', alignItems: 'center', gap: 14, width: '100%', border: 'none', borderRadius: 20, padding: '12px 18px 12px 12px', marginBottom: 12, cursor: 'pointer', fontFamily: 'inherit', color: '#fff', background: 'linear-gradient(135deg,#0b2a4a 0%,#123e6b 60%,#1d4ed8 140%)', boxShadow: '0 10px 24px rgba(11,42,74,.28)' },
   konusKure: { display: 'inline-flex', flexShrink: 0 },
   konusBaslik: { display: 'block', fontSize: 18, fontWeight: 800, letterSpacing: -0.2 },
