@@ -24,58 +24,9 @@ function sonrakiTarih(t, tekrar) {
 const HAZIRLIK_VARSAYILAN = ['Havuz hazırlama (temizlik + kimyasal ayar)', 'Su vanalarını açma'];
 const DURUM_AD = { bekliyor: 'bekliyor', basladi: 'başlandı', tamamlandi: 'tamamlandı' };
 
-// ------------------------------------------------------------ yapay zekâya tanıtılan araçlar
-const S = (properties, required = []) => ({ type: 'OBJECT', properties, required });
-const str = (description) => ({ type: 'STRING', description });
-const num = (description) => ({ type: 'NUMBER', description });
-const bool = (description) => ({ type: 'BOOLEAN', description });
-const en = (description, list) => ({ type: 'STRING', description, enum: list });
-
-export const ARACLAR = [
-  // --- okuma
-  { name: 'genel_ozet', description: 'Firmanın anlık durumu: müşteri sayısı, bugünkü ve bekleyen iş emirleri, gecikmiş ve yaklaşan bakımlar, açık hatırlatmalar, tahsil edilmemiş alacak. "Bugün ne var", "durum ne" gibi sorularda kullan.' },
-  { name: 'musteri_ara', description: 'Ad, telefon veya adresin bir parçasıyla müşteri arar; cihazlarını da getirir.', parameters: S({ sorgu: str('Aranacak metin, örn. "Köstekçi", "0532", "Alaçatı"') }, ['sorgu']) },
-  { name: 'musteri_detay', description: 'Bir müşterinin her şeyi: iletişim, cihazlar, bakım takvimi, son iş emirleri, açık hatırlatmalar, notlar, gelişler.', parameters: S({ musteri_id: str('Müşteri id') }, ['musteri_id']) },
-  { name: 'is_emirleri', description: 'İş emirlerini listeler.', parameters: S({
-    durum: en('Hangi iş emirleri', ['aktif', 'bekliyor', 'basladi', 'tamamlandi', 'tumu']),
-    baslangic: str('Planlanan tarih en erken (YYYY-MM-DD)'), bitis: str('Planlanan tarih en geç (YYYY-MM-DD)'),
-    musteri_id: str('Sadece bu müşteri'), odenmemis: bool('Sadece ödemesi tamamlanmamış olanlar'),
-  }) },
-  { name: 'bakimlar', description: 'Bakım takvimi: tarihi gelmiş/gecikmiş ve önümüzdeki günlerde yapılacak bakımlar (müşteri ve cihazıyla).', parameters: S({ gun: num('Kaç gün ilerisine bakılsın (varsayılan 30)') }) },
-  { name: 'hatirlatmalar', description: 'Hatırlatmaları (ödeme, tahsilat, yapılacak iş) listeler.', parameters: S({ durum: en('Hangileri', ['acik', 'tamamlanan', 'tumu']) }) },
-  { name: 'gelisler', description: 'Müşteri geliş/ayrılış planları (yazlıkçıların gelişi).', parameters: S({ baslangic: str('YYYY-MM-DD, varsayılan bugün'), bitis: str('YYYY-MM-DD') }) },
-  { name: 'notlar', description: 'Ekibin ortak notları (id ile).', parameters: S({ ara: str('Notlarda geçen kelime (isteğe bağlı)'), bitenler: bool('Tamamlanmış notlar da gelsin') }) },
-  { name: 'mesaj_gecmisi', description: 'Müşterilere gönderilmiş mesaj kayıtları (WhatsApp/SMS bilgilendirme, bakım hatırlatması) id ile.', parameters: S({ musteri_id: str('Sadece bu müşteri (isteğe bağlı)') }) },
-
-  // --- silme (ONAYLI): bu araç silmez, sadece kullanıcıdan onay ister; onaydan sonra uygulama siler
-  { name: 'kayit_sil', description: 'Bir notu, hatırlatmayı/ödemeyi ya da mesaj kaydını silmek için KULLANICIDAN ONAY İSTER. Kaydı hemen silmez: uygulama kullanıcıya "emin misin?" diye sorar, kullanıcı evet derse uygulama siler. Önce notlar / hatirlatmalar / mesaj_gecmisi araçlarıyla doğru kaydın id\'sini bul; birden fazla aday varsa önce hangisi olduğunu sor.', parameters: S({ id: str('Silinecek kaydın id\'si') }, ['id']) },
-
-  // --- yazma (hepsi geri alınabilir)
-  { name: 'musteri_ekle', description: 'Yeni müşteri ekler. Önce aynı isimde müşteri var mı diye müşteri listesine bak.', parameters: S({ ad: str('Ad soyad'), telefon: str('Telefon'), adres: str('Adres / site / bölge'), not: str('Not') }, ['ad']) },
-  { name: 'musteri_guncelle', description: 'Müşterinin bilgisini değiştirir. Sadece değişecek alanları gönder.', parameters: S({ musteri_id: str('Müşteri id'), ad: str('Yeni ad'), telefon: str('Yeni telefon'), adres: str('Yeni adres'), not: str('Yeni not (eskisinin yerine geçer)') }, ['musteri_id']) },
-  { name: 'cihaz_ekle', description: 'Müşteriye cihaz ekler (havuz pompası, hidrofor, kuyu pompası, ısı pompası, filtre, pano vb.).', parameters: S({
-    musteri_id: str('Müşteri id'), kategori: str('Kategori: Havuz, Kuyu, Hidrofor, Sulama, Tesisat, Elektrik, Isıtma vb.'), cihaz: str('Cihaz/iş adı, örn. "Havuz pompası"'),
-    marka: str('Marka'), model: str('Model, güç, faz vb. serbest yazı'), konum: str('Nerede (bahçe, makine dairesi...)'),
-  }, ['musteri_id', 'kategori', 'cihaz']) },
-  { name: 'hatirlatma_ekle', description: 'Hatırlatma ekler (ödeme, tahsilat, arama, yapılacak iş). Günü gelince ana sayfada ve bildirimde çıkar.', parameters: S({
-    baslik: str('Kısa başlık, örn. "İhsan Köstekçi ödemesi"'), tarih: str('YYYY-MM-DD'), tutar: num('TL tutar (yoksa gönderme)'),
-    tekrar: en('Tekrar', ['tek', 'haftalik', 'aylik', 'yillik']), musteri_id: str('İlgili müşteri id (varsa)'), aciklama: str('Ek açıklama'),
-  }, ['baslik', 'tarih']) },
-  { name: 'hatirlatma_tamamla', description: 'Hatırlatmayı tamamlandı yapar (ödeme alındı, iş yapıldı). Tekrarlıysa bir sonraki tarihe kurar.', parameters: S({ id: str('Hatırlatma id') }, ['id']) },
-  { name: 'is_emri_ac', description: 'Yeni iş emri açar.', parameters: S({
-    musteri_id: str('Müşteri id'), baslik: str('Yapılacak iş, örn. "Hidrofor basınç ayarı"'), tarih: str('Planlanan tarih YYYY-MM-DD (söylenmezse bugün)'),
-    aciklama: str('Ayrıntı'), iscilik: num('İşçilik ücreti TL'), atanan: str('İşi yapacak kişi'),
-  }, ['musteri_id', 'baslik']) },
-  { name: 'is_emri_guncelle', description: 'İş emrinin durumunu, tarihini veya işçilik ücretini değiştirir; tamamlandı yapılırsa bağlı bakımın son servis tarihi bugün olur.', parameters: S({
-    id: str('İş emri id'), durum: en('Yeni durum', ['bekliyor', 'basladi', 'tamamlandi']), tarih: str('Yeni planlanan tarih YYYY-MM-DD'), iscilik: num('İşçilik ücreti TL'),
-  }, ['id']) },
-  { name: 'tahsilat_ekle', description: 'İş emrine alınan ödemeyi işler.', parameters: S({ is_emri_id: str('İş emri id'), tutar: num('Alınan tutar TL') }, ['is_emri_id', 'tutar']) },
-  { name: 'not_ekle', description: 'Ekibin ortak not defterine not ekler.', parameters: S({ metin: str('Not'), musteri_id: str('İlgili müşteri id (varsa)'), sabit: bool('Üstte sabitlensin mi') }, ['metin']) },
-  { name: 'gelis_ekle', description: 'Müşterinin geliş planını kaydeder; gelişten 2 gün önceye hazırlık iş emri otomatik açılır.', parameters: S({
-    musteri_id: str('Müşteri id'), gelis_tarihi: str('YYYY-MM-DD'), ayrilis_tarihi: str('YYYY-MM-DD (biliniyorsa)'),
-    istekler: { type: 'ARRAY', items: { type: 'STRING' }, description: 'Hazırlık işleri (söylenmezse havuz hazırlama ve su vanalarını açma)' }, notlar: str('Not'),
-  }, ['musteri_id', 'gelis_tarihi']) },
-];
+// Araç tanımları ayrı dosyada (sesli canlı asistan sunucusu da aynı listeyi kullanıyor)
+import { ARACLAR } from './asistanTanimlar.js';
+export { ARACLAR };
 
 // ------------------------------------------------------------ çalıştırıcılar
 // Her biri { sonuc } döndürür; yazanlar ayrıca { eylem: "kısa açıklama", geriAl: async () => {} } döndürür.

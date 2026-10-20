@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabase';
 import { ARACLAR, YAZAN_ARACLAR, aracCalistir } from '../asistanAraclar';
+import { promptOlustur } from '../asistanTanimlar.js';
 import { Ikon } from '../ikonlar';
 
 // Ana sayfadaki yapay zeka asistanı: normal bir sohbet gibi konuşur (yazarak ya da sesle),
@@ -115,42 +116,8 @@ function sistemMetni(musteriler, ad, sesli) {
   const bugun = `${yerel(b)} (${GUNLER[b.getDay()]}, ${b.getDate()} ${AYLAR[b.getMonth()]} ${b.getFullYear()})`;
   const ilkAd = String(ad || '').split(' ')[0];
   const hitap = /^volkan/i.test(ilkAd) ? 'Volkan abi' : ilkAd || 'ekip arkadaşım';
-  const liste = musteriler.slice(0, 600).map((m) => `${m.id}|${m.name}`).join('\n') || '(henüz müşteri yok)';
-  return `Sen ALKA Mekanik ve Havuz Sistemleri'nin asistanısın. ALKA, Çeşme/İzmir'de yazlık villalara havuz, kuyu pompası, hidrofor, sulama, tesisat ve elektrik bakım-servisi yapan bir firma. Bu uygulama firmanın iş takip sistemi; sen de içindeki verilere erişen bir çalışma arkadaşısın.
-Konuştuğun kişi: ${ad || 'ekip üyesi'} (ona "${hitap}" de). Bugün: ${bugun}. Saat dilimi İstanbul.
-
-UYGULAMADAKİ KAVRAMLAR
-- Müşteri: villa sahibi ya da site (ad, telefon, adres/bölge: Alaçatı, Ilıca, Reisdere, Dalyan vb.).
-- Cihaz: müşterideki ekipman (havuz pompası, kum filtresi, hidrofor, kuyu pompası, ısı pompası, pano, sulama).
-- Bakım: cihazın periyodik bakımı; her bakımın bir sonraki tarihi var (gecikmiş / yaklaşan).
-- İş emri: yapılacak somut iş (arıza, montaj, bakım ziyareti); durumu bekliyor / başladı / tamamlandı; işçilik ve tahsilat tutulur.
-- Hatırlatma: tarihli hatırlatma, çoğunlukla ödeme/tahsilat ("X'in 20'sinde 30 bin ödemesi var"); tekrarlı olabilir.
-- Not: ekibin ortak not defteri. Geliş: yazlıkçının villaya geliş tarihi; öncesinde hazırlık işi açılır.
-- Araçların: genel_ozet (bugün/durum), musteri_ara, musteri_detay, is_emirleri, bakimlar, hatirlatmalar, gelisler, notlar; kayıt için musteri_ekle/guncelle, cihaz_ekle, hatirlatma_ekle/tamamla, is_emri_ac/guncelle, tahsilat_ekle, not_ekle, gelis_ekle.
-
-NASIL KONUŞURSUN
-- ${sesli ? 'Cevabın sesli okunuyor: EN FAZLA 1-2 KISA CÜMLE. Liste yok, giriş cümlesi yok, tekrar yok. Bir sayı ya da isim yeterliyse sadece onu söyle.' : 'Cevap ekranda okunuyor: kısa ve net; en fazla birkaç satır.'}
-- "Tabii", "Hemen bakıyorum", "Merak etme" gibi dolgu sözler kullanma; doğrudan cevap ver.
-- Markdown, yıldız, madde işareti, emoji yok. Tutarlar "30 bin lira", tarihler "20 Ekim Salı" gibi.
-- Önceki konuşmayı bağlamdan anla ("onun telefonu", "aynısını Ahmet Bey'e de yap").
-- Havuz kimyası, pompa, hidrofor, tesisat, elektrik gibi teknik sorulara araç kullanmadan pratik, kısa cevap ver.
-
-SESLİ KOMUTLAR (ÖNEMLİ)
-- Kullanıcının sözü telefonun ses tanımasıyla yazıya çevriliyor; kelimeler yanlış duyulmuş olabilir. İsimleri ve terimleri SESÇE en yakın anlama göre yorumla (ör. "hidro for" → hidrofor, "Köstek çi" → Köstekçi); müşteri adını listedeki en yakın isimle eşleştir.
-- Cümle anlamsız, yarım ya da işle alakasız görünüyorsa TAHMİNLE İŞ YAPMA: "Tam anlayamadım, tekrar söyler misin?" de.
-- Kayıt yapan işlerde (ekle/aç/tamamla) duyduğun isim listede yoksa ya da birden fazla adaya uyuyorsa önce kısaca sor.
-
-UYGULAMAYA HÂKİMSİN
-- Firma verisiyle ilgili her soruda araçları kullan; tahmin etme, uydurma. Bulamazsan "kayıtlarda yok" de.
-- Bir şey yapmanı isterse ve bilgi yeterliyse ONAY SORMADAN yap, sonra tek cümleyle ne yaptığını söyle.
-- Müşteri id'sini aşağıdaki listeden bul; emin değilsen musteri_ara kullan. Yeni müşteri eklemeden önce listede aynı kişi var mı bak.
-- Tarih: "20'sinde" → bu ayın 20'si, geçtiyse gelecek ayın. "yarın", "cuma", "haftaya" bugüne göre. "30 bin" = 30000.
-- Birden fazla iş istenirse hepsini yap; araçları mümkünse aynı turda birlikte çağır.
-- SİLME: Not, hatırlatma/ödeme ve mesaj kaydı silebilirsin ama SADECE kayit_sil aracıyla. Önce notlar / hatirlatmalar / mesaj_gecmisi ile doğru kaydı bul; birden fazla aday varsa hangisi olduğunu sor. kayit_sil kaydı hemen silmez, kullanıcıdan onay ister: sen de "… siliniyor, emin misin?" diye sor. Kullanıcı onaylamadan ASLA "sildim" deme. Müşteri, iş emri, cihaz gibi diğer kayıtları silemezsin; onlar için ilgili sayfayı söyle.
-- "Ödemesi yapıldı / alındı" denirse bunu silme olarak değil, hatirlatma_tamamla ile tamamlandı olarak işle; kullanıcı açıkça "sil" derse kayit_sil kullan.
-
-MÜŞTERİ LİSTESİ (id|ad):
-${liste}`;
+  const musteriListesi = musteriler.slice(0, 600).map((m) => `${m.id}|${m.name}`).join('\n') || '(henüz müşteri yok)';
+  return promptOlustur({ kullanici: ad || 'ekip üyesi', hitap, bugun, musteriListesi, sesli });
 }
 
 // ------------------------------------------------------------ bileşen
@@ -170,6 +137,10 @@ export default function SesliAsistan({ ad, onDegisti }) {
   const [musteriler, setMusteriler] = useState([]);
   const [durumYazi, setDurumYazi] = useState('');
   const [sohbet, setSohbet] = useState(false);
+  // Canlı ses (ElevenLabs + Claude): 'yok' | 'baglaniyor' | 'dinliyor' | 'konusuyor'
+  const [canli, setCanli] = useState('yok');
+  const canliRef = useRef(null);       // aktif canlı görüşme
+  const sonSoz = useRef('');           // canlı görüşmede kullanıcının son söylediği (silme onayı için)
   const tanima = useRef(null);
   const sonMetin = useRef('');
   const listeRef = useRef(null);
@@ -257,6 +228,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
 
   // Sesle sorulan soruya her zaman sesli cevap verilir; yazıyla sorulanda hoparlör düğmesine bakılır.
   function konus(metin, zorla) {
+    if (canliRef.current) return; // canlı görüşmede sesi ElevenLabs veriyor
     const ss = typeof window !== 'undefined' ? window.speechSynthesis : null;
     if ((!sesAcik && !zorla) || !metin || !ss) { sonraDinle(); return; }
     setKonusuyor(true);
@@ -284,9 +256,109 @@ export default function SesliAsistan({ ad, onDegisti }) {
     } catch { sonraDinle(); }
   }
 
-  function sohbetBaslat() {
+  // ---------------- canlı ses (ElevenLabs)
+  function canliAraclar() {
+    const tools = {};
+    for (const t of ARACLAR) {
+      tools[t.name] = async (params) => {
+        const r = await aracCalistir(t.name, params || {}, { ad });
+        if (r.geriAl) {
+          ekle('asistan', null, { eylemler: [{ yazi: r.eylem || t.name, geriAl: r.geriAl, durum: '' }] });
+          veriYukle(); onDegisti && onDegisti();
+        }
+        if (r.silOnay) {
+          bekleyenSil.current = r.silOnay;
+          ekle('asistan', null, { silOnay: { ...r.silOnay } });
+        }
+        return typeof r.sonuc === 'string' ? r.sonuc : JSON.stringify(r.sonuc ?? '');
+      };
+    }
+    // Silme ancak kullanıcının SON SÖZÜ açıkça "evet" ise yapılır (yapay zekâ yanlış anlasa bile)
+    tools.silmeyi_onayla = async ({ onay } = {}) => {
+      if (!bekleyenSil.current) return 'Onay bekleyen bir silme yok.';
+      const k = kucuk(sonSoz.current).replace(/[.,!?]/g, ' ').trim();
+      const evet = EVET.test(k) && !HAYIR.test(k);
+      if (onay && evet) { const a = bekleyenSil.current.aciklama; await silmeyiUygula(true, false); return `Silindi: ${a}. Ekranda Geri al düğmesi var.`; }
+      if (!onay || HAYIR.test(k)) { await silmeyiUygula(false, false); return 'Silinmedi, iptal edildi.'; }
+      return 'Kullanıcının son sözü açık bir "evet" değildi; SİLİNMEDİ. Kullanıcıya tekrar "emin misin?" diye sor.';
+    };
+    return tools;
+  }
+
+  async function canliBaslat() {
+    setCanli('baglaniyor');
+    let v = {};
+    try {
+      const r = await fetch('/api/ses-asistan', { method: 'POST' });
+      v = await r.json().catch(() => ({}));
+      if (!r.ok || !v.signedUrl) throw Object.assign(new Error(v.hata || 'Canlı ses açılamadı'), { kod: v.kod });
+      const { Conversation } = await import('@elevenlabs/client');
+      const b = new Date();
+      const isim = String(ad || '').split(' ')[0];
+      const conv = await Conversation.startSession({
+        signedUrl: v.signedUrl,
+        connectionType: 'websocket',
+        dynamicVariables: {
+          kullanici: ad || 'ekip üyesi',
+          hitap: /^volkan/i.test(isim) ? 'Volkan abi' : isim || 'ekip arkadaşım',
+          bugun: `${yerel(b)} (${GUNLER[b.getDay()]}, ${b.getDate()} ${AYLAR[b.getMonth()]} ${b.getFullYear()})`,
+          musteri_listesi: musteriler.slice(0, 500).map((m) => `${m.id}|${m.name}`).join('\n') || '(henüz müşteri yok)',
+        },
+        clientTools: canliAraclar(),
+        onMessage: ({ message, role, source }) => {
+          const kim = (role || source) === 'user' ? 'ben' : 'asistan';
+          if (!message) return;
+          if (kim === 'ben') sonSoz.current = message;
+          ekle(kim, message, kim === 'ben' ? { sesle: true } : {});
+        },
+        onModeChange: ({ mode }) => setCanli(mode === 'speaking' ? 'konusuyor' : 'dinliyor'),
+        onDisconnect: (d) => {
+          canliRef.current = null;
+          setCanli('yok');
+          sohbetRef.current = false;
+          setSohbet(false);
+          if (d?.reason === 'error') setHata('Sesli görüşme koptu: ' + (d.message || 'bağlantı hatası'));
+        },
+        onError: (mesaj) => { if (mesaj) setHata(String(mesaj)); },
+      });
+      canliRef.current = conv;
+      setCanli('dinliyor');
+      return true;
+    } catch (e) {
+      canliRef.current = null;
+      setCanli('yok');
+      if (e?.kod !== 'anahtar-yok') {
+        const izin = /permission|notallowed|denied/i.test(String(e?.name || '') + String(e?.message || ''));
+        setBilgi(izin ? 'Mikrofon izni verilmedi. Tarayıcı ayarlarından bu siteye mikrofon izni ver.'
+          : `${e?.message || 'Canlı ses açılamadı.'} Şimdilik telefonun kendi sesiyle devam ediyorum.`);
+        if (izin) return 'izin';
+      }
+      return false;
+    }
+  }
+
+  async function sohbetBaslat() {
+    // iPhone: mikrofon ve ses ancak dokunuş anında açılabiliyor; ağ beklemeden ÖNCE ikisini de aç
     sesKilidiAc();
+    const mikSoz = navigator.mediaDevices?.getUserMedia ? navigator.mediaDevices.getUserMedia({ audio: true }).catch((e) => e) : Promise.resolve(null);
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) { const ac = new AC(); const kaynak = ac.createBufferSource(); kaynak.buffer = ac.createBuffer(1, 1, 22050); kaynak.connect(ac.destination); kaynak.start(0); ac.resume?.(); setTimeout(() => ac.close?.(), 1500); }
+    } catch { /* yok */ }
     setHata(''); setBilgi('');
+    sohbetRef.current = true;
+    setSohbet(true);
+    const mik = await mikSoz;
+    if (mik instanceof Error) {
+      sohbetRef.current = false; setSohbet(false);
+      setBilgi('Mikrofon izni verilmedi. Tarayıcı ayarlarından bu siteye mikrofon izni ver.');
+      return;
+    }
+    try { mik?.getTracks?.().forEach((t) => t.stop()); } catch { /* yok */ }
+    const sonuc = await canliBaslat();
+    if (sonuc === true) return;
+    if (sonuc === 'izin') { sohbetRef.current = false; setSohbet(false); return; }
+    sesKilidiAc();
     hataSayac.current = 0;
     sessizSayac.current = 0;
     sohbetRef.current = true;
@@ -299,6 +371,13 @@ export default function SesliAsistan({ ad, onDegisti }) {
   function sohbetBitir(sesli) {
     sohbetRef.current = false;
     setSohbet(false);
+    if (canliRef.current) {
+      const c = canliRef.current;
+      canliRef.current = null;
+      setCanli('yok');
+      try { c.endSession(); } catch { /* yok */ }
+      return;
+    }
     try { tanima.current?.abort(); } catch { /* yok */ }
     if (sesli) {
       const isim = String(ad || '').split(' ')[0];
@@ -366,12 +445,13 @@ export default function SesliAsistan({ ad, onDegisti }) {
   // Onaylanan silme: kaydı siler, "Geri al" ile aynı kaydı geri koyar
   async function silmeyiUygula(onay, sesle) {
     const b = bekleyenSil.current;
+    try { canliRef.current?.sendContextualUpdate?.(b ? `Kullanıcı "${b.aciklama}" silme isteğini ${onay ? 'onayladı, kayıt silindi' : 'iptal etti, silinmedi'}.` : ''); } catch { /* yok */ }
     bekleyenSil.current = null;
     setMesajlar((l) => l.map((m) => (m.silOnay && m.silOnay.id === b?.id ? { ...m, silOnay: { ...m.silOnay, durum: onay ? 'silindi' : 'iptal' } } : m)));
     if (!b) return;
     if (!onay) {
       gecmisRef.current = [...gecmisRef.current, { role: 'user', parts: [{ text: 'Hayır, silme.' }] }, { role: 'model', parts: [{ text: `Tamam, ${b.aciklama} silinmedi.` }] }].slice(-MAX_SOHBET * 2);
-      asistanDer('Tamam, silmedim.', {}, sesle);
+      if (!canliRef.current) asistanDer('Tamam, silmedim.', {}, sesle);
       return;
     }
     const { error } = await supabase.from('mesaj_kayitlari').delete().eq('id', b.id);
@@ -381,7 +461,8 @@ export default function SesliAsistan({ ad, onDegisti }) {
       if (e2) throw new Error(e2.message);
     } };
     gecmisRef.current = [...gecmisRef.current, { role: 'user', parts: [{ text: 'Evet, sil.' }] }, { role: 'model', parts: [{ text: `Sildim: ${b.aciklama}.` }] }].slice(-MAX_SOHBET * 2);
-    asistanDer('Sildim.', { eylemler: [eylem] }, sesle);
+    if (canliRef.current) ekle('asistan', null, { eylemler: [eylem] }); // canlıda sözlü cevabı sesli ajan veriyor
+    else asistanDer('Sildim.', { eylemler: [eylem] }, sesle);
     await veriYukle();
     onDegisti && onDegisti();
   }
@@ -502,6 +583,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
   }
 
   function kureDokun() {
+    if (canliRef.current || canli !== 'yok') return;
     if (!sohbetRef.current) { sohbetBaslat(); return; }
     if (konusuyor) { sesiSustur(); setKonusuyor(false); sessizSayac.current = 0; setTimeout(() => dinle(true), 150); return; }
     if (dinliyor) { try { tanima.current?.stop(); } catch { /* yok */ } }
@@ -523,11 +605,12 @@ export default function SesliAsistan({ ad, onDegisti }) {
   }
 
   dinleRef.current = dinle;
-  const durum = dinliyor ? 'dinliyor' : dusunuyor ? 'dusunuyor' : konusuyor ? 'konusuyor' : 'hazir';
+  const durum = canli === 'dinliyor' ? 'dinliyor' : canli === 'konusuyor' ? 'konusuyor' : canli === 'baglaniyor' ? 'dusunuyor'
+    : dinliyor ? 'dinliyor' : dusunuyor ? 'dusunuyor' : konusuyor ? 'konusuyor' : 'hazir';
   const yaziVar = yaziMetin.trim().length > 0;
 
-  const sohbetYazi = dinliyor ? (araMetin || 'Dinliyorum…') : dusunuyor ? `${durumYazi || 'Düşünüyorum'}…` : konusuyor ? 'Konuşuyorum…' : 'Hazırım';
-  const sohbetIpucu = dinliyor ? 'Konuş, bitince ben cevap veririm' : konusuyor ? 'Sözümü kesmek için küreye dokun' : dusunuyor ? '' : 'Konuşmak için küreye dokun';
+  const sohbetYazi = canli === 'baglaniyor' ? 'Bağlanıyor…' : canli === 'dinliyor' ? 'Dinliyorum…' : canli === 'konusuyor' ? 'Konuşuyorum…' : dinliyor ? (araMetin || 'Dinliyorum…') : dusunuyor ? `${durumYazi || 'Düşünüyorum'}…` : konusuyor ? 'Konuşuyorum…' : 'Hazırım';
+  const sohbetIpucu = canli !== 'yok' ? (canli === 'konusuyor' ? 'Sözümü kesmek için konuşman yeterli' : canli === 'dinliyor' ? 'Konuş, seni dinliyorum' : '') : dinliyor ? 'Konuş, bitince ben cevap veririm' : konusuyor ? 'Sözümü kesmek için küreye dokun' : dusunuyor ? '' : 'Konuşmak için küreye dokun';
 
   return (
     <section style={s.kart} aria-label="Yapay zeka asistanı">
@@ -579,7 +662,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
               {m.sesle && (
                 <div style={s.duyulan}><Ikon ad="mikrofon" boyut={12} renk="#64748b" kalin={2.2} /> Duyduğum</div>
               )}
-              <div style={m.kim === 'ben' ? s.benBalon : s.asBalon}>{m.yazi}</div>
+              {m.yazi && <div style={m.kim === 'ben' ? s.benBalon : s.asBalon}>{m.yazi}</div>}
               {m.silOnay && (
                 <div style={{ ...s.silKart, ...(m.silOnay.durum ? { opacity: 0.6 } : {}) }}>
                   <div style={s.silBaslik}><Ikon ad="kapat" boyut={14} renk="#b91c1c" kalin={2.4} /> {m.silOnay.aciklama}</div>
