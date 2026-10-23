@@ -13,7 +13,8 @@ export const config = { maxDuration: 30 };
 
 const API = 'https://api.elevenlabs.io';
 const AJAN_ADI = 'ALKA Asistan';
-const SES_ADI = 'ALKA Erkek Ses';
+const SES_ADI = 'ALKA Erkek Ses Pro';
+const SES_SURUM = 'ses-2'; // ses seçimi değişince mevcut ajanın sesi de yenilenir
 const YEDEK_SES = 'pNInz6obpgDQGcFmaJgB'; // ElevenLabs hazır erkek ses (Adam); Türkçe ses bulunamazsa
 let onbellek = null; // { ajanId, surum } — sıcak sunucuda tekrar tekrar aramamak için
 
@@ -126,9 +127,14 @@ async function sesBul(anahtar) {
     if (var_) return var_.voice_id;
   } catch { /* devam */ }
   try {
-    const paylasilan = await el(anahtar, '/v1/shared-voices?language=tr&gender=male&page_size=40&sort=cloned_by_count');
-    const aday = (paylasilan?.voices || []).filter((v) => v.free_users_allowed !== false)
-      .sort((a, b) => (b.cloned_by_count || 0) - (a.cloned_by_count || 0))[0];
+    // Önce stüdyo kalitesindeki (profesyonel kayıtlı) sesler: yankısız, temiz; yoksa yüksek kaliteli olanlar
+    let aday = null;
+    for (const kategori of ['professional', 'high_quality', '']) {
+      const paylasilan = await el(anahtar, `/v1/shared-voices?language=tr&gender=male&page_size=40&sort=cloned_by_count${kategori ? '&category=' + kategori : ''}`);
+      aday = (paylasilan?.voices || []).filter((v) => v.free_users_allowed !== false && !/narrat|asmr|whisper|fısıltı|old|yaşlı|radio|radyo/i.test(`${v.name} ${v.descriptive} ${v.use_case} ${v.description || ''}`))
+        .sort((a, b) => (b.cloned_by_count || 0) - (a.cloned_by_count || 0))[0];
+      if (aday) break;
+    }
     if (aday) {
       const eklenen = await el(anahtar, `/v1/voices/add/${aday.public_owner_id}/${aday.voice_id}`, { method: 'POST', body: JSON.stringify({ new_name: SES_ADI }) });
       if (eklenen?.voice_id) return eklenen.voice_id;
@@ -141,16 +147,17 @@ async function ajanHazirla(anahtar) {
   const liste = await el(anahtar, `/v1/convai/agents?search=${encodeURIComponent(AJAN_ADI)}&page_size=30`);
   const mevcut = (liste?.agents || []).find((a) => a.name === AJAN_ADI && !a.archived);
   if (mevcut) {
-    const ayar = ajanAyari(mevcut.voice_id || YEDEK_SES);
+    const sesYeni = !(mevcut.tags || []).includes(SES_SURUM);
+    const ayar = ajanAyari(sesYeni ? await sesBul(anahtar) : (mevcut.voice_id || YEDEK_SES));
     const s = surum(ayar);
-    if (!(mevcut.tags || []).includes(s)) {
-      await el(anahtar, `/v1/convai/agents/${mevcut.agent_id}`, { method: 'PATCH', body: JSON.stringify({ ...ayar, tags: [s] }) });
+    if (sesYeni || !(mevcut.tags || []).includes(s)) {
+      await el(anahtar, `/v1/convai/agents/${mevcut.agent_id}`, { method: 'PATCH', body: JSON.stringify({ ...ayar, tags: [s, SES_SURUM] }) });
     }
     return { ajanId: mevcut.agent_id, surum: s };
   }
   const ayar = ajanAyari(await sesBul(anahtar));
   const s = surum(ayar);
-  const yeni = await el(anahtar, '/v1/convai/agents/create', { method: 'POST', body: JSON.stringify({ ...ayar, tags: [s] }) });
+  const yeni = await el(anahtar, '/v1/convai/agents/create', { method: 'POST', body: JSON.stringify({ ...ayar, tags: [s, SES_SURUM] }) });
   return { ajanId: yeni.agent_id, surum: s };
 }
 
@@ -183,7 +190,10 @@ export default async function handler(req, res) {
       if (e.durum === 404) { onbellek = await ajanHazirla(anahtar); link = await el(anahtar, `/v1/convai/conversation/get-signed-url?agent_id=${onbellek.ajanId}`); }
       else throw e;
     }
-    return cevap(res, 200, { signedUrl: link.signed_url, ajanId: onbellek.ajanId });
+    // WebRTC (yankı engelleme, daha temiz ve hızlı ses) için token; olmazsa tarayıcı signedUrl ile websocket'e düşer
+    let token = null;
+    try { token = (await el(anahtar, `/v1/convai/conversation/token?agent_id=${onbellek.ajanId}`))?.token || null; } catch (e) { console.error('WebRTC token alınamadı:', e.message); }
+    return cevap(res, 200, { signedUrl: link.signed_url, token, ajanId: onbellek.ajanId });
   } catch (e) {
     console.error(e);
     const kota = /quota|limit|credit|exceed/i.test(e.message);

@@ -295,9 +295,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
       const { Conversation } = await import('@elevenlabs/client');
       const b = new Date();
       const isim = String(ad || '').split(' ')[0];
-      const conv = await Conversation.startSession({
-        signedUrl: v.signedUrl,
-        connectionType: 'websocket',
+      const ortak = {
         dynamicVariables: {
           kullanici: ad || 'ekip üyesi',
           hitap: /^volkan/i.test(isim) ? 'Volkan abi' : isim || 'ekip arkadaşım',
@@ -320,7 +318,13 @@ export default function SesliAsistan({ ad, onDegisti }) {
           if (d?.reason === 'error') setHata('Sesli görüşme koptu: ' + (d.message || 'bağlantı hatası'));
         },
         onError: (mesaj) => { if (mesaj) setHata(String(mesaj)); },
-      });
+      };
+      // WebRTC: telefonun yankı engellemesi devrede, ses daha temiz; olmazsa websocket
+      let conv;
+      if (v.token) {
+        try { conv = await Conversation.startSession({ ...ortak, conversationToken: v.token, connectionType: 'webrtc' }); } catch (e) { console.warn('WebRTC açılamadı, websocket deneniyor', e); }
+      }
+      if (!conv) conv = await Conversation.startSession({ ...ortak, signedUrl: v.signedUrl, connectionType: 'websocket' });
       canliRef.current = conv;
       setCanli('dinliyor');
       return true;
