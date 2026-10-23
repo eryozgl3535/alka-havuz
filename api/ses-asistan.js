@@ -172,9 +172,10 @@ export default async function handler(req, res) {
       try {
         const h = await ajanHazirla(anahtar); onbellek = h; d.ajan = h;
         const a = await el(anahtar, `/v1/convai/agents/${h.ajanId}`);
+        d.ajanEtiket = a?.tags;
         const sesId = a?.conversation_config?.tts?.voice_id;
         d.dil = a?.conversation_config?.agent?.language; d.beyin = a?.conversation_config?.agent?.prompt?.llm;
-        try { const v = await el(anahtar, `/v1/voices/${sesId}`); d.ses = { ad: v?.name, cinsiyet: v?.labels?.gender, aksan: v?.labels?.accent, dil: v?.labels?.language }; } catch { d.ses = { id: sesId }; }
+        try { const v = await el(anahtar, `/v1/voices/${sesId}`); d.ses = { ad: v?.name, cinsiyet: v?.labels?.gender, aksan: v?.labels?.accent, dil: v?.labels?.language, kategori: v?.category, aciklama: (v?.description || '').slice(0, 160), kalite: v?.high_quality_base_model_ids, etiketler: (a?.tags || []).join(',') }; } catch { d.ses = { id: sesId }; }
       } catch (e) { d.ajanHata = e.message; }
     }
     return cevap(res, 200, d);
