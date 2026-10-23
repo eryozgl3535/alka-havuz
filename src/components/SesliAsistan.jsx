@@ -719,7 +719,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
                   <Ikon ad={caliyor ? 'durdur' : 'sesAcik'} boyut={16} renk="#0b2a4a" dolgu={caliyor ? '#0b2a4a' : 'none'} />
                 </button>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={s.sesAd}>{v.ad.split(' - ')[0]} <span style={s.sesEtiket}>{v.cinsiyet === 'female' ? 'Kadın' : v.cinsiyet === 'male' ? 'Erkek' : ''}{v.tur === 'turkce' ? ' · Türkçe stüdyo' : ' · Stüdyo'}</span></div>
+                  <div style={s.sesAd}>{v.ad.split(' - ')[0]} <span style={s.sesEtiket}>{v.cinsiyet === 'female' ? 'Kadın' : v.cinsiyet === 'male' ? 'Erkek' : ''}{v.tur === 'turkce' ? ' · Türkçe' : ' · Uluslararası'}</span>{v.onerilen && <span style={s.onerilen}>Önerilen</span>}</div>
                   {v.aciklama && <div style={s.sesSatirAlt}>{v.aciklama}</div>}
                 </div>
                 {secili ? <span style={s.sesSeciliYazi}>Seçili</span> : (
@@ -887,6 +887,7 @@ const s = {
   sesAd: { fontSize: 14, fontWeight: 700, color: '#0b1730' },
   sesEtiket: { fontSize: 11.5, fontWeight: 600, color: '#64748b', marginLeft: 4 },
   sesSatirAlt: { fontSize: 12, color: '#64748b', marginTop: 1, lineHeight: 1.35 },
+  onerilen: { marginLeft: 6, fontSize: 10.5, fontWeight: 800, color: '#15803d', background: '#dcfce7', borderRadius: 6, padding: '2px 6px', verticalAlign: 1 },
   sesSecBtn: { border: 'none', background: '#0b2a4a', color: '#fff', borderRadius: 10, padding: '7px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 },
   sesSeciliYazi: { fontSize: 12.5, fontWeight: 700, color: '#1d4ed8', flexShrink: 0, paddingRight: 4 },
   kureMik: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', opacity: 0.9 },

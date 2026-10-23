@@ -165,24 +165,39 @@ async function ajanHazirla(anahtar) {
 
 // ------------------------------------------------------------ ses seçici
 const ORNEK_METIN = 'Merhaba Eray, ben ALKA asistanınım. Bugün iki bakım randevun var; ilki Alaçatı\'da saat onda.';
-const HAZIR_TERCIH = /^(eric|chris|brian|liam|will|daniel|george|roger|charlie|callum|bill|sarah|jessica|laura|matilda|alice|lily|river)\b/i;
+const HAZIR_TERCIH = /^(eric|chris|brian|will|daniel|roger|sarah|jessica|matilda|alice|river)\b/i;
 
 async function sesListesi(anahtar) {
   const sesler = [];
-  // 1) Stüdyo kayıtlı (profesyonel) Türkçe sesler — Türkçe örnekleri hazır
-  try {
-    const p = await el(anahtar, '/v1/shared-voices?language=tr&category=professional&page_size=60&sort=cloned_by_count');
-    for (const v of (p?.voices || []).filter((x) => x.free_users_allowed !== false)) {
-      if (/asmr|whisper|fısıltı|narrat|audiobook|kitap|radio|radyo|old|yaşlı|child|çocuk/i.test(`${v.name} ${v.descriptive} ${v.use_case} ${v.description || ''}`)) continue;
-      const tr = (v.verified_languages || []).find((l) => l.language === 'tr' && l.preview_url);
-      sesler.push({ id: v.voice_id, sahip: v.public_owner_id, ad: v.name, cinsiyet: v.gender, aciklama: (v.description || v.descriptive || '').slice(0, 90), ornek: tr?.preview_url || v.preview_url, tur: 'turkce' });
-      if (sesler.length >= 8) break;
-    }
-  } catch (e) { console.error('Kütüphane sesleri alınamadı:', e.message); }
+  // 1) Stüdyo kayıtlı (profesyonel) Türkçe sesler — Türkçe örnekleri hazır. Sohbete uygun (net, doğal, sakin) olanlar öne.
+  const puan = (v) => {
+    const t = `${v.name} ${v.descriptive || ''} ${v.use_case || ''} ${v.description || ''}`.toLowerCase();
+    let p = 0;
+    if (/natural|doğal|clear|net|calm|sakin|steady|conversational|sohbet|warm|sıcak|friendly|samimi|smooth|soft/.test(t)) p += 3;
+    if (/conversational|customer|assistant|asistan|support/.test(t)) p += 2;
+    if (/energetic|fast|hızlı|game|trailer|creaky|thick|kalın|powerful|storytell|hyped|dramatic|epic|news|haber|advert|reklam/.test(t)) p -= 3;
+    return p;
+  };
+  for (const [cinsiyet, adet] of [['male', 5], ['female', 4]]) {
+    try {
+      const p = await el(anahtar, `/v1/shared-voices?language=tr&gender=${cinsiyet}&category=professional&page_size=60&sort=cloned_by_count`);
+      const uygun = (p?.voices || [])
+        .filter((x) => x.free_users_allowed !== false && !/asmr|whisper|fısıltı|narrat|audiobook|kitap|radio|radyo|old|yaşlı|child|çocuk|meditation|meditasyon/i.test(`${x.name} ${x.descriptive} ${x.use_case} ${x.description || ''}`))
+        .map((x, k) => ({ x, p: puan(x) - k * 0.05 }))
+        .sort((a, b) => b.p - a.p)
+        .slice(0, adet);
+      for (const { x: v } of uygun) {
+        if (sesler.some((y) => y.id === v.voice_id)) continue;
+        const tr = (v.verified_languages || []).find((l) => l.language === 'tr' && l.preview_url);
+        sesler.push({ id: v.voice_id, sahip: v.public_owner_id, ad: v.name, cinsiyet: v.gender, aciklama: (v.description || v.descriptive || '').slice(0, 90), ornek: tr?.preview_url || v.preview_url, tur: 'turkce' });
+      }
+    } catch (e) { console.error('Kütüphane sesleri alınamadı:', e.message); }
+  }
+  if (sesler.length) sesler[0].onerilen = true;
   // 2) ElevenLabs'in kendi stüdyo sesleri (çok temiz; Türkçe örnek anında üretilir)
   try {
     const h = await el(anahtar, '/v2/voices?voice_type=default&page_size=100');
-    for (const v of (h?.voices || []).filter((x) => HAZIR_TERCIH.test(x.name || '')).slice(0, 8)) {
+    for (const v of (h?.voices || []).filter((x) => HAZIR_TERCIH.test(x.name || '')).slice(0, 5)) {
       sesler.push({ id: v.voice_id, sahip: null, ad: v.name, cinsiyet: v.labels?.gender, aciklama: (v.labels?.descriptive || v.labels?.description || v.description || '').slice(0, 90), ornek: null, tur: 'hazir' });
     }
   } catch (e) { console.error('Hazır sesler alınamadı:', e.message); }
