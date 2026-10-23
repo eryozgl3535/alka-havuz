@@ -157,6 +157,15 @@ async function ajanHazirla(anahtar) {
 export default async function handler(req, res) {
   if (req.method !== 'POST' && req.method !== 'GET') return cevap(res, 405, { hata: 'Sadece POST' });
   const anahtar = (process.env.ELEVENLABS_API_KEY || '').trim();
+  // Teşhis: /api/ses-asistan?durum=1 her zaman 200 döner ve sorunu açıkça yazar (link üretmez)
+  if (req.query?.durum || /[?&]durum=/.test(req.url || '')) {
+    const d = { anahtarVar: !!anahtar, anahtarBasi: anahtar ? anahtar.slice(0, 5) + '…' : null };
+    if (anahtar) {
+      try { const u = await el(anahtar, '/v1/user/subscription'); d.plan = u?.tier; d.karakter = `${u?.character_count}/${u?.character_limit}`; } catch (e) { d.abonelikHata = e.message; }
+      try { const h = await ajanHazirla(anahtar); onbellek = h; d.ajan = h; } catch (e) { d.ajanHata = e.message; }
+    }
+    return cevap(res, 200, d);
+  }
   if (!anahtar) return cevap(res, 503, { hata: 'Sesli asistan anahtarı Vercel ayarlarında yok (ELEVENLABS_API_KEY).', kod: 'anahtar-yok' });
   try {
     const guncel = surum(ajanAyari('x'));
