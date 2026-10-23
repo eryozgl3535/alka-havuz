@@ -139,6 +139,12 @@ export default function SesliAsistan({ ad, onDegisti }) {
   const [sohbet, setSohbet] = useState(false);
   // Canlı ses (ElevenLabs + Claude): 'yok' | 'baglaniyor' | 'dinliyor' | 'konusuyor'
   const [canli, setCanli] = useState('yok');
+  // Ses seçici
+  const [sesPanel, setSesPanel] = useState(false);
+  const [sesler, setSesler] = useState(null);      // null: yükleniyor
+  const [seciliSes, setSeciliSes] = useState(null);
+  const [sesIslem, setSesIslem] = useState('');    // çalan ya da seçilen sesin id'si
+  const dinletici = useRef(null);
   const canliRef = useRef(null);       // aktif canlı görüşme
   const sonSoz = useRef('');           // canlı görüşmede kullanıcının son söylediği (silme onayı için)
   const tanima = useRef(null);
@@ -341,6 +347,40 @@ export default function SesliAsistan({ ad, onDegisti }) {
       }
       return false;
     }
+  }
+
+  // ---------------- ses seçici
+  async function sesPaneliAc() {
+    if (sesPanel) { setSesPanel(false); try { dinletici.current?.pause(); } catch { /* yok */ } return; }
+    setSesPanel(true); setSesler(null); setHata('');
+    try {
+      const r = await fetch('/api/ses-asistan?sesler=1');
+      const v = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(v.hata || 'Ses listesi alınamadı');
+      setSesler(v.sesler || []); setSeciliSes(v.secili || null);
+    } catch (e) { setSesler([]); setHata(e.message); }
+  }
+  function sesDinle(v) {
+    try { dinletici.current?.pause(); } catch { /* yok */ }
+    if (sesIslem === 'calan:' + v.id) { setSesIslem(''); return; }
+    const a = new Audio(v.ornek || `/api/ses-asistan?ornek=${encodeURIComponent(v.id)}`);
+    dinletici.current = a;
+    setSesIslem('calan:' + v.id);
+    a.onended = () => setSesIslem('');
+    a.onerror = () => { setSesIslem(''); setHata('Örnek ses çalınamadı.'); };
+    a.play().catch(() => setSesIslem(''));
+  }
+  async function sesiSec(v) {
+    setSesIslem('sec:' + v.id); setHata('');
+    try {
+      const r = await fetch('/api/ses-asistan?sec=1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: v.id, sahip: v.sahip, ad: v.ad }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.hata || 'Ses değiştirilemedi');
+      setSeciliSes(d.sesId || v.id);
+      setSesler((l) => (l || []).map((x) => (x.id === v.id ? { ...x, secildi: true } : { ...x, secildi: false })));
+      setBilgi(`Asistanın sesi "${v.ad.split(' - ')[0]}" oldu. Konuş'a bastığında bu sesle konuşacak.`);
+    } catch (e) { setHata(e.message); }
+    setSesIslem('');
   }
 
   async function sohbetBaslat() {
@@ -659,6 +699,40 @@ export default function SesliAsistan({ ad, onDegisti }) {
         </button>
       ) : null}
 
+      {!sohbet && (
+        <button className="as-link" style={{ ...s.bildirimLink, margin: '-4px auto 10px' }} onClick={sesPaneliAc}>
+          <Ikon ad="sesAcik" boyut={14} renk="#2563eb" /> {sesPanel ? 'Ses seçimini kapat' : 'Asistanın sesini seç'}
+        </button>
+      )}
+
+      {sesPanel && !sohbet && (
+        <div style={s.sesPanel}>
+          <div style={s.sesPanelBaslik}>Bir sesi dinle, beğendiğini seç</div>
+          {sesler === null && <div style={s.sesSatirAlt}>Sesler yükleniyor…</div>}
+          {sesler && sesler.length === 0 && <div style={s.sesSatirAlt}>Ses listesi alınamadı.</div>}
+          {(sesler || []).map((v) => {
+            const secili = v.secildi || (seciliSes && seciliSes === v.id);
+            const caliyor = sesIslem === 'calan:' + v.id;
+            return (
+              <div key={v.id} style={{ ...s.sesSatir, ...(secili ? s.sesSatirSecili : {}) }}>
+                <button style={s.sesDinleBtn} onClick={() => sesDinle(v)} aria-label={caliyor ? 'Durdur' : 'Dinle'}>
+                  <Ikon ad={caliyor ? 'durdur' : 'sesAcik'} boyut={16} renk="#0b2a4a" dolgu={caliyor ? '#0b2a4a' : 'none'} />
+                </button>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={s.sesAd}>{v.ad.split(' - ')[0]} <span style={s.sesEtiket}>{v.cinsiyet === 'female' ? 'Kadın' : v.cinsiyet === 'male' ? 'Erkek' : ''}{v.tur === 'turkce' ? ' · Türkçe stüdyo' : ' · Stüdyo'}</span></div>
+                  {v.aciklama && <div style={s.sesSatirAlt}>{v.aciklama}</div>}
+                </div>
+                {secili ? <span style={s.sesSeciliYazi}>Seçili</span> : (
+                  <button style={s.sesSecBtn} disabled={!!sesIslem && sesIslem.startsWith('sec:')} onClick={() => sesiSec(v)}>
+                    {sesIslem === 'sec:' + v.id ? 'Bekle…' : 'Seç'}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {bilgi && <div style={s.bilgi}>{bilgi}</div>}
 
       {mesajlar.length > 0 && (
@@ -805,6 +879,16 @@ const s = {
   konusBaslik: { display: 'block', fontSize: 18, fontWeight: 800, letterSpacing: -0.2 },
   konusAlt: { display: 'block', fontSize: 13, opacity: 0.8, marginTop: 2 },
   kureBtn: { position: 'relative', border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', borderRadius: '50%', display: 'inline-flex' },
+  sesPanel: { border: '1px solid #e6ecf3', borderRadius: 16, padding: 10, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 360, overflowY: 'auto' },
+  sesPanelBaslik: { fontSize: 13, fontWeight: 700, color: '#334155', padding: '2px 4px 4px' },
+  sesSatir: { display: 'flex', alignItems: 'center', gap: 10, padding: '8px 8px', borderRadius: 12, background: '#f8fafc' },
+  sesSatirSecili: { background: '#eff6ff', boxShadow: 'inset 0 0 0 1.5px #93c5fd' },
+  sesDinleBtn: { width: 36, height: 36, borderRadius: '50%', border: '1px solid #dbe3ee', background: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, padding: 0 },
+  sesAd: { fontSize: 14, fontWeight: 700, color: '#0b1730' },
+  sesEtiket: { fontSize: 11.5, fontWeight: 600, color: '#64748b', marginLeft: 4 },
+  sesSatirAlt: { fontSize: 12, color: '#64748b', marginTop: 1, lineHeight: 1.35 },
+  sesSecBtn: { border: 'none', background: '#0b2a4a', color: '#fff', borderRadius: 10, padding: '7px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 },
+  sesSeciliYazi: { fontSize: 12.5, fontWeight: 700, color: '#1d4ed8', flexShrink: 0, paddingRight: 4 },
   kureMik: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', opacity: 0.9 },
   sohbetIpucu: { fontSize: 12.5, color: '#64748b', marginTop: -4 },
   bildirimLink: { display: 'flex', alignItems: 'center', gap: 6, margin: '10px auto 0', border: 'none', background: 'transparent', color: '#2563eb', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: 4 },

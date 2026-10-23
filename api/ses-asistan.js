@@ -104,7 +104,8 @@ function ajanAyari(sesId) {
           tools: araclar(),
         },
       },
-      tts: { model_id: 'eleven_flash_v2_5', voice_id: sesId, stability: 0.55, similarity_boost: 0.8, speed: 1.0 },
+      // turbo v2.5: Türkçede flash'tan daha net ve doğal, gecikmesi hâlâ çok düşük
+      tts: { model_id: 'eleven_turbo_v2_5', voice_id: sesId, stability: 0.6, similarity_boost: 0.75, speed: 1.0 },
       turn: { turn_eagerness: 'normal', silence_end_call_timeout: 90 },
     },
     platform_settings: { auth: { enable_auth: true } },
@@ -151,7 +152,8 @@ async function ajanHazirla(anahtar) {
     const ayar = ajanAyari(sesYeni ? await sesBul(anahtar) : (mevcut.voice_id || YEDEK_SES));
     const s = surum(ayar);
     if (sesYeni || !(mevcut.tags || []).includes(s)) {
-      await el(anahtar, `/v1/convai/agents/${mevcut.agent_id}`, { method: 'PATCH', body: JSON.stringify({ ...ayar, tags: [s, SES_SURUM] }) });
+      const korunan = (mevcut.tags || []).filter((t) => t.startsWith('secim'));
+      await el(anahtar, `/v1/convai/agents/${mevcut.agent_id}`, { method: 'PATCH', body: JSON.stringify({ ...ayar, tags: [s, SES_SURUM, ...korunan] }) });
     }
     return { ajanId: mevcut.agent_id, surum: s };
   }
@@ -161,7 +163,98 @@ async function ajanHazirla(anahtar) {
   return { ajanId: yeni.agent_id, surum: s };
 }
 
+// ------------------------------------------------------------ ses seçici
+const ORNEK_METIN = 'Merhaba Eray, ben ALKA asistanınım. Bugün iki bakım randevun var; ilki Alaçatı\'da saat onda.';
+const HAZIR_TERCIH = /^(eric|chris|brian|liam|will|daniel|george|roger|charlie|callum|bill|sarah|jessica|laura|matilda|alice|lily|river)\b/i;
+
+async function sesListesi(anahtar) {
+  const sesler = [];
+  // 1) Stüdyo kayıtlı (profesyonel) Türkçe sesler — Türkçe örnekleri hazır
+  try {
+    const p = await el(anahtar, '/v1/shared-voices?language=tr&category=professional&page_size=60&sort=cloned_by_count');
+    for (const v of (p?.voices || []).filter((x) => x.free_users_allowed !== false)) {
+      if (/asmr|whisper|fısıltı|narrat|audiobook|kitap|radio|radyo|old|yaşlı|child|çocuk/i.test(`${v.name} ${v.descriptive} ${v.use_case} ${v.description || ''}`)) continue;
+      const tr = (v.verified_languages || []).find((l) => l.language === 'tr' && l.preview_url);
+      sesler.push({ id: v.voice_id, sahip: v.public_owner_id, ad: v.name, cinsiyet: v.gender, aciklama: (v.description || v.descriptive || '').slice(0, 90), ornek: tr?.preview_url || v.preview_url, tur: 'turkce' });
+      if (sesler.length >= 8) break;
+    }
+  } catch (e) { console.error('Kütüphane sesleri alınamadı:', e.message); }
+  // 2) ElevenLabs'in kendi stüdyo sesleri (çok temiz; Türkçe örnek anında üretilir)
+  try {
+    const h = await el(anahtar, '/v2/voices?voice_type=default&page_size=100');
+    for (const v of (h?.voices || []).filter((x) => HAZIR_TERCIH.test(x.name || '')).slice(0, 8)) {
+      sesler.push({ id: v.voice_id, sahip: null, ad: v.name, cinsiyet: v.labels?.gender, aciklama: (v.labels?.descriptive || v.labels?.description || v.description || '').slice(0, 90), ornek: null, tur: 'hazir' });
+    }
+  } catch (e) { console.error('Hazır sesler alınamadı:', e.message); }
+  return sesler;
+}
+
+async function sesSec(anahtar, { id, sahip, ad }) {
+  let sesId = id;
+  if (sahip) {
+    // Kütüphaneye ekle (ücretsiz planda yer az: önce eski ALKA seslerini temizle)
+    const benim = await el(anahtar, '/v1/voices?search=ALKA').catch(() => ({ voices: [] }));
+    const ajan = onbellek?.ajanId ? await el(anahtar, `/v1/convai/agents/${onbellek.ajanId}`).catch(() => null) : null;
+    const kullanilan = ajan?.conversation_config?.tts?.voice_id;
+    for (const v of (benim?.voices || [])) {
+      if (/^ALKA/.test(v.name || '') && v.voice_id !== kullanilan) await el(anahtar, `/v1/voices/${v.voice_id}`, { method: 'DELETE' }).catch(() => {});
+    }
+    const eklenen = await el(anahtar, `/v1/voices/add/${sahip}/${id}`, { method: 'POST', body: JSON.stringify({ new_name: `ALKA Ses - ${String(ad || 'Seçilen').slice(0, 30)}` }) });
+    sesId = eklenen?.voice_id || id;
+  }
+  if (!onbellek) onbellek = await ajanHazirla(anahtar);
+  const ayar = ajanAyari(sesId);
+  const s = surum(ayar);
+  await el(anahtar, `/v1/convai/agents/${onbellek.ajanId}`, { method: 'PATCH', body: JSON.stringify({ ...ayar, tags: [s, SES_SURUM, 'secim'] }) });
+  onbellek = { ajanId: onbellek.ajanId, surum: s };
+  return sesId;
+}
+
+async function govdeOku(req) {
+  if (req.body && typeof req.body === 'object') return req.body;
+  if (typeof req.body === 'string') { try { return JSON.parse(req.body); } catch { return {}; } }
+  const p = []; for await (const x of req) p.push(x);
+  try { return JSON.parse(Buffer.concat(p).toString('utf8') || '{}'); } catch { return {}; }
+}
+
 export default async function handler(req, res) {
+  const sorgu = new URL(req.url || '/', 'http://x').searchParams;
+  const anahtarS = (process.env.ELEVENLABS_API_KEY || '').trim();
+  if (anahtarS && sorgu.get('sesler')) {
+    try {
+      if (!onbellek) onbellek = await ajanHazirla(anahtarS);
+      const a = await el(anahtarS, `/v1/convai/agents/${onbellek.ajanId}`);
+      const secili = a?.conversation_config?.tts?.voice_id;
+      let seciliAd = null;
+      try { seciliAd = (await el(anahtarS, `/v1/voices/${secili}`))?.name; } catch { /* yok */ }
+      return cevap(res, 200, { secili, seciliAd, sesler: await sesListesi(anahtarS) });
+    } catch (e) { return cevap(res, 502, { hata: 'Ses listesi alınamadı: ' + e.message }); }
+  }
+  if (anahtarS && sorgu.get('ornek')) {
+    // Hazır ses için Türkçe örnek cümle üret (mp3)
+    try {
+      const r = await fetch(`${API}/v1/text-to-speech/${encodeURIComponent(sorgu.get('ornek'))}?output_format=mp3_44100_64`, {
+        method: 'POST', headers: { 'xi-api-key': anahtarS, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: ORNEK_METIN, model_id: 'eleven_turbo_v2_5', voice_settings: { stability: 0.6, similarity_boost: 0.75 } }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!r.ok) return cevap(res, 502, { hata: 'Örnek ses üretilemedi (' + r.status + ')' });
+      res.statusCode = 200; res.setHeader('Content-Type', 'audio/mpeg'); res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.end(Buffer.from(await r.arrayBuffer()));
+    } catch (e) { return cevap(res, 502, { hata: 'Örnek ses üretilemedi: ' + e.message }); }
+  }
+  if (anahtarS && sorgu.get('sec') && req.method === 'POST') {
+    try {
+      const b = await govdeOku(req);
+      if (!b?.id) return cevap(res, 400, { hata: 'Ses seçilmedi.' });
+      const sesId = await sesSec(anahtarS, b);
+      return cevap(res, 200, { tamam: true, sesId });
+    } catch (e) { return cevap(res, 502, { hata: 'Ses değiştirilemedi: ' + e.message }); }
+  }
+  return anaIslem(req, res);
+}
+
+async function anaIslem(req, res) {
   if (req.method !== 'POST' && req.method !== 'GET') return cevap(res, 405, { hata: 'Sadece POST' });
   const anahtar = (process.env.ELEVENLABS_API_KEY || '').trim();
   // Teşhis: /api/ses-asistan?durum=1 her zaman 200 döner ve sorunu açıkça yazar (link üretmez)
