@@ -123,20 +123,19 @@ function surum(ayar) {
 async function sesBul(anahtar) {
   if (process.env.ELEVENLABS_VOICE_ID) return process.env.ELEVENLABS_VOICE_ID;
   try {
-    const benim = await el(anahtar, `/v1/voices?search=${encodeURIComponent('ALKA Ses - Mehmet')}`);
-    const var_ = (benim?.voices || []).find((v) => /^ALKA Ses - Mehmet/.test(v.name || ''));
-    if (var_) return var_.voice_id;
-  } catch { /* devam */ }
-  try {
     // Ses seçicideki sıralamayla aynı: sohbete en uygun (net, doğal) Türkçe erkek ses
     const liste = await sesListesi(anahtar);
     const aday = liste.find((v) => v.tur === 'turkce' && v.cinsiyet === 'male') || liste.find((v) => v.tur === 'turkce');
     if (aday) {
-      const eklenen = await el(anahtar, `/v1/voices/add/${aday.sahip}/${aday.id}`, { method: 'POST', body: JSON.stringify({ new_name: `ALKA Ses - ${String(aday.ad).slice(0, 30)}` }) });
+      const ad = `ALKA Ses - ${String(aday.ad).slice(0, 30)}`;
+      const benim = await el(anahtar, `/v1/voices?search=${encodeURIComponent('ALKA Ses')}`).catch(() => null);
+      const var_ = (benim?.voices || []).find((v) => v.name === ad);
+      if (var_) return var_.voice_id;
+      const eklenen = await el(anahtar, `/v1/voices/add/${aday.sahip}/${aday.id}`, { method: 'POST', body: JSON.stringify({ new_name: ad }) });
       if (eklenen?.voice_id) return eklenen.voice_id;
     }
   } catch (e) { console.error('Türkçe ses eklenemedi:', e.message); }
-  return YEDEK_SES;
+  return null; // bulunamazsa mevcut ses korunur
 }
 
 async function ajanHazirla(anahtar) {
@@ -145,15 +144,24 @@ async function ajanHazirla(anahtar) {
   if (mevcut) {
     // Kullanıcı sesi kendisi seçtiyse ("secim") asla otomatik değiştirme
     const sesYeni = !(mevcut.tags || []).includes(SES_SURUM) && !(mevcut.tags || []).includes('secim');
-    const ayar = ajanAyari(sesYeni ? await sesBul(anahtar) : (mevcut.voice_id || YEDEK_SES));
+    const ayar = ajanAyari((sesYeni && await sesBul(anahtar)) || mevcut.voice_id || YEDEK_SES);
     const s = surum(ayar);
     if (sesYeni || !(mevcut.tags || []).includes(s)) {
       const korunan = (mevcut.tags || []).filter((t) => t.startsWith('secim'));
-      await el(anahtar, `/v1/convai/agents/${mevcut.agent_id}`, { method: 'PATCH', body: JSON.stringify({ ...ayar, tags: [s, SES_SURUM, ...korunan] }) });
+      try {
+        await el(anahtar, `/v1/convai/agents/${mevcut.agent_id}`, { method: 'PATCH', body: JSON.stringify({ ...ayar, tags: [s, SES_SURUM, ...korunan] }) });
+      } catch (e) {
+        if (!sesYeni) throw e;
+        // Yeni ses ajana uygun değilse (ör. canlı denetimli ses) mevcut çalışan sesle devam
+        console.error('Yeni ses uygulanamadı, mevcut ses korunuyor:', e.message);
+        const eskiAyar = ajanAyari(mevcut.voice_id || YEDEK_SES);
+        await el(anahtar, `/v1/convai/agents/${mevcut.agent_id}`, { method: 'PATCH', body: JSON.stringify({ ...eskiAyar, tags: [surum(eskiAyar), SES_SURUM, ...korunan] }) });
+        return { ajanId: mevcut.agent_id, surum: surum(eskiAyar) };
+      }
     }
     return { ajanId: mevcut.agent_id, surum: s };
   }
-  const ayar = ajanAyari(await sesBul(anahtar));
+  const ayar = ajanAyari((await sesBul(anahtar)) || YEDEK_SES);
   const s = surum(ayar);
   const yeni = await el(anahtar, '/v1/convai/agents/create', { method: 'POST', body: JSON.stringify({ ...ayar, tags: [s, SES_SURUM] }) });
   return { ajanId: yeni.agent_id, surum: s };
@@ -176,9 +184,9 @@ async function sesListesi(anahtar) {
   };
   for (const [cinsiyet, adet] of [['male', 5], ['female', 4]]) {
     try {
-      const p = await el(anahtar, `/v1/shared-voices?language=tr&gender=${cinsiyet}&category=professional&page_size=60&sort=cloned_by_count`);
+      const p = await el(anahtar, `/v1/shared-voices?language=tr&gender=${cinsiyet}&category=professional&page_size=80&sort=cloned_by_count&include_live_moderated=false`);
       const uygun = (p?.voices || [])
-        .filter((x) => x.free_users_allowed !== false && !/asmr|whisper|fısıltı|narrat|audiobook|kitap|radio|radyo|old|yaşlı|child|çocuk|meditation|meditasyon/i.test(`${x.name} ${x.descriptive} ${x.use_case} ${x.description || ''}`))
+        .filter((x) => x.free_users_allowed !== false && !x.live_moderation_enabled && !/asmr|whisper|fısıltı|narrat|audiobook|kitap|radio|radyo|old|yaşlı|child|çocuk|meditation|meditasyon/i.test(`${x.name} ${x.descriptive} ${x.use_case} ${x.description || ''}`))
         .map((x, k) => ({ x, p: puan(x) - k * 0.05 }))
         .sort((a, b) => b.p - a.p)
         .slice(0, adet);
@@ -260,7 +268,10 @@ export default async function handler(req, res) {
       if (!b?.id) return cevap(res, 400, { hata: 'Ses seçilmedi.' });
       const sesId = await sesSec(anahtarS, b);
       return cevap(res, 200, { tamam: true, sesId });
-    } catch (e) { return cevap(res, 502, { hata: 'Ses değiştirilemedi: ' + e.message }); }
+    } catch (e) {
+      const mesaj = /moderation/i.test(e.message) ? 'Bu ses sesli asistanda kullanılamıyor (ElevenLabs kısıtı). Lütfen başka bir ses seç.' : 'Ses değiştirilemedi: ' + e.message;
+      return cevap(res, 502, { hata: mesaj });
+    }
   }
   return anaIslem(req, res);
 }
