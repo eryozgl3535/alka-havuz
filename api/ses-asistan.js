@@ -159,10 +159,16 @@ export default async function handler(req, res) {
   const anahtar = (process.env.ELEVENLABS_API_KEY || '').trim();
   // Teşhis: /api/ses-asistan?durum=1 her zaman 200 döner ve sorunu açıkça yazar (link üretmez)
   if (req.query?.durum || /[?&]durum=/.test(req.url || '')) {
-    const d = { anahtarVar: !!anahtar, anahtarBasi: anahtar ? anahtar.slice(0, 5) + '…' : null };
+    const d = { anahtarVar: !!anahtar };
     if (anahtar) {
       try { const u = await el(anahtar, '/v1/user/subscription'); d.plan = u?.tier; d.karakter = `${u?.character_count}/${u?.character_limit}`; } catch (e) { d.abonelikHata = e.message; }
-      try { const h = await ajanHazirla(anahtar); onbellek = h; d.ajan = h; } catch (e) { d.ajanHata = e.message; }
+      try {
+        const h = await ajanHazirla(anahtar); onbellek = h; d.ajan = h;
+        const a = await el(anahtar, `/v1/convai/agents/${h.ajanId}`);
+        const sesId = a?.conversation_config?.tts?.voice_id;
+        d.dil = a?.conversation_config?.agent?.language; d.beyin = a?.conversation_config?.agent?.prompt?.llm;
+        try { const v = await el(anahtar, `/v1/voices/${sesId}`); d.ses = { ad: v?.name, cinsiyet: v?.labels?.gender, aksan: v?.labels?.accent, dil: v?.labels?.language }; } catch { d.ses = { id: sesId }; }
+      } catch (e) { d.ajanHata = e.message; }
     }
     return cevap(res, 200, d);
   }
