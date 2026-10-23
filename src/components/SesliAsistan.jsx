@@ -327,7 +327,9 @@ export default function SesliAsistan({ ad, onDegisti }) {
     } catch (e) {
       canliRef.current = null;
       setCanli('yok');
-      if (e?.kod !== 'anahtar-yok') {
+      if (e?.kod === 'anahtar-yok') {
+        setBilgi('Doğal ses henüz açık değil: ElevenLabs anahtarı Vercel ayarlarına eklenmemiş. Şimdilik telefonun sesiyle devam ediyorum.');
+      } else {
         const izin = /permission|notallowed|denied/i.test(String(e?.name || '') + String(e?.message || ''));
         setBilgi(izin ? 'Mikrofon izni verilmedi. Tarayıcı ayarlarından bu siteye mikrofon izni ver.'
           : `${e?.message || 'Canlı ses açılamadı.'} Şimdilik telefonun kendi sesiyle devam ediyorum.`);
