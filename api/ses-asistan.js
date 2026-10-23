@@ -14,7 +14,7 @@ export const config = { maxDuration: 30 };
 const API = 'https://api.elevenlabs.io';
 const AJAN_ADI = 'ALKA Asistan';
 const SES_ADI = 'ALKA Erkek Ses Pro';
-const SES_SURUM = 'ses-2'; // ses seçimi değişince mevcut ajanın sesi de yenilenir
+const SES_SURUM = 'ses-3'; // ses seçimi değişince mevcut ajanın sesi de yenilenir
 const YEDEK_SES = 'pNInz6obpgDQGcFmaJgB'; // ElevenLabs hazır erkek ses (Adam); Türkçe ses bulunamazsa
 let onbellek = null; // { ajanId, surum } — sıcak sunucuda tekrar tekrar aramamak için
 
@@ -123,21 +123,16 @@ function surum(ayar) {
 async function sesBul(anahtar) {
   if (process.env.ELEVENLABS_VOICE_ID) return process.env.ELEVENLABS_VOICE_ID;
   try {
-    const benim = await el(anahtar, `/v1/voices?search=${encodeURIComponent(SES_ADI)}`);
-    const var_ = (benim?.voices || []).find((v) => v.name === SES_ADI);
+    const benim = await el(anahtar, `/v1/voices?search=${encodeURIComponent('ALKA Ses - Mehmet')}`);
+    const var_ = (benim?.voices || []).find((v) => /^ALKA Ses - Mehmet/.test(v.name || ''));
     if (var_) return var_.voice_id;
   } catch { /* devam */ }
   try {
-    // Önce stüdyo kalitesindeki (profesyonel kayıtlı) sesler: yankısız, temiz; yoksa yüksek kaliteli olanlar
-    let aday = null;
-    for (const kategori of ['professional', 'high_quality', '']) {
-      const paylasilan = await el(anahtar, `/v1/shared-voices?language=tr&gender=male&page_size=40&sort=cloned_by_count${kategori ? '&category=' + kategori : ''}`);
-      aday = (paylasilan?.voices || []).filter((v) => v.free_users_allowed !== false && !/narrat|asmr|whisper|fısıltı|old|yaşlı|radio|radyo/i.test(`${v.name} ${v.descriptive} ${v.use_case} ${v.description || ''}`))
-        .sort((a, b) => (b.cloned_by_count || 0) - (a.cloned_by_count || 0))[0];
-      if (aday) break;
-    }
+    // Ses seçicideki sıralamayla aynı: sohbete en uygun (net, doğal) Türkçe erkek ses
+    const liste = await sesListesi(anahtar);
+    const aday = liste.find((v) => v.tur === 'turkce' && v.cinsiyet === 'male') || liste.find((v) => v.tur === 'turkce');
     if (aday) {
-      const eklenen = await el(anahtar, `/v1/voices/add/${aday.public_owner_id}/${aday.voice_id}`, { method: 'POST', body: JSON.stringify({ new_name: SES_ADI }) });
+      const eklenen = await el(anahtar, `/v1/voices/add/${aday.sahip}/${aday.id}`, { method: 'POST', body: JSON.stringify({ new_name: `ALKA Ses - ${String(aday.ad).slice(0, 30)}` }) });
       if (eklenen?.voice_id) return eklenen.voice_id;
     }
   } catch (e) { console.error('Türkçe ses eklenemedi:', e.message); }
@@ -148,7 +143,8 @@ async function ajanHazirla(anahtar) {
   const liste = await el(anahtar, `/v1/convai/agents?search=${encodeURIComponent(AJAN_ADI)}&page_size=30`);
   const mevcut = (liste?.agents || []).find((a) => a.name === AJAN_ADI && !a.archived);
   if (mevcut) {
-    const sesYeni = !(mevcut.tags || []).includes(SES_SURUM);
+    // Kullanıcı sesi kendisi seçtiyse ("secim") asla otomatik değiştirme
+    const sesYeni = !(mevcut.tags || []).includes(SES_SURUM) && !(mevcut.tags || []).includes('secim');
     const ayar = ajanAyari(sesYeni ? await sesBul(anahtar) : (mevcut.voice_id || YEDEK_SES));
     const s = surum(ayar);
     if (sesYeni || !(mevcut.tags || []).includes(s)) {
