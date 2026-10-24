@@ -151,6 +151,9 @@ export default function SesliAsistan({ ad, onDegisti }) {
   // Ses seçici
   const [sesPanel, setSesPanel] = useState(false);
   const [sesler, setSesler] = useState(null);      // null: yükleniyor
+  const [seciliAd, setSeciliAd] = useState('');
+  const [panelMesaj, setPanelMesaj] = useState(null); // { tur: 'ok' | 'hata', yazi }
+  const panelRef = useRef(null);
   const [seciliSes, setSeciliSes] = useState(null);
   const [sesIslem, setSesIslem] = useState('');    // çalan ya da seçilen sesin id'si
   const dinletici = useRef(null);
@@ -360,15 +363,20 @@ export default function SesliAsistan({ ad, onDegisti }) {
   }
 
   // ---------------- ses seçici
+  const adKisa = (ad) => String(ad || '').replace(/^ALKA Ses - /, '').split(' - ')[0].trim();
   async function sesPaneliAc() {
     if (sesPanel) { setSesPanel(false); try { dinletici.current?.pause(); } catch { /* yok */ } return; }
-    setSesPanel(true); setSesler(null); setHata('');
+    setSesPanel(true); setSesler(null); setPanelMesaj(null);
+    setTimeout(() => { try { panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch { /* yok */ } }, 60);
     try {
-      const r = await fetch('/api/ses-asistan?sesler=1');
+      const r = await fetch('/api/ses-asistan?sesler=1&t=' + Date.now(), { cache: 'no-store' });
       const v = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(v.hata || 'Ses listesi alınamadı');
-      setSesler(v.sesler || []); setSeciliSes(v.secili || null);
-    } catch (e) { setSesler([]); setHata(e.message); }
+      const ad = adKisa(v.seciliAd);
+      setSeciliAd(ad); setSeciliSes(v.secili || null);
+      // Türkçe sesler kütüphaneye kopyalanınca kimliği değişir; adından eşleştir
+      setSesler((v.sesler || []).map((x) => ({ ...x, secildi: x.id === v.secili || (!!ad && adKisa(x.ad).slice(0, 30) === ad.slice(0, 30)) })));
+    } catch (e) { setSesler([]); setPanelMesaj({ tur: 'hata', yazi: e.message }); }
   }
   function sesDinle(v) {
     try { dinletici.current?.pause(); } catch { /* yok */ }
@@ -377,19 +385,19 @@ export default function SesliAsistan({ ad, onDegisti }) {
     dinletici.current = a;
     setSesIslem('calan:' + v.id);
     a.onended = () => setSesIslem('');
-    a.onerror = () => { setSesIslem(''); setHata('Örnek ses çalınamadı.'); };
-    a.play().catch(() => setSesIslem(''));
+    a.onerror = () => { setSesIslem(''); setPanelMesaj({ tur: 'hata', yazi: 'Örnek ses çalınamadı. Telefonun sessiz modda olmadığından emin ol.' }); };
+    a.play().catch(() => { setSesIslem(''); setPanelMesaj({ tur: 'hata', yazi: 'Örnek ses çalınamadı. Telefonun yan tuşundaki sessiz modu kapatıp tekrar dene.' }); });
   }
   async function sesiSec(v) {
-    setSesIslem('sec:' + v.id); setHata('');
+    setSesIslem('sec:' + v.id); setPanelMesaj({ tur: 'bekle', yazi: `"${adKisa(v.ad)}" sesi ayarlanıyor, birkaç saniye sürebilir…` });
     try {
       const r = await fetch('/api/ses-asistan?sec=1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: v.id, sahip: v.sahip, ad: v.ad }) });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.hata || 'Ses değiştirilemedi');
-      setSeciliSes(d.sesId || v.id);
-      setSesler((l) => (l || []).map((x) => (x.id === v.id ? { ...x, secildi: true } : { ...x, secildi: false })));
-      setBilgi(`Asistanın sesi "${v.ad.split(' - ')[0]}" oldu. Konuş'a bastığında bu sesle konuşacak.`);
-    } catch (e) { setHata(e.message); }
+      if (!r.ok) throw new Error(d.hata || 'Ses değiştirilemedi. Başka bir ses dene.');
+      setSeciliSes(d.sesId || v.id); setSeciliAd(adKisa(v.ad));
+      setSesler((l) => (l || []).map((x) => ({ ...x, secildi: x.id === v.id })));
+      setPanelMesaj({ tur: 'ok', yazi: `Tamam! Asistanın sesi artık "${adKisa(v.ad)}". ${sohbet ? 'Bitir\'e basıp tekrar Konuş\'a basınca' : 'Konuş\'a bastığında'} bu sesle konuşacak.` });
+    } catch (e) { setPanelMesaj({ tur: 'hata', yazi: e.message }); }
     setSesIslem('');
   }
 
@@ -714,8 +722,14 @@ export default function SesliAsistan({ ad, onDegisti }) {
       ) : null}
 
       {sesPanel && (
-        <div style={s.sesPanel}>
-          <div style={s.sesPanelBaslik}>Bir sesi dinle, beğendiğini seç{sohbet ? ' (yeni ses bir sonraki konuşmada geçerli)' : ''}</div>
+        <div ref={panelRef} style={s.sesPanel}>
+          <div style={s.sesPanelBaslik}>
+            Şu anki ses: <b>{seciliAd || '…'}</b>
+            <div style={{ fontWeight: 500, color: '#64748b', marginTop: 2 }}>▶ ile dinle, beğendiğinin yanındaki <b>Seç</b>'e bas.</div>
+          </div>
+          {panelMesaj && (
+            <div style={panelMesaj.tur === 'hata' ? s.panelHata : panelMesaj.tur === 'ok' ? s.panelOk : s.panelBekle} aria-live="polite">{panelMesaj.yazi}</div>
+          )}
           {sesler === null && <div style={s.sesSatirAlt}>Sesler yükleniyor…</div>}
           {sesler && sesler.length === 0 && <div style={s.sesSatirAlt}>Ses listesi alınamadı.</div>}
           {(sesler || []).map((v) => {
@@ -889,16 +903,19 @@ const s = {
   kureBtn: { position: 'relative', border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', borderRadius: '50%', display: 'inline-flex' },
   sesSecUst: { display: 'inline-flex', alignItems: 'center', gap: 5, height: 36, padding: '0 12px', borderRadius: 11, border: '1px solid #dbe3ee', background: '#fff', color: '#0b2a4a', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 },
   sesSecUstAcik: { background: '#0b2a4a', borderColor: '#0b2a4a', color: '#fff' },
-  sesPanel: { border: '1px solid #e6ecf3', borderRadius: 16, padding: 10, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 360, overflowY: 'auto' },
+  sesPanel: { border: '1px solid #e6ecf3', borderRadius: 16, padding: 10, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 460, overflowY: 'auto', WebkitOverflowScrolling: 'touch', scrollMarginTop: 80 },
+  panelOk: { background: '#f0fdf4', border: '1px solid #86efac', color: '#166534', borderRadius: 12, padding: '10px 12px', fontSize: 14, fontWeight: 600, lineHeight: 1.45 },
+  panelHata: { background: '#fef2f2', border: '1px solid #fca5a5', color: '#991b1b', borderRadius: 12, padding: '10px 12px', fontSize: 14, fontWeight: 600, lineHeight: 1.45 },
+  panelBekle: { background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1e3a8a', borderRadius: 12, padding: '10px 12px', fontSize: 14, fontWeight: 600, lineHeight: 1.45 },
   sesPanelBaslik: { fontSize: 13, fontWeight: 700, color: '#334155', padding: '2px 4px 4px' },
   sesSatir: { display: 'flex', alignItems: 'center', gap: 10, padding: '8px 8px', borderRadius: 12, background: '#f8fafc' },
   sesSatirSecili: { background: '#eff6ff', boxShadow: 'inset 0 0 0 1.5px #93c5fd' },
-  sesDinleBtn: { width: 36, height: 36, borderRadius: '50%', border: '1px solid #dbe3ee', background: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, padding: 0 },
+  sesDinleBtn: { width: 44, height: 44, borderRadius: '50%', border: '1px solid #dbe3ee', background: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, padding: 0 },
   sesAd: { fontSize: 14, fontWeight: 700, color: '#0b1730' },
   sesEtiket: { fontSize: 11.5, fontWeight: 600, color: '#64748b', marginLeft: 4 },
   sesSatirAlt: { fontSize: 12, color: '#64748b', marginTop: 1, lineHeight: 1.35 },
   onerilen: { marginLeft: 6, fontSize: 10.5, fontWeight: 800, color: '#15803d', background: '#dcfce7', borderRadius: 6, padding: '2px 6px', verticalAlign: 1 },
-  sesSecBtn: { border: 'none', background: '#0b2a4a', color: '#fff', borderRadius: 10, padding: '7px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 },
+  sesSecBtn: { border: 'none', background: '#0b2a4a', color: '#fff', borderRadius: 10, padding: '0 18px', minHeight: 44, fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 },
   sesSeciliYazi: { fontSize: 12.5, fontWeight: 700, color: '#1d4ed8', flexShrink: 0, paddingRight: 4 },
   kureMik: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', opacity: 0.9 },
   sohbetIpucu: { fontSize: 12.5, color: '#64748b', marginTop: -4 },

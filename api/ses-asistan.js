@@ -208,7 +208,9 @@ async function sesListesi(anahtar) {
   return sesler;
 }
 
+let sonSecimHata = null;
 async function sesSec(anahtar, { id, sahip, ad }) {
+  sonSecimHata = null;
   let sesId = id;
   if (sahip) {
     // Kütüphaneye ekle (ücretsiz planda yer az: önce eski ALKA seslerini temizle)
@@ -218,13 +220,24 @@ async function sesSec(anahtar, { id, sahip, ad }) {
     for (const v of (benim?.voices || [])) {
       if (/^ALKA/.test(v.name || '') && v.voice_id !== kullanilan) await el(anahtar, `/v1/voices/${v.voice_id}`, { method: 'DELETE' }).catch(() => {});
     }
-    const eklenen = await el(anahtar, `/v1/voices/add/${sahip}/${id}`, { method: 'POST', body: JSON.stringify({ new_name: `ALKA Ses - ${String(ad || 'Seçilen').slice(0, 30)}` }) });
-    sesId = eklenen?.voice_id || id;
+    try {
+      const eklenen = await el(anahtar, `/v1/voices/add/${sahip}/${id}`, { method: 'POST', body: JSON.stringify({ new_name: `ALKA Ses - ${String(ad || 'Seçilen').slice(0, 30)}` }) });
+      sesId = eklenen?.voice_id || id;
+    } catch (e) {
+      // Kütüphaneye eklenemezse (izin / ses sınırı) sesi doğrudan kimliğiyle dene
+      console.error('Ses kütüphaneye eklenemedi, doğrudan deneniyor:', e.message);
+      sonSecimHata = e.message;
+      sesId = id;
+    }
   }
   if (!onbellek) onbellek = await ajanHazirla(anahtar);
   const ayar = ajanAyari(sesId);
   const s = surum(ayar);
-  await el(anahtar, `/v1/convai/agents/${onbellek.ajanId}`, { method: 'PATCH', body: JSON.stringify({ ...ayar, tags: [s, SES_SURUM, 'secim'] }) });
+  try {
+    await el(anahtar, `/v1/convai/agents/${onbellek.ajanId}`, { method: 'PATCH', body: JSON.stringify({ ...ayar, tags: [s, SES_SURUM, 'secim'] }) });
+  } catch (e) {
+    throw new Error(sonSecimHata ? `${sonSecimHata} | ${e.message}` : e.message);
+  }
   onbellek = { ajanId: onbellek.ajanId, surum: s };
   return sesId;
 }
@@ -269,7 +282,12 @@ export default async function handler(req, res) {
       const sesId = await sesSec(anahtarS, b);
       return cevap(res, 200, { tamam: true, sesId });
     } catch (e) {
-      const mesaj = /moderation/i.test(e.message) ? 'Bu ses sesli asistanda kullanılamıyor (ElevenLabs kısıtı). Lütfen başka bir ses seç.' : 'Ses değiştirilemedi: ' + e.message;
+      console.error('Ses seçimi hatası:', e.message);
+      const m = e.message || '';
+      const mesaj = /moderation/i.test(m) ? 'Bu ses sesli asistanda kullanılamıyor (ElevenLabs kısıtı). Lütfen başka bir ses seç.'
+        : /permission|missing_permissions|voices_write|not_allowed|unauthorized/i.test(m) ? 'ElevenLabs anahtarının ses ekleme izni yok. Şimdilik "Uluslararası" işaretli seslerden birini seç.'
+        : /limit|quota|maximum|slots/i.test(m) ? 'ElevenLabs ücretsiz planda ses yeri dolu. Şimdilik "Uluslararası" işaretli seslerden birini seç.'
+        : 'Ses değiştirilemedi: ' + m.slice(0, 200);
       return cevap(res, 502, { hata: mesaj });
     }
   }
