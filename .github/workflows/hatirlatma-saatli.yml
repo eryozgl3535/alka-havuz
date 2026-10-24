@@ -1,0 +1,14 @@
+# Saatli hatırlatma bildirimleri: birkaç dakikada bir, saati gelmiş hatırlatmaları telefona bildirir.
+# (Vercel'in ücretsiz planında zamanlayıcı günde bir kez çalışabildiği için GitHub'ın ücretsiz zamanlayıcısı kullanılıyor.)
+name: Saatli hatırlatmalar
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch: {}
+jobs:
+  bildir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Saati gelen hatırlatmaları bildir
+        run: curl -fsS --max-time 60 "https://alka-tesisat.vercel.app/api/hatirlatma-bildirim?saatli=1"

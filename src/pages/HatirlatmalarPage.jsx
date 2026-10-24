@@ -20,7 +20,16 @@ function veriCoz(n) {
     tutar: v.tutar != null ? Number(v.tutar) : null,
     tekrar: v.tekrar || 'tek',
     aciklama: v.aciklama || '',
+    saat: v.saat || '',
   };
+}
+
+// iPhone/Android takvimine alarmlı etkinlik olarak ekleme linki (sunucu .ics dosyası üretir)
+function takvimLinki(v, musteri) {
+  const q = new URLSearchParams({ b: v.baslik || 'Hatırlatma', t: v.tarih || '', s: v.saat || '09:00', r: v.tekrar || 'tek' });
+  const ek = [v.tutar != null ? Number(v.tutar).toLocaleString('tr-TR') + ' TL' : '', musteri || '', v.aciklama || ''].filter(Boolean).join(' · ');
+  if (ek) q.set('a', ek);
+  return '/api/takvim?' + q.toString();
 }
 
 function tutarYaz(t) {
@@ -65,7 +74,7 @@ const TEKRARLAR = [
   { id: 'yillik', ad: 'Her yıl' },
 ];
 
-const bosForm = () => ({ baslik: '', tarih: yerel(new Date()), tutar: '', tekrar: 'tek', aciklama: '', customer_id: '' });
+const bosForm = () => ({ baslik: '', tarih: yerel(new Date()), saat: '09:00', tutar: '', tekrar: 'tek', aciklama: '', customer_id: '' });
 
 async function geminiAyristir(metin) {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
@@ -153,7 +162,7 @@ export default function HatirlatmalarPage({ ad }) {
     setHata('');
     if (x) {
       setDuzenlenenId(x.id);
-      setForm({ baslik: x.v.baslik, tarih: x.v.tarih || yerel(new Date()), tutar: x.v.tutar != null ? String(x.v.tutar) : '',
+      setForm({ baslik: x.v.baslik, tarih: x.v.tarih || yerel(new Date()), saat: x.v.saat || '09:00', tutar: x.v.tutar != null ? String(x.v.tutar) : '',
         tekrar: x.v.tekrar, aciklama: x.v.aciklama, customer_id: x.customer_id || '' });
     } else {
       setDuzenlenenId(null);
@@ -172,6 +181,7 @@ export default function HatirlatmalarPage({ ad }) {
       setForm({
         baslik: sonuc.baslik || '',
         tarih: sonuc.tarih || yerel(new Date()),
+        saat: sonuc.saat || '09:00',
         tutar: sonuc.tutar != null ? String(sonuc.tutar) : '',
         tekrar: sonuc.tekrar || 'tek',
         aciklama: '',
@@ -193,6 +203,7 @@ export default function HatirlatmalarPage({ ad }) {
     const icerik = JSON.stringify({
       baslik: form.baslik.trim(),
       tarih: form.tarih || null,
+      saat: /^\d{2}:\d{2}$/.test(form.saat || '') ? form.saat : null,
       tutar: form.tutar !== '' ? Number(String(form.tutar).replace(/[^\d]/g, '')) : null,
       tekrar: form.tekrar,
       aciklama: form.aciklama.trim(),
@@ -296,16 +307,18 @@ export default function HatirlatmalarPage({ ad }) {
           <input style={s.input} value={form.baslik} onChange={(e) => setForm({ ...form, baslik: e.target.value })}
             placeholder="Örn: Memur Baba Ahmet Bey ödemesi" />
           <div style={s.ikili}>
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ flex: 1.3, minWidth: 0 }}>
               <label style={s.etiket}>Tarih</label>
               <input style={s.input} type="date" value={form.tarih || ''} onChange={(e) => setForm({ ...form, tarih: e.target.value })} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <label style={s.etiket}>Tutar (₺)</label>
-              <input style={s.input} type="number" inputMode="numeric" value={form.tutar}
-                onChange={(e) => setForm({ ...form, tutar: e.target.value })} placeholder="30000" />
+              <label style={s.etiket}>Saat (bildirim)</label>
+              <input style={s.input} type="time" value={form.saat || ''} onChange={(e) => setForm({ ...form, saat: e.target.value })} />
             </div>
           </div>
+          <label style={s.etiket}>Tutar (₺)</label>
+          <input style={s.input} type="number" inputMode="numeric" value={form.tutar}
+            onChange={(e) => setForm({ ...form, tutar: e.target.value })} placeholder="30000" />
           <label style={s.etiket}>Tekrar</label>
           <div style={s.tekrarSatir}>
             {TEKRARLAR.map((t) => (
@@ -362,7 +375,7 @@ export default function HatirlatmalarPage({ ad }) {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ ...s.hatBaslik, ...(x.bitti ? { textDecoration: 'line-through' } : {}) }}>{x.v.baslik}</div>
               <div style={s.hatMeta}>
-                {x.v.tarih && <><Ikon ad="takvim" boyut={13} renk="#94a3b8" /><span>{tarihYaz(x.v.tarih)}</span></>}
+                {x.v.tarih && <><Ikon ad="takvim" boyut={13} renk="#94a3b8" /><span>{tarihYaz(x.v.tarih)}{x.v.saat ? ` · ${x.v.saat}` : ''}</span></>}
                 {x.v.tekrar && x.v.tekrar !== 'tek' && <span style={s.tekrarRozet}>🔁 {TEKRARLAR.find((t) => t.id === x.v.tekrar)?.ad}</span>}
                 {x.customers?.name && <span style={s.musteriRozet}>👤 {x.customers.name}</span>}
               </div>
@@ -370,6 +383,7 @@ export default function HatirlatmalarPage({ ad }) {
               {!x.bitti && (
                 <div style={s.islemler}>
                   <button style={s.islem} onClick={() => formAc(x)}>Düzenle</button>
+                  {x.v.tarih && <a style={{ ...s.islem, textDecoration: 'none' }} href={takvimLinki(x.v, x.customers?.name)} target="_blank" rel="noreferrer">Takvime ekle (alarm)</a>}
                   <button style={{ ...s.islem, color: '#b91c1c' }} onClick={() => sil(x)}>Sil</button>
                 </div>
               )}

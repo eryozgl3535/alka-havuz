@@ -1,6 +1,8 @@
 // Günlük hatırlatma bildirimi (telefon/bilgisayar bildirimi).
 // GET  → Vercel Cron her gün 10:00 ve 21:00'de (İstanbul) çağırır: bugünkü + gecikmiş hatırlatmaları tüm abone cihazlara yollar.
 // POST → { abonelik } ile sadece o cihaza deneme bildirimi yollar ("Bildirimleri aç" butonundan sonra).
+// GET ?saatli=1 → saati gelmiş hatırlatmaları TEK TEK, alarm gibi bildirir (her hatırlatma bir kez).
+//   Birkaç dakikada bir GitHub Actions zamanlayıcısı çağırır (.github/workflows/hatirlatma-saatli.yml).
 // Abonelikler her kullanıcının Supabase user_metadata.push listesinde tutulur (ayrı tablo gerekmez).
 import webpush from 'web-push';
 
@@ -24,6 +26,51 @@ async function govdeOku(req) {
 const bugunIstanbul = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' });
 const saatIstanbul = () => Number(new Date().toLocaleString('en-GB', { hour: '2-digit', hour12: false, timeZone: 'Europe/Istanbul' }));
 const tl = (n) => Number(n).toLocaleString('tr-TR') + ' ₺';
+const saatDakikaIstanbul = () => new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Europe/Istanbul' });
+
+// Tüm abone cihazlara yükü yollar; süresi dolan abonelikleri temizler
+async function herkeseGonder(url, basliklar, yuk) {
+  const ur = await fetch(`${url}/auth/v1/admin/users?page=1&per_page=1000`, { headers: basliklar });
+  const uv = ur.ok ? await ur.json() : {};
+  const kullanicilar = Array.isArray(uv) ? uv : (uv.users || []);
+  let gonderilen = 0;
+  for (const k of kullanicilar) {
+    const meta = k.user_metadata || {};
+    const abonelikler = Array.isArray(meta.push) ? meta.push : [];
+    if (!abonelikler.length) continue;
+    const kalan = [];
+    for (const a of abonelikler) {
+      try { await webpush.sendNotification(a, yuk, { urgency: 'high', TTL: 3600 }); gonderilen++; kalan.push(a); }
+      catch (e) { if (e.statusCode !== 404 && e.statusCode !== 410) kalan.push(a); }
+    }
+    if (kalan.length !== abonelikler.length) {
+      await fetch(`${url}/auth/v1/admin/users/${k.id}`, { method: 'PUT', headers: basliklar, body: JSON.stringify({ user_metadata: { ...meta, push: kalan } }) }).catch(() => {});
+    }
+  }
+  return gonderilen;
+}
+
+// Saati gelmiş hatırlatmalar: her biri ayrı, alarm gibi bildirim; bildirilince kayda işaret konur (tekrar gitmez)
+async function saatliGonder(url, basliklar) {
+  const hr = await fetch(`${url}/rest/v1/mesaj_kayitlari?tur=eq.hatirlatma&select=id,mesaj,customers(name)&limit=500`, { headers: basliklar });
+  const kayitlar = hr.ok ? await hr.json() : [];
+  const bugun = bugunIstanbul();
+  const simdi = saatDakikaIstanbul();
+  let gonderilen = 0, hatirlatma = 0;
+  for (const k of kayitlar) {
+    let v = {}; try { v = JSON.parse(k.mesaj || '{}'); } catch { continue; }
+    if (!v.saat || v.tarih !== bugun || v.saat > simdi) continue;
+    const anahtar = `${v.tarih} ${v.saat}`;
+    if (v.bildirildi === anahtar) continue;
+    // Önce işaretle (aynı anda iki çağrı gelirse çift bildirim olmasın)
+    const isaret = await fetch(`${url}/rest/v1/mesaj_kayitlari?id=eq.${k.id}`, { method: 'PATCH', headers: basliklar, body: JSON.stringify({ mesaj: JSON.stringify({ ...v, bildirildi: anahtar }) }) });
+    if (!isaret.ok) continue;
+    hatirlatma++;
+    const govde = [v.tutar != null ? tl(v.tutar) : '', k.customers?.name || '', v.aciklama || ''].filter(Boolean).join(' · ') || `Saat ${v.saat} hatırlatması`;
+    gonderilen += await herkeseGonder(url, basliklar, JSON.stringify({ baslik: `⏰ ${v.baslik || 'Hatırlatma'}`, govde, url: '/', etiket: `alka-hat-${k.id}`, alarm: true }));
+  }
+  return { hatirlatma, gonderilen, saat: simdi };
+}
 
 export default async function handler(req, res) {
   try {
@@ -43,14 +90,19 @@ export default async function handler(req, res) {
       return cevap(res, 200, { tamam: true });
     }
 
-    // Cron çağrısı: CRON_SECRET tanımlıysa doğrula
-    const gizli = process.env.CRON_SECRET;
-    if (gizli && req.headers.authorization !== `Bearer ${gizli}`) return cevap(res, 401, { hata: 'Yetkisiz' });
-
     const url = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '').replace(/\/$/, '');
     const anahtar = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !anahtar) return cevap(res, 500, { hata: 'Sunucu ayarları eksik.' });
     const basliklar = { apikey: anahtar, Authorization: `Bearer ${anahtar}`, 'Content-Type': 'application/json' };
+
+    // Saatli hatırlatmalar: sadece saati gelmiş ve henüz bildirilmemiş olanları yollar (tekrar çağrılması zararsız)
+    if (new URL(req.url || '/', 'http://x').searchParams.get('saatli')) {
+      return cevap(res, 200, await saatliGonder(url, basliklar));
+    }
+
+    // Günlük özet (Vercel Cron): CRON_SECRET tanımlıysa doğrula
+    const gizli = process.env.CRON_SECRET;
+    if (gizli && req.headers.authorization !== `Bearer ${gizli}`) return cevap(res, 401, { hata: 'Yetkisiz' });
 
     // 1) Açık hatırlatmalar
     const hr = await fetch(`${url}/rest/v1/mesaj_kayitlari?tur=eq.hatirlatma&select=id,mesaj,customers(name)&limit=500`, { headers: basliklar });
@@ -73,32 +125,8 @@ export default async function handler(req, res) {
       : `${geciken.length} gecikmiş hatırlatma`;
     const yuk = JSON.stringify({ baslik, govde: parcalar.join('\n'), url: '/' });
 
-    // 2) Abone cihazlar (kullanıcıların user_metadata.push listesi)
-    const ur = await fetch(`${url}/auth/v1/admin/users?page=1&per_page=1000`, { headers: basliklar });
-    const uv = ur.ok ? await ur.json() : {};
-    const kullanicilar = Array.isArray(uv) ? uv : (uv.users || []);
-
-    let gonderilen = 0;
-    for (const k of kullanicilar) {
-      const meta = k.user_metadata || {};
-      const abonelikler = Array.isArray(meta.push) ? meta.push : [];
-      if (!abonelikler.length) continue;
-      const kalan = [];
-      for (const a of abonelikler) {
-        try {
-          await webpush.sendNotification(a, yuk);
-          gonderilen++;
-          kalan.push(a);
-        } catch (e) {
-          if (e.statusCode !== 404 && e.statusCode !== 410) kalan.push(a); // süresi dolmuşları at
-        }
-      }
-      if (kalan.length !== abonelikler.length) {
-        await fetch(`${url}/auth/v1/admin/users/${k.id}`, {
-          method: 'PUT', headers: basliklar, body: JSON.stringify({ user_metadata: { ...meta, push: kalan } }),
-        }).catch(() => {});
-      }
-    }
+    // 2) Abone cihazlar
+    const gonderilen = await herkeseGonder(url, basliklar, yuk);
     return cevap(res, 200, { gonderilen, bugun: bugunku.length, geciken: geciken.length });
   } catch (e) {
     return cevap(res, 500, { hata: e?.message || 'Sunucu hatası' });

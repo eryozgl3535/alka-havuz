@@ -669,6 +669,10 @@ export default function SesliAsistan({ ad, onDegisti }) {
             {sohbet ? 'Sesli sohbet açık' : dusunuyor ? `${durumYazi || 'Düşünüyorum'}…` : 'Sor, söyle, kaydetsin'}
           </div>
         </div>
+        <button className="as-ikonbtn" style={{ ...s.sesSecUst, ...(sesPanel ? s.sesSecUstAcik : {}) }} onClick={sesPaneliAc}
+          aria-label="Asistanın sesini seç" aria-expanded={sesPanel}>
+          <Ikon ad="dalga" boyut={16} renk={sesPanel ? '#fff' : '#0b2a4a'} /> Ses
+        </button>
         <button className="as-ikonbtn" style={s.ikonBtn} onClick={sesDegis}
           title={sesAcik ? 'Yazılı cevapları sesli okuma: açık' : 'Yazılı cevapları sesli okuma: kapalı'}
           aria-label={sesAcik ? 'Sesli okumayı kapat' : 'Sesli okumayı aç'}>
@@ -699,15 +703,9 @@ export default function SesliAsistan({ ad, onDegisti }) {
         </button>
       ) : null}
 
-      {!sohbet && (
-        <button className="as-link" style={{ ...s.bildirimLink, margin: '-4px auto 10px' }} onClick={sesPaneliAc}>
-          <Ikon ad="sesAcik" boyut={14} renk="#2563eb" /> {sesPanel ? 'Ses seçimini kapat' : 'Asistanın sesini seç'}
-        </button>
-      )}
-
-      {sesPanel && !sohbet && (
+      {sesPanel && (
         <div style={s.sesPanel}>
-          <div style={s.sesPanelBaslik}>Bir sesi dinle, beğendiğini seç</div>
+          <div style={s.sesPanelBaslik}>Bir sesi dinle, beğendiğini seç{sohbet ? ' (yeni ses bir sonraki konuşmada geçerli)' : ''}</div>
           {sesler === null && <div style={s.sesSatirAlt}>Sesler yükleniyor…</div>}
           {sesler && sesler.length === 0 && <div style={s.sesSatirAlt}>Ses listesi alınamadı.</div>}
           {(sesler || []).map((v) => {
@@ -879,6 +877,8 @@ const s = {
   konusBaslik: { display: 'block', fontSize: 18, fontWeight: 800, letterSpacing: -0.2 },
   konusAlt: { display: 'block', fontSize: 13, opacity: 0.8, marginTop: 2 },
   kureBtn: { position: 'relative', border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', borderRadius: '50%', display: 'inline-flex' },
+  sesSecUst: { display: 'inline-flex', alignItems: 'center', gap: 5, height: 36, padding: '0 12px', borderRadius: 11, border: '1px solid #dbe3ee', background: '#fff', color: '#0b2a4a', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 },
+  sesSecUstAcik: { background: '#0b2a4a', borderColor: '#0b2a4a', color: '#fff' },
   sesPanel: { border: '1px solid #e6ecf3', borderRadius: 16, padding: 10, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 360, overflowY: 'auto' },
   sesPanelBaslik: { fontSize: 13, fontWeight: 700, color: '#334155', padding: '2px 4px 4px' },
   sesSatir: { display: 'flex', alignItems: 'center', gap: 10, padding: '8px 8px', borderRadius: 12, background: '#f8fafc' },

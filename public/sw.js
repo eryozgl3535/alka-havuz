@@ -10,8 +10,12 @@ self.addEventListener('push', (e) => {
     body: v.govde || '',
     icon: '/ikon-192.png',
     badge: '/ikon-192.png',
-    tag: 'alka-hatirlatma',
+    tag: v.etiket || 'alka-hatirlatma',
     renotify: true,
+    // Alarm gibi: ekranda kalır (destekleyen cihazlarda), titreşir, sessiz değildir
+    requireInteraction: !!v.alarm,
+    vibrate: v.alarm ? [500, 250, 500, 250, 900] : [200],
+    silent: false,
     data: { url: v.url || '/' },
   }));
 });

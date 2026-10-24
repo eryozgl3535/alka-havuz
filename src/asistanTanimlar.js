@@ -34,7 +34,7 @@ export const ARACLAR = [
     marka: str('Marka'), model: str('Model, güç, faz vb. serbest yazı'), konum: str('Nerede (bahçe, makine dairesi...)'),
   }, ['musteri_id', 'kategori', 'cihaz']) },
   { name: 'hatirlatma_ekle', description: 'Hatırlatma ekler (ödeme, tahsilat, arama, yapılacak iş). Günü gelince ana sayfada ve bildirimde çıkar.', parameters: S({
-    baslik: str('Kısa başlık, örn. "İhsan Köstekçi ödemesi"'), tarih: str('YYYY-MM-DD'), tutar: num('TL tutar (yoksa gönderme)'),
+    baslik: str('Kısa başlık, örn. "İhsan Köstekçi ödemesi"'), tarih: str('YYYY-MM-DD'), saat: str('Bildirim saati HH:MM (söylenmezse 09:00)'), tutar: num('TL tutar (yoksa gönderme)'),
     tekrar: en('Tekrar', ['tek', 'haftalik', 'aylik', 'yillik']), musteri_id: str('İlgili müşteri id (varsa)'), aciklama: str('Ek açıklama'),
   }, ['baslik', 'tarih']) },
   { name: 'hatirlatma_tamamla', description: 'Hatırlatmayı tamamlandı yapar (ödeme alındı, iş yapıldı). Tekrarlıysa bir sonraki tarihe kurar.', parameters: S({ id: str('Hatırlatma id') }, ['id']) },
@@ -83,6 +83,7 @@ UYGULAMAYA HÂKİMSİN
 - Firma verisiyle ilgili her soruda araçları kullan; tahmin etme, uydurma. Bulamazsan "kayıtlarda yok" de.
 - Bir şey yapmanı isterse ve bilgi yeterliyse ONAY SORMADAN yap, sonra tek cümleyle ne yaptığını söyle.
 - Müşteri id'sini aşağıdaki listeden bul; emin değilsen musteri_ara kullan. Yeni müşteri eklemeden önce listede aynı kişi var mı bak.
+- Hatırlatmada saat söylenirse ("öğleden sonra 3'te" → 15:00) saat alanına yaz; söylenmezse 09:00. O saatte telefona bildirim gider.
 - Tarih: "20'sinde" → bu ayın 20'si, geçtiyse gelecek ayın. "yarın", "cuma", "haftaya" bugüne göre. "30 bin" = 30000.
 - Birden fazla iş istenirse hepsini yap; araçları mümkünse aynı turda birlikte çağır.
 - SİLME: Not, hatırlatma/ödeme ve mesaj kaydı silebilirsin ama SADECE kayit_sil aracıyla. Önce notlar / hatirlatmalar / mesaj_gecmisi ile doğru kaydı bul; birden fazla aday varsa hangisi olduğunu sor. kayit_sil kaydı hemen silmez, kullanıcıdan onay ister: sen de "… siliniyor, emin misin?" diye sor. Kullanıcı onaylamadan ASLA "sildim" deme. Müşteri, iş emri, cihaz gibi diğer kayıtları silemezsin; onlar için ilgili sayfayı söyle.

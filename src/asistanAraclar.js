@@ -216,12 +216,13 @@ const CALISTIR = {
       geriAl: async () => hataVer((await supabase.from('equipment').delete().eq('id', data.id)).error) };
   },
 
-  async hatirlatma_ekle({ baslik, tarih, tutar, tekrar = 'tek', musteri_id, aciklama }, ctx) {
+  async hatirlatma_ekle({ baslik, tarih, saat, tutar, tekrar = 'tek', musteri_id, aciklama }, ctx) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(tarih || ''))) throw new Error('Tarih YYYY-MM-DD olmalı.');
-    const icerik = JSON.stringify({ baslik: String(baslik || 'Hatırlatma').trim(), tarih, tutar: tutar != null && tutar !== '' ? sayi(tutar) : null, tekrar: tekrar || 'tek', aciklama: String(aciklama || '').trim() });
+    const saatT = /^\d{1,2}:\d{2}$/.test(String(saat || '')) ? String(saat).padStart(5, '0') : '09:00';
+    const icerik = JSON.stringify({ baslik: String(baslik || 'Hatırlatma').trim(), tarih, saat: saatT, tutar: tutar != null && tutar !== '' ? sayi(tutar) : null, tekrar: tekrar || 'tek', aciklama: String(aciklama || '').trim() });
     const { data, error } = await supabase.from('mesaj_kayitlari').insert([{ tur: 'hatirlatma', kanal: 'hatirlatma', baslik: 'Hatırlatma', mesaj: icerik, gonderen: ctx.ad || '', customer_id: musteri_id || null }]).select('id').single();
     hataVer(error);
-    return { sonuc: { eklendi: true, id: data.id }, eylem: `Hatırlatma: ${baslik} · ${trTarih(tarih)}${tutar ? ' · ' + Number(sayi(tutar)).toLocaleString('tr-TR') + ' TL' : ''}`,
+    return { sonuc: { eklendi: true, id: data.id, bildirim_saati: saatT }, eylem: `Hatırlatma: ${baslik} · ${trTarih(tarih)} ${saatT}${tutar ? ' · ' + Number(sayi(tutar)).toLocaleString('tr-TR') + ' TL' : ''}`,
       geriAl: async () => hataVer((await supabase.from('mesaj_kayitlari').delete().eq('id', data.id)).error) };
   },
 
