@@ -16,7 +16,7 @@ import { Ikon } from '../ikonlar';
 //  - Geçmiş yüzünden hata olursa
 //    sadece son soruyla bir kez daha denenir (sunucu yoğunlukta kendisi bir kez daha dener).
 //  - Sesli okuma telefonun kendi sesiyle anında başlar (indirme yok, cızırtı yok, ses hep aynı).
-const VAPID_PUBLIC = 'BJUQaPBgiZZBfiwUVprGm_uZvvPJyL1O8LRkSB7SA9-5ZteuaLGbskvnKIZ4cGfyd7oZq4Ye7Ge_edz6pfKfT6I';
+const VAPID_PUBLIC = 'BEXI4-QmOdqpCT1FOuz5fO8hHVeCVuwSc2-W72LIMvuFJfj5cUnpf3twR9c-ypXrieq5aeeA1AkRRKDWMjqCpbY';
 const TUR_BITTI = 'hatirlatma-bitti';
 const AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 const GUNLER = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
@@ -43,6 +43,15 @@ function base64Uint8(b64) {
   return Uint8Array.from([...ham].map((c) => c.charCodeAt(0)));
 }
 
+// Abonelik bugünkü bildirim anahtarıyla mı yapılmış? (anahtar değişince eski abonelikler çalışmaz, yenilenmeli)
+function aboneAnahtariGuncel(abone) {
+  try {
+    const k = abone?.options?.applicationServerKey;
+    if (!k) return true;
+    const a = new Uint8Array(k), b = base64Uint8(VAPID_PUBLIC);
+    return a.length === b.length && a.every((x, i) => x === b[i]);
+  } catch { return true; }
+}
 const pushDestek = () => typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 const iosMu = () => typeof navigator !== 'undefined' && /iphone|ipad|ipod/i.test(navigator.userAgent);
 const yukluMu = () => typeof window !== 'undefined' && (window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true);
@@ -179,7 +188,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
       try {
         const kayit = await navigator.serviceWorker.getRegistration();
         const abone = kayit && await kayit.pushManager.getSubscription();
-        setBildirim(abone && Notification.permission === 'granted' ? 'acik' : 'kapali');
+        setBildirim(abone && Notification.permission === 'granted' && aboneAnahtariGuncel(abone) ? 'acik' : 'kapali');
       } catch { setBildirim('kapali'); }
     })();
   }, []);
@@ -199,6 +208,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
       if (!kayit) kayit = await navigator.serviceWorker.register('/sw.js');
       await navigator.serviceWorker.ready;
       let abone = await kayit.pushManager.getSubscription();
+      if (abone && !aboneAnahtariGuncel(abone)) { try { await abone.unsubscribe(); } catch { /* yok */ } abone = null; }
       if (!abone) abone = await kayit.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64Uint8(VAPID_PUBLIC) });
       const json = abone.toJSON();
       const { data } = await supabase.auth.getUser();

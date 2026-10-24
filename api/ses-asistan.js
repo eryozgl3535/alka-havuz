@@ -292,6 +292,21 @@ async function anaIslem(req, res) {
         d.dil = a?.conversation_config?.agent?.language; d.beyin = a?.conversation_config?.agent?.prompt?.llm;
         try { const v = await el(anahtar, `/v1/voices/${sesId}`); d.ses = { ad: v?.name, cinsiyet: v?.labels?.gender, aksan: v?.labels?.accent, dil: v?.labels?.language, kategori: v?.category, aciklama: (v?.description || '').slice(0, 160), kalite: v?.high_quality_base_model_ids, etiketler: (a?.tags || []).join(',') }; } catch { d.ses = { id: sesId }; }
       } catch (e) { d.ajanHata = e.message; }
+      // Son görüşmeler: ne kadar sürdü, neden bitti (sorun teşhisi)
+      try {
+        const g = await el(anahtar, `/v1/convai/conversations?agent_id=${onbellek?.ajanId || ''}&page_size=5`);
+        d.sonGorusmeler = [];
+        for (const c of (g?.conversations || []).slice(0, 5)) {
+          let ayrinti = null;
+          try { ayrinti = await el(anahtar, `/v1/convai/conversations/${c.conversation_id}`); } catch { /* yok */ }
+          d.sonGorusmeler.push({
+            zaman: new Date((c.start_time_unix_secs || 0) * 1000).toISOString(), sure: c.call_duration_secs, mesaj: c.message_count, durum: c.status,
+            bitis: c.termination_reason || ayrinti?.metadata?.termination_reason || null,
+            hata: ayrinti?.metadata?.error ? JSON.stringify(ayrinti.metadata.error).slice(0, 300) : null,
+            konusma: (ayrinti?.transcript || []).slice(0, 6).map((t) => `${t.role}: ${String(t.message || (t.tool_calls ? '[araç]' : '')).slice(0, 80)}`),
+          });
+        }
+      } catch (e) { d.gorusmeHata = e.message; }
     }
     return cevap(res, 200, d);
   }

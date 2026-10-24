@@ -6,7 +6,8 @@
 // Abonelikler her kullanıcının Supabase user_metadata.push listesinde tutulur (ayrı tablo gerekmez).
 import webpush from 'web-push';
 
-const VAPID_PUBLIC = 'BJUQaPBgiZZBfiwUVprGm_uZvvPJyL1O8LRkSB7SA9-5ZteuaLGbskvnKIZ4cGfyd7oZq4Ye7Ge_edz6pfKfT6I';
+// Genel anahtar (gizli değil). Gizli eşi Vercel'de VAPID_PRIVATE_KEY olarak durur.
+const VAPID_PUBLIC = (process.env.VAPID_PUBLIC_KEY || 'BEXI4-QmOdqpCT1FOuz5fO8hHVeCVuwSc2-W72LIMvuFJfj5cUnpf3twR9c-ypXrieq5aeeA1AkRRKDWMjqCpbY').trim();
 
 function cevap(res, kod, veri) {
   res.statusCode = kod;
