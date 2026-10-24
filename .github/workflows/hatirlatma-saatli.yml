@@ -11,4 +11,5 @@ jobs:
     timeout-minutes: 2
     steps:
       - name: Saati gelen hatırlatmaları bildir
-        run: curl -fsS --max-time 60 "https://alka-tesisat.vercel.app/api/hatirlatma-bildirim?saatli=1"
+        # Ayar eksikse bile iş "başarısız" olup her 5 dakikada e-posta atmasın; cevabı günlüğe yazar
+        run: curl -sS --max-time 60 "https://alka-tesisat.vercel.app/api/hatirlatma-bildirim?saatli=1" || true
