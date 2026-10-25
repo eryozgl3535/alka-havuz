@@ -220,13 +220,24 @@ export default function SesliAsistan({ ad, onDegisti }) {
       const { error } = await supabase.auth.updateUser({ data: { push: liste } });
       if (error) throw new Error(error.message);
       setBildirim('acik');
-      setBilgi('Deneme bildirimi 8 saniye içinde gelecek. İstersen telefonu kilitle, kilit ekranında görünecek…');
-      const r = await fetch('/api/hatirlatma-bildirim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ abonelik: json, gecikme: true }) });
+      setBilgi('Deneme bildirimi gönderiliyor…');
+      let r;
+      try {
+        r = await fetch('/api/hatirlatma-bildirim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ abonelik: json }) });
+      } catch {
+        // Bağlantı kesildi (iPhone'da "Load failed"): bir kez daha dene
+        await new Promise((x) => setTimeout(x, 1200));
+        r = await fetch('/api/hatirlatma-bildirim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ abonelik: json }) });
+      }
       const v = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(v.hata || 'Deneme bildirimi gönderilemedi.');
       setBilgi('Bildirimler açık ✅ Deneme bildirimi gönderildi. Saatli hatırlatmalar, saati gelince telefona bildirim olarak düşecek.');
     } catch (e) {
-      setHata('Bildirim açılamadı: ' + (e?.message || e));
+      const m = String(e?.message || e);
+      setBilgi('');
+      setHata(/load failed|failed to fetch|network/i.test(m)
+        ? 'Sunucuya ulaşılamadı (internet bağlantısı kesildi). Uygulama açıkken, ekranı kilitlemeden tekrar dene. VPN açıksa bir de VPN\'i kapatıp dene.'
+        : 'Bildirim açılamadı: ' + m);
     }
   }
 
