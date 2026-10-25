@@ -81,13 +81,14 @@ export default async function handler(req, res) {
 
     // Deneme bildirimi: sadece gönderilen cihaza
     if (req.method === 'POST') {
-      const { abonelik } = await govdeOku(req);
+      const { abonelik, gecikme } = await govdeOku(req);
       if (!abonelik?.endpoint) return cevap(res, 400, { hata: 'Abonelik yok.' });
+      if (gecikme) await new Promise((r) => setTimeout(r, 8000)); // telefonu kilitleyip görebilsin
       await webpush.sendNotification(abonelik, JSON.stringify({
-        baslik: 'ALKA bildirimleri açık ✅',
-        govde: 'Her gün 10:00 ve 21:00\'de o günün hatırlatmalarını buraya göndereceğim.',
-        url: '/',
-      }));
+        baslik: '⏰ ALKA deneme hatırlatması',
+        govde: 'Bildirimler çalışıyor. Hatırlatmaların saati gelince böyle gelecek.',
+        url: '/', etiket: 'alka-deneme', alarm: true,
+      }), { urgency: 'high', TTL: 3600 });
       return cevap(res, 200, { tamam: true });
     }
 

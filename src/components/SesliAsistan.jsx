@@ -220,10 +220,11 @@ export default function SesliAsistan({ ad, onDegisti }) {
       const { error } = await supabase.auth.updateUser({ data: { push: liste } });
       if (error) throw new Error(error.message);
       setBildirim('acik');
-      const r = await fetch('/api/hatirlatma-bildirim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ abonelik: json }) });
+      setBilgi('Deneme bildirimi 8 saniye içinde gelecek. İstersen telefonu kilitle, kilit ekranında görünecek…');
+      const r = await fetch('/api/hatirlatma-bildirim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ abonelik: json, gecikme: true }) });
       const v = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(v.hata || 'Deneme bildirimi gönderilemedi.');
-      setBilgi('Bildirimler açık. Her gün 10:00 ve 21:00\'de o günün hatırlatmaları gelecek. Bir deneme bildirimi gönderildi.');
+      setBilgi('Bildirimler açık ✅ Deneme bildirimi gönderildi. Saatli hatırlatmalar, saati gelince telefona bildirim olarak düşecek.');
     } catch (e) {
       setHata('Bildirim açılamadı: ' + (e?.message || e));
     }
@@ -826,9 +827,9 @@ export default function SesliAsistan({ ad, onDegisti }) {
         </form>
       )}
 
-      {!sohbet && bildirim === 'kapali' && (
+      {!sohbet && (bildirim === 'kapali' || bildirim === 'acik') && (
         <button className="as-link" style={s.bildirimLink} onClick={bildirimAc}>
-          <Ikon ad="zil" boyut={14} renk="#2563eb" /> Hatırlatmalar telefonuma bildirim olarak gelsin
+          <Ikon ad="zil" boyut={14} renk="#2563eb" /> {bildirim === 'acik' ? 'Bildirimler açık · Deneme bildirimi gönder' : 'Hatırlatmalar telefonuma bildirim olarak gelsin'}
         </button>
       )}
     </section>
