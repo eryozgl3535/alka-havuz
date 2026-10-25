@@ -12,4 +12,6 @@ jobs:
     steps:
       - name: Saati gelen hatırlatmaları bildir
         # Ayar eksikse bile iş "başarısız" olup her 5 dakikada e-posta atmasın; cevabı günlüğe yazar
-        run: curl -sS --max-time 60 "https://alka-tesisat.vercel.app/api/hatirlatma-bildirim?saatli=1" || true
+        run: |
+          out=$(curl -sS --max-time 60 "https://alka-tesisat.vercel.app/api/hatirlatma-bildirim?saatli=1" 2>&1 || true)
+          echo "::notice title=Sonuc::$out"
