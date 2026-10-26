@@ -64,6 +64,7 @@ const yukluMu = () => typeof window !== 'undefined' && (window.matchMedia?.('(di
 // iPhone'da ses ancak bir dokunuştan sonra açılır: ilk dokunuşta sessiz bir söz söyletilir.
 let sesKilidiAcik = false;
 function sesKilidiAc() {
+  azureKilidiAc();
   if (sesKilidiAcik || typeof window === 'undefined' || !window.speechSynthesis) return;
   sesKilidiAcik = true;
   try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; window.speechSynthesis.speak(u); } catch { /* yok */ }
@@ -86,8 +87,24 @@ if (typeof window !== 'undefined' && window.speechSynthesis) {
   try { sesSec(); window.speechSynthesis.addEventListener?.('voiceschanged', sesSec); } catch { /* yok */ }
 }
 
+// Azure doğal ses (varsa): Web Audio ile çalınır; iPhone'da ilk dokunuşta kilidi açılır, sonra hep açık kalır
+let azureYok = false;
+let azureAC = null;
+let azureKaynak = null;
+function azureKilidiAc() {
+  if (typeof window === 'undefined' || azureYok) return;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    if (!azureAC) azureAC = new AC();
+    azureAC.resume?.();
+    const k = azureAC.createBufferSource(); k.buffer = azureAC.createBuffer(1, 1, 22050); k.connect(azureAC.destination); k.start(0);
+  } catch { /* yok */ }
+}
+
 function sesiSustur() {
   try { window.speechSynthesis?.cancel(); } catch { /* yok */ }
+  try { azureKaynak?.stop(); } catch { /* yok */ }
 }
 
 // Uzun metni cümlelere böler (bazı tarayıcılar uzun konuşmayı yarıda kesiyor)
@@ -261,8 +278,43 @@ export default function SesliAsistan({ ad, onDegisti }) {
   // Sesle sorulan soruya her zaman sesli cevap verilir; yazıyla sorulanda hoparlör düğmesine bakılır.
   function konus(metin, zorla) {
     if (canliRef.current) return; // canlı görüşmede sesi ElevenLabs veriyor
+    if ((!sesAcik && !zorla) || !metin) { sonraDinle(); return; }
+    if (!azureYok && azureAC) { azureIleKonus(metin); return; }
+    cihazIleKonus(metin);
+  }
+
+  // Microsoft Azure doğal sesiyle oku; olmazsa telefonun sesine düş
+  async function azureIleKonus(metin) {
+    setKonusuyor(true);
+    let bitti = false;
+    const devam = () => { if (bitti) return; bitti = true; sonraDinle(); };
+    try {
+      const r = await fetch('/api/ses-oku', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ metin }) });
+      if (!r.ok) {
+        const v = await r.json().catch(() => ({}));
+        if (v.kod === 'yok' || v.kod === 'anahtar') azureYok = true;
+        throw new Error(v.hata || 'Azure sesi yok');
+      }
+      const ac = azureAC;
+      if (ac.state === 'suspended') await ac.resume().catch(() => {});
+      const veri = await ac.decodeAudioData(await r.arrayBuffer());
+      try { azureKaynak?.stop(); } catch { /* yok */ }
+      const k = ac.createBufferSource();
+      k.buffer = veri; k.connect(ac.destination);
+      azureKaynak = k;
+      const emniyet = setTimeout(devam, Math.min(60000, veri.duration * 1000 + 1500));
+      k.onended = () => { clearTimeout(emniyet); if (azureKaynak === k) azureKaynak = null; devam(); };
+      k.start(0);
+    } catch (e) {
+      console.warn('Azure ses kullanılamadı, telefon sesi:', e?.message);
+      bitti = true;
+      cihazIleKonus(metin);
+    }
+  }
+
+  function cihazIleKonus(metin) {
     const ss = typeof window !== 'undefined' ? window.speechSynthesis : null;
-    if ((!sesAcik && !zorla) || !metin || !ss) { sonraDinle(); return; }
+    if (!ss) { sonraDinle(); return; }
     setKonusuyor(true);
     try {
       ss.cancel();
