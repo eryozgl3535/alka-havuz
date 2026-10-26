@@ -1,0 +1,16 @@
+# Elle çalıştırılan teşhis: uygulamanın bir teşhis adresini çağırıp sonucu not olarak yazar
+name: Teshis
+on:
+  workflow_dispatch:
+    inputs:
+      yol:
+        description: 'Adres yolu, örn. /api/ses-asistan?durum=1'
+        required: true
+jobs:
+  bak:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: |
+          out=$(curl -sS --max-time 60 "https://alka-tesisat.vercel.app${{ inputs.yol }}" 2>&1 | head -c 3500 | tr '\n' ' ' || true)
+          echo "::notice title=Sonuc::$out"
