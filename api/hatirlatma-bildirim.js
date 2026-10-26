@@ -100,7 +100,7 @@ export default async function handler(req, res) {
     // Saatli hatırlatmalar: sadece saati gelmiş ve henüz bildirilmemiş olanları yollar (tekrar çağrılması zararsız)
     if (new URL(req.url || '/', 'http://x').searchParams.get('teshis')) {
       // Teşhis: son hatırlatmaların saati ve bildirilip bildirilmediği + abone cihaz sayısı (başlık yok)
-      const hr = await fetch(`${url}/rest/v1/mesaj_kayitlari?tur=eq.hatirlatma&select=id,mesaj,created_at&order=created_at.desc&limit=8`, { headers: basliklar });
+      const hr = await fetch(`${url}/rest/v1/mesaj_kayitlari?tur=like.hatirlatma*&select=id,tur,mesaj,created_at&order=created_at.desc&limit=8`, { headers: basliklar });
       const kayit = hr.ok ? await hr.json() : [];
       const ur = await fetch(`${url}/auth/v1/admin/users?page=1&per_page=1000`, { headers: basliklar });
       const uv = ur.ok ? await ur.json() : {};
@@ -108,7 +108,7 @@ export default async function handler(req, res) {
       return cevap(res, 200, {
         simdi: `${bugunIstanbul()} ${saatDakikaIstanbul()}`,
         aboneler: ku.map((k) => ({ cihaz: (k.user_metadata?.push || []).map((a) => String(a.endpoint || '').split('/')[2]) })).filter((x) => x.cihaz.length),
-        hatirlatmalar: kayit.map((k) => { let v = {}; try { v = JSON.parse(k.mesaj || '{}'); } catch { /* yok */ } return { olusturma: k.created_at, tarih: v.tarih, saat: v.saat, tamam: v.tamamlandi || v.durum, bildirildi: v.bildirildi || null, tekrar: v.tekrar }; }),
+        hatirlatmalar: kayit.map((k) => { let v = {}; try { v = JSON.parse(k.mesaj || '{}'); } catch { /* yok */ } return { tur: k.tur, olusturma: k.created_at, tarih: v.tarih, saat: v.saat, tamam: v.tamamlandi || v.durum, bildirildi: v.bildirildi || null, tekrar: v.tekrar }; }),
       });
     }
     if (new URL(req.url || '/', 'http://x').searchParams.get('saatli')) {
