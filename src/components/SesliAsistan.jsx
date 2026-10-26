@@ -346,6 +346,13 @@ export default function SesliAsistan({ ad, onDegisti }) {
         onDisconnect: (d) => {
           canliRef.current = null;
           // WebRTC bağlantısı koptuysa (mobil ağ/VPN) sohbeti bitirme: websocket ile sessizce yeniden bağlan
+          if (d?.reason === 'error' && /quota|credit/i.test(String(d?.message || '')) && sohbetRef.current) {
+            setCanli('yok');
+            setBilgi('Doğal sesin bu ayki ücretsiz hakkı bitti. Telefonun kendi sesiyle devam ediyorum.');
+            const isim = String(ad || '').split(' ')[0];
+            asistanDer(`Buyur${isim ? ' ' + isim : ''}, dinliyorum.`);
+            return;
+          }
           if (d?.reason === 'error' && tur === 'webrtc' && sohbetRef.current) {
             webrtcKotu.current = true;
             setCanli('baglaniyor');
@@ -374,7 +381,9 @@ export default function SesliAsistan({ ad, onDegisti }) {
     } catch (e) {
       canliRef.current = null;
       setCanli('yok');
-      if (e?.kod === 'anahtar-yok') {
+      if (e?.kod === 'kota') {
+        setBilgi('Doğal sesin (ElevenLabs) bu ayki ücretsiz hakkı bitti. Şimdilik telefonun kendi sesiyle konuşuyorum, her şey aynı çalışıyor.');
+      } else if (e?.kod === 'anahtar-yok') {
         setBilgi('Doğal ses henüz açık değil: ElevenLabs anahtarı Vercel ayarlarına eklenmemiş. Şimdilik telefonun sesiyle devam ediyorum.');
       } else {
         const izin = /permission|notallowed|denied/i.test(String(e?.name || '') + String(e?.message || ''));

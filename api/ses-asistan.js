@@ -330,6 +330,13 @@ async function anaIslem(req, res) {
   }
   if (!anahtar) return cevap(res, 503, { hata: 'Sesli asistan anahtarı Vercel ayarlarında yok (ELEVENLABS_API_KEY).', kod: 'anahtar-yok' });
   try {
+    // Ücretsiz hak bittiyse hiç bağlanmaya çalışma: tarayıcı telefonun sesine geçsin
+    try {
+      const u = await el(anahtar, '/v1/user/subscription');
+      if (u?.character_limit && u.character_count >= u.character_limit) {
+        return cevap(res, 503, { hata: 'Doğal sesin bu ayki ücretsiz hakkı bitti.', kod: 'kota', yenilenme: u.next_character_count_reset_unix || null });
+      }
+    } catch { /* kontrol edilemezse normal devam */ }
     const guncel = surum(ajanAyari('x'));
     if (!onbellek || onbellek.surum !== guncel) onbellek = await ajanHazirla(anahtar);
     let link;
