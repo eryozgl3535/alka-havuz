@@ -325,6 +325,23 @@ async function anaIslem(req, res) {
           });
         }
       } catch (e) { d.gorusmeHata = e.message; }
+      // ?harcama=1 → tüm görüşmelerin süresi ve kredi maliyeti (kredinin nereye gittiği)
+      if (/[?&]harcama=/.test(req.url || '')) {
+        try {
+          const tum = []; let imlec = null;
+          for (let i = 0; i < 4; i++) {
+            const g = await el(anahtar, `/v1/convai/conversations?agent_id=${onbellek?.ajanId || ''}&page_size=100${imlec ? '&cursor=' + imlec : ''}`);
+            tum.push(...(g?.conversations || [])); imlec = g?.next_cursor; if (!g?.has_more || !imlec) break;
+          }
+          const satir = [];
+          for (const c of tum) {
+            let a = null; try { a = await el(anahtar, `/v1/convai/conversations/${c.conversation_id}`); } catch { /* yok */ }
+            satir.push(`${new Date((c.start_time_unix_secs || 0) * 1000 + 3 * 3600000).toISOString().slice(5, 16)} ${c.call_duration_secs}sn ${a?.metadata?.cost ?? '?'}kr`);
+          }
+          d.harcama = { adet: tum.length, toplamSn: tum.reduce((t, c) => t + (c.call_duration_secs || 0), 0), satir };
+          delete d.sonGorusmeler;
+        } catch (e) { d.harcamaHata = e.message; }
+      }
     }
     return cevap(res, 200, d);
   }
