@@ -154,6 +154,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
   const [seciliAd, setSeciliAd] = useState('');
   const [panelMesaj, setPanelMesaj] = useState(null); // { tur: 'ok' | 'hata', yazi }
   const panelRef = useRef(null);
+  const webrtcKotu = useRef(false); // bu oturumda WebRTC koptuysa bir daha deneme, websocket kullan
   const [seciliSes, setSeciliSes] = useState(null);
   const [sesIslem, setSesIslem] = useState('');    // çalan ya da seçilen sesin id'si
   const dinletici = useRef(null);
@@ -316,8 +317,9 @@ export default function SesliAsistan({ ad, onDegisti }) {
     return tools;
   }
 
-  async function canliBaslat() {
+  async function canliBaslat(sadeceWs = false) {
     setCanli('baglaniyor');
+    let tur = 'websocket';
     let v = {};
     try {
       const r = await fetch('/api/ses-asistan', { method: 'POST' });
@@ -343,19 +345,29 @@ export default function SesliAsistan({ ad, onDegisti }) {
         onModeChange: ({ mode }) => setCanli(mode === 'speaking' ? 'konusuyor' : 'dinliyor'),
         onDisconnect: (d) => {
           canliRef.current = null;
+          // WebRTC bağlantısı koptuysa (mobil ağ/VPN) sohbeti bitirme: websocket ile sessizce yeniden bağlan
+          if (d?.reason === 'error' && tur === 'webrtc' && sohbetRef.current) {
+            webrtcKotu.current = true;
+            setCanli('baglaniyor');
+            canliBaslat(true).then((ok) => {
+              if (ok !== true) { sohbetRef.current = false; setSohbet(false); setCanli('yok'); setHata('Sesli görüşme koptu. İnternet bağlantını kontrol edip tekrar Konuş\'a bas.'); }
+            });
+            return;
+          }
           setCanli('yok');
           sohbetRef.current = false;
           setSohbet(false);
-          if (d?.reason === 'error') setHata('Sesli görüşme koptu: ' + (d.message || 'bağlantı hatası'));
+          if (d?.reason === 'error') setHata('Sesli görüşme koptu. İnternet bağlantını kontrol edip tekrar Konuş\'a bas.');
         },
         onError: (mesaj) => { if (mesaj) setHata(String(mesaj)); },
       };
       // WebRTC: telefonun yankı engellemesi devrede, ses daha temiz; olmazsa websocket
       let conv;
-      if (v.token) {
-        try { conv = await Conversation.startSession({ ...ortak, conversationToken: v.token, connectionType: 'webrtc' }); } catch (e) { console.warn('WebRTC açılamadı, websocket deneniyor', e); }
+      if (v.token && !sadeceWs && !webrtcKotu.current) {
+        tur = 'webrtc';
+        try { conv = await Conversation.startSession({ ...ortak, conversationToken: v.token, connectionType: 'webrtc' }); } catch (e) { console.warn('WebRTC açılamadı, websocket deneniyor', e); webrtcKotu.current = true; }
       }
-      if (!conv) conv = await Conversation.startSession({ ...ortak, signedUrl: v.signedUrl, connectionType: 'websocket' });
+      if (!conv) { tur = 'websocket'; conv = await Conversation.startSession({ ...ortak, signedUrl: v.signedUrl, connectionType: 'websocket' }); }
       canliRef.current = conv;
       setCanli('dinliyor');
       return true;
