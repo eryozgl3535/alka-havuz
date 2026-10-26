@@ -9,6 +9,7 @@ const en = (description, list) => ({ type: 'STRING', description, enum: list });
 
 export const ARACLAR = [
   // --- okuma
+  { name: 'saat_kac', description: 'Şu anki tarih, gün ve saat (İstanbul). Saat, tarih, "kaçta", "ne kadar kaldı" gibi sorularda ve saate göre hatırlatma kurarken MUTLAKA kullan; saati asla tahmin etme.' },
   { name: 'genel_ozet', description: 'Firmanın anlık durumu: müşteri sayısı, bugünkü ve bekleyen iş emirleri, gecikmiş ve yaklaşan bakımlar, açık hatırlatmalar, tahsil edilmemiş alacak. "Bugün ne var", "durum ne" gibi sorularda kullan.' },
   { name: 'musteri_ara', description: 'Ad, telefon veya adresin bir parçasıyla müşteri arar; cihazlarını da getirir.', parameters: S({ sorgu: str('Aranacak metin, örn. "Köstekçi", "0532", "Alaçatı"') }, ['sorgu']) },
   { name: 'musteri_detay', description: 'Bir müşterinin her şeyi: iletişim, cihazlar, bakım takvimi, son iş emirleri, açık hatırlatmalar, notlar, gelişler.', parameters: S({ musteri_id: str('Müşteri id') }, ['musteri_id']) },
@@ -56,7 +57,7 @@ export const ARACLAR = [
 // Asistanın talimatı. Yazılı asistan gerçek değerlerle, sesli canlı asistan {{değişken}} yer tutucularla çağırır.
 export function promptOlustur({ kullanici, hitap, bugun, musteriListesi, sesli }) {
   return `Sen ALKA Mekanik ve Havuz Sistemleri'nin asistanısın. ALKA, Çeşme/İzmir'de yazlık villalara havuz, kuyu pompası, hidrofor, sulama, tesisat ve elektrik bakım-servisi yapan bir firma. Bu uygulama firmanın iş takip sistemi; sen de içindeki verilere erişen bir çalışma arkadaşısın.
-Konuştuğun kişi: ${kullanici} (ona "${hitap}" de). Bugün: ${bugun}. Saat dilimi İstanbul.
+Konuştuğun kişi: ${kullanici} (ona "${hitap}" de). Bugün: ${bugun}. Saat dilimi İstanbul. Saati sorarlarsa ya da "1 saat sonra", "akşam 6'da" gibi saate bağlı bir şey derlerse önce saat_kac aracını çağır; saati asla tahmin etme, "bilmiyorum" deme.
 
 UYGULAMADAKİ KAVRAMLAR
 - Müşteri: villa sahibi ya da site (ad, telefon, adres/bölge: Alaçatı, Ilıca, Reisdere, Dalyan vb.).
@@ -65,7 +66,7 @@ UYGULAMADAKİ KAVRAMLAR
 - İş emri: yapılacak somut iş (arıza, montaj, bakım ziyareti); durumu bekliyor / başladı / tamamlandı; işçilik ve tahsilat tutulur.
 - Hatırlatma: tarihli hatırlatma, çoğunlukla ödeme/tahsilat ("X'in 20'sinde 30 bin ödemesi var"); tekrarlı olabilir.
 - Not: ekibin ortak not defteri. Geliş: yazlıkçının villaya geliş tarihi; öncesinde hazırlık işi açılır.
-- Araçların: genel_ozet (bugün/durum), musteri_ara, musteri_detay, is_emirleri, bakimlar, hatirlatmalar, gelisler, notlar; kayıt için musteri_ekle/guncelle, cihaz_ekle, hatirlatma_ekle/tamamla, is_emri_ac/guncelle, tahsilat_ekle, not_ekle, gelis_ekle.
+- Araçların: saat_kac (şu anki saat), genel_ozet (bugün/durum), musteri_ara, musteri_detay, is_emirleri, bakimlar, hatirlatmalar, gelisler, notlar; kayıt için musteri_ekle/guncelle, cihaz_ekle, hatirlatma_ekle/tamamla, is_emri_ac/guncelle, tahsilat_ekle, not_ekle, gelis_ekle.
 
 NASIL KONUŞURSUN
 - ${sesli ? 'Cevabın sesli okunuyor: EN FAZLA 1-2 KISA CÜMLE. Liste yok, giriş cümlesi yok, tekrar yok. Bir sayı ya da isim yeterliyse sadece onu söyle.' : 'Cevap ekranda okunuyor: kısa ve net; en fazla birkaç satır.'}

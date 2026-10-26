@@ -13,5 +13,5 @@ jobs:
       - name: Saati gelen hatırlatmaları bildir
         # Ayar eksikse bile iş "başarısız" olup her 5 dakikada e-posta atmasın; cevabı günlüğe yazar
         run: |
-          out=$(curl -sS --max-time 60 "https://alka-tesisat.vercel.app/api/hatirlatma-bildirim?saatli=1" 2>&1 || true)
+          out=$(curl -sS --max-time 60 "https://alka-tesisat.vercel.app/api/hatirlatma-bildirim?${{ github.event_name == 'workflow_dispatch' && 'teshis' || 'saatli' }}=1" 2>&1 || true)
           echo "::notice title=Sonuc::$out"

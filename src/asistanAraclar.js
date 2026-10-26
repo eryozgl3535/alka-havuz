@@ -38,6 +38,15 @@ async function musteriAdi(id) {
 const cihazYazi = (e) => [e.equipment_type || e.category, e.brand, e.model].filter(Boolean).join(' · ');
 
 const CALISTIR = {
+  async saat_kac() {
+    const n = new Date();
+    const z = { timeZone: 'Europe/Istanbul' };
+    return {
+      saat: n.toLocaleTimeString('tr-TR', { ...z, hour: '2-digit', minute: '2-digit' }),
+      tarih: n.toLocaleDateString('en-CA', z),
+      gun: n.toLocaleDateString('tr-TR', { ...z, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+    };
+  },
   async genel_ozet() {
     const b = bugun(), ileri = gunEkle(b, 14);
     const [m, isler, bakim, hat] = await Promise.all([
