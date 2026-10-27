@@ -98,14 +98,6 @@ export default async function handler(req, res) {
     const basliklar = { apikey: anahtar, Authorization: `Bearer ${anahtar}`, 'Content-Type': 'application/json' };
 
     // Saatli hatırlatmalar: sadece saati gelmiş ve henüz bildirilmemiş olanları yollar (tekrar çağrılması zararsız)
-    // GEÇİCİ uçtan uca deneme: 2 dakika sonrasına "Deneme alarmı" kurar (test bitince kaldırılacak)
-    if (new URL(req.url || '/', 'http://x').searchParams.get('denemekur') === 'alka-2710b') {
-      const t = new Date(Date.now() + 2 * 60000);
-      const saat = t.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Europe/Istanbul' });
-      const mesaj = JSON.stringify({ baslik: 'Deneme alarmı 2 (Claude testi)', tarih: bugunIstanbul(), saat, tekrar: 'tek', aciklama: 'Zamanlayıcı testi' });
-      const r = await fetch(`${url}/rest/v1/mesaj_kayitlari`, { method: 'POST', headers: { ...basliklar, Prefer: 'return=representation' }, body: JSON.stringify([{ tur: 'hatirlatma', kanal: 'hatirlatma', baslik: 'Hatırlatma', mesaj, gonderen: 'Claude' }]) });
-      return cevap(res, r.ok ? 200 : 500, { durum: r.status, saat });
-    }
     if (new URL(req.url || '/', 'http://x').searchParams.get('teshis')) {
       // Teşhis: son hatırlatmaların saati ve bildirilip bildirilmediği + abone cihaz sayısı (başlık yok)
       const hr = await fetch(`${url}/rest/v1/mesaj_kayitlari?tur=like.hatirlatma*&select=id,tur,mesaj,created_at&order=created_at.desc&limit=8`, { headers: basliklar });
