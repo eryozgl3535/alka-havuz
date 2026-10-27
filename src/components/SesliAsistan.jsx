@@ -98,6 +98,7 @@ const AZURE_SESLER = [
 const azureSesiOku = () => { try { return localStorage.getItem('alka-azure-ses') || AZURE_SESLER[0].id; } catch { return AZURE_SESLER[0].id; } };
 let azureAC = null;
 let azureKaynak = null;
+let azureNesil = 0; // susturulunca artar: sıradaki cümleler çalınmaz
 function azureKilidiAc() {
   if (typeof window === 'undefined' || azureYok) return;
   try {
@@ -111,6 +112,7 @@ function azureKilidiAc() {
 
 function sesiSustur() {
   try { window.speechSynthesis?.cancel(); } catch { /* yok */ }
+  azureNesil++;
   try { azureKaynak?.stop(); } catch { /* yok */ }
 }
 
@@ -162,6 +164,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
   const [yaziMetin, setYaziMetin] = useState('');
   const [dusunuyor, setDusunuyor] = useState(false);
   const [konusuyor, setKonusuyor] = useState(false);
+  const [azureSes, setAzureSes] = useState(azureSesiOku);
   const [sesAcik, setSesAcik] = useState(() => { try { return localStorage.getItem('alkaAsistanSes') !== '0'; } catch { return true; } });
   const [hata, setHata] = useState('');
   const [bildirim, setBildirim] = useState('bilinmiyor'); // bilinmiyor | acik | kapali | desteklenmiyor
@@ -295,25 +298,39 @@ export default function SesliAsistan({ ad, onDegisti }) {
     setKonusuyor(true);
     let bitti = false;
     const devam = () => { if (bitti) return; bitti = true; sonraDinle(); };
+    const ac = azureAC;
+    const nesil = ++azureNesil;
+    // Cümleler aynı anda hazırlanır, ilki gelir gelmez çalmaya başlar (uzun cevaplarda bekleme olmaz)
+    const parcalar = cumleler(metin);
+    const hazirla = (c) => fetch('/api/ses-oku', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ metin: c, ses: azureSesiOku() }) })
+      .then(async (r) => {
+        if (!r.ok) {
+          const v = await r.json().catch(() => ({}));
+          if (v.kod === 'yok' || v.kod === 'anahtar') azureYok = true;
+          throw new Error(v.hata || 'Azure sesi yok');
+        }
+        return ac.decodeAudioData(await r.arrayBuffer());
+      });
+    const sozler = parcalar.map(hazirla);
+    sozler.forEach((p) => p.catch(() => {}));
     try {
-      const r = await fetch('/api/ses-oku', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ metin, ses: azureSesiOku() }) });
-      if (!r.ok) {
-        const v = await r.json().catch(() => ({}));
-        if (v.kod === 'yok' || v.kod === 'anahtar') azureYok = true;
-        throw new Error(v.hata || 'Azure sesi yok');
-      }
-      const ac = azureAC;
       if (ac.state === 'suspended') await ac.resume().catch(() => {});
-      const veri = await ac.decodeAudioData(await r.arrayBuffer());
-      try { azureKaynak?.stop(); } catch { /* yok */ }
-      const k = ac.createBufferSource();
-      k.buffer = veri; k.connect(ac.destination);
-      azureKaynak = k;
-      const emniyet = setTimeout(devam, Math.min(60000, veri.duration * 1000 + 1500));
-      k.onended = () => { clearTimeout(emniyet); if (azureKaynak === k) azureKaynak = null; devam(); };
-      k.start(0);
+      for (let i = 0; i < sozler.length; i++) {
+        const veri = await sozler[i];
+        if (bitti || nesil !== azureNesil) break;
+        await new Promise((tamam) => {
+          const k = ac.createBufferSource();
+          k.buffer = veri; k.connect(ac.destination);
+          azureKaynak = k;
+          const emniyet = setTimeout(tamam, veri.duration * 1000 + 1500);
+          k.onended = () => { clearTimeout(emniyet); if (azureKaynak === k) azureKaynak = null; tamam(); };
+          k.start(0);
+        });
+      }
+      devam();
     } catch (e) {
       console.warn('Azure ses kullanılamadı, telefon sesi:', e?.message);
+      if (bitti) return;
       bitti = true;
       cihazIleKonus(metin);
     }
@@ -662,7 +679,9 @@ export default function SesliAsistan({ ad, onDegisti }) {
     setDusunuyor(true);
     setDurumYazi('Düşünüyorum');
     const eylemler = [];
-    const soru = notRef.current + t;
+    // Gerçek saat her mesajla gider: yapay zekâ saati sormak için ayrıca araç çağırmaz (daha hızlı)
+    const saatSimdi = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul' });
+    const soru = `[saat ${saatSimdi}] ` + notRef.current + t;
     notRef.current = '';
     try {
       const sistem = sistemMetni(musteriler, ad, sohbetRef.current);
@@ -795,10 +814,14 @@ export default function SesliAsistan({ ad, onDegisti }) {
             {sohbet ? 'Sesli sohbet açık' : dusunuyor ? `${durumYazi || 'Düşünüyorum'}…` : 'Sor, söyle, kaydetsin'}
           </div>
         </div>
-        <button className="as-ikonbtn" style={{ ...s.sesSecUst, ...(sesPanel ? s.sesSecUstAcik : {}) }} onClick={sesPaneliAc}
-          aria-label="Asistanın sesini seç" aria-expanded={sesPanel}>
-          <Ikon ad="dalga" boyut={16} renk={sesPanel ? '#fff' : '#0b2a4a'} /> Ses
-        </button>
+        <div style={s.sesSecim} role="group" aria-label="Asistanın sesi">
+          {AZURE_SESLER.map((v) => (
+            <button key={v.id} type="button" onClick={() => { try { localStorage.setItem('alka-azure-ses', v.id); } catch { /* yok */ } setAzureSes(v.id); }}
+              style={{ ...s.sesSecimBtn, ...(azureSes === v.id ? s.sesSecimAktif : {}) }} aria-pressed={azureSes === v.id}>
+              {v.ad}
+            </button>
+          ))}
+        </div>
         <button className="as-ikonbtn" style={s.ikonBtn} onClick={sesDegis}
           title={sesAcik ? 'Yazılı cevapları sesli okuma: açık' : 'Yazılı cevapları sesli okuma: kapalı'}
           aria-label={sesAcik ? 'Sesli okumayı kapat' : 'Sesli okumayı aç'}>
@@ -1009,6 +1032,9 @@ const s = {
   konusBaslik: { display: 'block', fontSize: 18, fontWeight: 800, letterSpacing: -0.2 },
   konusAlt: { display: 'block', fontSize: 13, opacity: 0.8, marginTop: 2 },
   kureBtn: { position: 'relative', border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', borderRadius: '50%', display: 'inline-flex' },
+  sesSecim: { display: 'inline-flex', padding: 3, borderRadius: 12, background: '#eef2f7', flexShrink: 0 },
+  sesSecimBtn: { border: 'none', background: 'transparent', color: '#64748b', height: 32, padding: '0 12px', borderRadius: 9, fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' },
+  sesSecimAktif: { background: '#fff', color: '#0b2a4a', boxShadow: '0 1px 3px rgba(15,23,42,.15)' },
   sesSecUst: { display: 'inline-flex', alignItems: 'center', gap: 5, height: 36, padding: '0 12px', borderRadius: 11, border: '1px solid #dbe3ee', background: '#fff', color: '#0b2a4a', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 },
   sesSecUstAcik: { background: '#0b2a4a', borderColor: '#0b2a4a', color: '#fff' },
   sesPanel: { border: '1px solid #e6ecf3', borderRadius: 16, padding: 10, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 460, overflowY: 'auto', WebkitOverflowScrolling: 'touch', scrollMarginTop: 80 },
