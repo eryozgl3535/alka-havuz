@@ -128,22 +128,99 @@ function cumleler(metin) {
 }
 
 // ------------------------------------------------------------ model
-async function modelSor(sistem, contents, model) {
+// parcaGeldi verilirse cevap akışlı istenir: Claude yazdıkça parcaGeldi(metinParçası) çağrılır
+async function modelSor(sistem, contents, model, parcaGeldi) {
   let res;
   try {
     res = await fetch('/api/asistan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sistem, contents, tools: ARACLAR, model }),
+      body: JSON.stringify({ sistem, contents, tools: ARACLAR, model, akis: !!parcaGeldi }),
       signal: AbortSignal.timeout ? AbortSignal.timeout(58000) : undefined,
     });
   } catch (e) {
     if (e?.name === 'TimeoutError' || e?.name === 'AbortError') throw Object.assign(new Error('Cevap çok gecikti. Tekrar dene.'), { kod: 'zaman' });
     throw Object.assign(new Error('Sunucuya ulaşılamadı. İnternet bağlantını kontrol et.'), { kod: 'ag' });
   }
+  if (res.ok && parcaGeldi && /ndjson/.test(res.headers.get('content-type') || '') && res.body?.getReader) {
+    const okuyucu = res.body.getReader();
+    const coz = new TextDecoder();
+    let tampon = '', son = null;
+    const satirIsle = (satir) => {
+      if (!satir.trim()) return;
+      let v; try { v = JSON.parse(satir); } catch { return; }
+      if (v.d) { try { parcaGeldi(v.d); } catch { /* yok */ } }
+      else if (v.son) son = v.son;
+      else if (v.hata) throw Object.assign(new Error(v.hata), { kod: 'zaman' });
+    };
+    for (;;) {
+      const { value, done } = await okuyucu.read();
+      if (done) break;
+      tampon += coz.decode(value, { stream: true });
+      let i;
+      while ((i = tampon.indexOf('\n')) >= 0) { satirIsle(tampon.slice(0, i)); tampon = tampon.slice(i + 1); }
+    }
+    satirIsle(tampon);
+    if (!son) throw Object.assign(new Error('Cevap yarım kaldı. Tekrar dene.'), { kod: 'zaman' });
+    return son;
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw Object.assign(new Error(data.hata || 'Sunucu hatası ' + res.status), { kod: data.kod || 'sunucu' });
   return data;
+}
+
+// Akışlı seslendirme: cümleler geldikçe Azure'da hazırlanır, sırayla çalınır. bitir() sonrası kuyruk bitince sonunda() çağrılır.
+function sesAkisiOlustur(sonunda) {
+  const kuyruk = [];
+  let caliyor = false, bitti = false, iptal = false, tampon = '', bitisCagrildi = false, parcaSayisi = 0;
+  const nesil = ++azureNesil;
+  const hazirla = (c) => {
+    const p = fetch('/api/ses-oku', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ metin: c, ses: azureSesiOku() }) })
+      .then(async (r) => { if (!r.ok) throw new Error('ses yok'); return azureAC.decodeAudioData(await r.arrayBuffer()); });
+    p.catch(() => {});
+    return p;
+  };
+  const kapat = () => { if (bitisCagrildi) return; bitisCagrildi = true; sonunda(); };
+  const cal = async () => {
+    if (caliyor) return;
+    caliyor = true;
+    while (kuyruk.length && !iptal && nesil === azureNesil) {
+      const p = kuyruk.shift();
+      let veri; try { veri = await p; } catch { continue; }
+      if (iptal || nesil !== azureNesil) break;
+      if (azureAC.state === 'suspended') await azureAC.resume().catch(() => {});
+      await new Promise((tamam) => {
+        const k = azureAC.createBufferSource();
+        k.buffer = veri; k.connect(azureAC.destination);
+        azureKaynak = k;
+        const emniyet = setTimeout(tamam, veri.duration * 1000 + 1500);
+        k.onended = () => { clearTimeout(emniyet); if (azureKaynak === k) azureKaynak = null; tamam(); };
+        k.start(0);
+      });
+    }
+    caliyor = false;
+    if ((bitti && !kuyruk.length) || iptal || nesil !== azureNesil) kapat();
+  };
+  const cumleAt = (c) => { const t = c.replace(/\s+/g, ' ').trim(); if (t.length > 1) { kuyruk.push(hazirla(t)); cal(); } };
+  return {
+    parca(d) {
+      if (iptal) return;
+      parcaSayisi++;
+      tampon += d;
+      // Cümle sonu (. ! ? … ya da satır sonu) gelince o cümleyi hemen seslendirmeye gönder
+      let m;
+      while ((m = tampon.match(/^([\s\S]*?[.!?…:](?=\s)|[\s\S]*?\n)/))) {
+        const c = m[1];
+        if (c.trim().length < 12 && tampon.length < 60 && !/\n/.test(c)) break; // çok kısa parçaları biriktir
+        tampon = tampon.slice(c.length);
+        cumleAt(c);
+      }
+    },
+    bitir() { if (tampon.trim()) cumleAt(tampon); tampon = ''; bitti = true; if (!caliyor && !kuyruk.length) kapat(); else cal(); },
+    iptal() { iptal = true; kapat(); },
+    sessizIptal() { iptal = true; bitisCagrildi = true; },
+    get parcaVar() { return parcaSayisi > 0; },
+  };
 }
 
 function sistemMetni(musteriler, ad, sesli) {
@@ -604,16 +681,17 @@ export default function SesliAsistan({ ad, onDegisti }) {
   }
 
   // Bir soruyu araç turlarıyla birlikte çözer; sadece metin cevabı ve yapılan işlemleri döndürür.
-  async function coz(sistem, onceki, soru, eylemler) {
+  async function coz(sistem, onceki, soru, eylemler, akis) {
     let gecmis = [...onceki, { role: 'user', parts: [{ text: soru }] }];
     let model;
     for (let tur = 0; tur < MAX_TUR; tur++) {
-      const r = await modelSor(sistem, gecmis, model);
+      const r = await modelSor(sistem, gecmis, model, akis ? (d) => { setKonusuyor(true); akis.parca(d); } : undefined);
       model = r.model; // araç turunun devamı aynı modelde kalsın
       const icerik = r.icerik && Array.isArray(r.icerik.parts) ? r.icerik : { role: 'model', parts: [{ text: r.metin || '' }] };
       gecmis = [...gecmis, icerik];
       const cagrilar = icerik.parts.filter((p) => p.functionCall);
       if (!cagrilar.length) return String(r.metin || '').trim();
+      if (akis) akis.parca('\n'); // araç öncesi söylenen kısa cümleyi hemen seslendir
       const yazar = cagrilar.some((p) => YAZAN_ARACLAR.has(p.functionCall.name));
       setDurumYazi(yazar ? 'Kaydediyorum' : 'Kayıtlara bakıyorum');
       const sonuclar = yazar
@@ -683,16 +761,18 @@ export default function SesliAsistan({ ad, onDegisti }) {
     const saatSimdi = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul' });
     const soru = `[saat ${saatSimdi}] ` + notRef.current + t;
     notRef.current = '';
+    // Sesli cevap verilecekse Claude yazdıkça cümle cümle seslendir (ilk cümle hemen başlar)
+    const akis = (sesAcik || sesle || sohbetRef.current) && !azureYok && azureAC && !canliRef.current ? sesAkisiOlustur(() => sonraDinle()) : null;
     try {
       const sistem = sistemMetni(musteriler, ad, sohbetRef.current);
       let son;
       try {
-        son = await coz(sistem, gecmisRef.current, soru, eylemler);
+        son = await coz(sistem, gecmisRef.current, soru, eylemler, akis);
       } catch (e) {
         // Geçmiş yüzünden reddedildiyse (ya da geçici hata) ve henüz kayıt yapılmadıysa: geçmişsiz bir kez daha dene
-        if (eylemler.length || !['istek', 'zaman', 'sunucu'].includes(e.kod)) throw e;
+        if (eylemler.length || !['istek', 'zaman', 'sunucu'].includes(e.kod) || akis?.parcaVar) throw e;
         gecmisRef.current = [];
-        son = await coz(sistem, [], soru, eylemler);
+        son = await coz(sistem, [], soru, eylemler, akis);
       }
       if (!son) son = eylemler.length ? 'Tamam, hallettim.' : 'Anlayamadım, tekrar söyler misin?';
       // Sonraki mesajlar için sadece soru + cevap metnini sakla (hızlı ve hafif)
@@ -703,9 +783,11 @@ export default function SesliAsistan({ ad, onDegisti }) {
       hataSayac.current = 0;
       const ek = eylemler.length ? { eylemler } : {};
       if (bekleyenSil.current) ek.silOnay = { ...bekleyenSil.current };
-      asistanDer(son, ek, sesle);
+      if (akis && akis.parcaVar) { ekle('asistan', son, ek); akis.bitir(); }
+      else { akis?.sessizIptal(); asistanDer(son, ek, sesle); }
       if (eylemler.length) { await veriYukle(); onDegisti && onDegisti(); }
     } catch (e) {
+      akis?.sessizIptal();
       if (eylemler.length) ekle('asistan', 'İşlem yarıda kaldı ama şunları yaptım:', { eylemler });
       setHata(e?.message || 'Bir hata oldu, tekrar dene.');
       hataSayac.current += 1;
@@ -743,7 +825,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
       for (let i = 0; i < e.results.length; i++) { metin += e.results[i][0].transcript; if (!e.results[i].isFinal) tamam = false; }
       sonMetin.current = metin;
       setAraMetin(metin);
-      if (metin.trim()) susmaBekle(tamam ? 700 : 1200);
+      if (metin.trim()) susmaBekle(tamam ? 500 : 950);
     };
     r.onerror = (e) => {
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { setHata('Mikrofon izni verilmedi. Tarayıcı ayarlarından bu siteye mikrofon izni ver.'); sohbetRef.current = false; setSohbet(false); }

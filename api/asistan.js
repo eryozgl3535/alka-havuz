@@ -73,7 +73,7 @@ async function claudeCagir(anahtar, govde, sure) {
 }
 
 // Başarılıysa cevabı yollar ve true döner; olmazsa sebebi döner ('kredi' | 'anahtar' | false).
-async function claudeIle(res, anahtar, { sistem, contents, tools }, baslangic) {
+async function claudeIle(res, anahtar, { sistem, contents, tools, akis }, baslangic) {
   const aracli = Array.isArray(tools) && tools.length > 0;
   const araclar = aracli ? tools.map((t) => ({
     name: t.name, description: t.description || '',
@@ -90,6 +90,7 @@ async function claudeIle(res, anahtar, { sistem, contents, tools }, baslangic) {
     ...(araclar ? { tools: araclar } : {}),
   };
   if (!govde.messages.length) { cevap(res, 400, { hata: 'Mesaj yok.' }); return true; }
+  if (akis && await claudeAkis(res, anahtar, govde, baslangic)) return true;
 
   let son = '';
   for (let deneme = 0; deneme < 2; deneme++) {
@@ -121,6 +122,66 @@ async function claudeIle(res, anahtar, { sistem, contents, tools }, baslangic) {
   }
   console.error(son);
   return false;
+}
+
+// ------------------------------------------------------------ akışlı cevap
+// Claude yazdıkça parça parça gönderir (satır başına bir JSON): {"d":"metin parçası"} ... sonunda {"son":{...}}
+// Böylece tarayıcı ilk cümle gelir gelmez seslendirmeye başlar. Akış açılamazsa false döner (normal yola düşülür).
+async function claudeAkis(res, anahtar, govde, baslangic) {
+  let r;
+  try {
+    r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': anahtar, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ ...govde, stream: true }),
+      signal: AbortSignal.timeout(30000),
+    });
+  } catch { return false; }
+  if (!r.ok || !r.body) return false;
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Accel-Buffering', 'no');
+  const bloklar = [];   // { type, text } | { type:'tool_use', id, name, json }
+  let bitis = null, tampon = '';
+  const coz = new TextDecoder();
+  try {
+    for await (const parca of r.body) {
+      tampon += coz.decode(parca, { stream: true });
+      let i;
+      while ((i = tampon.indexOf('\n\n')) >= 0) {
+        const olay = tampon.slice(0, i); tampon = tampon.slice(i + 2);
+        const veriSatir = olay.split('\n').find((x) => x.startsWith('data:'));
+        if (!veriSatir) continue;
+        let v; try { v = JSON.parse(veriSatir.slice(5)); } catch { continue; }
+        if (v.type === 'content_block_start') {
+          const b = v.content_block || {};
+          bloklar[v.index] = b.type === 'tool_use' ? { type: 'tool_use', id: b.id, name: b.name, json: '' } : { type: 'text', text: '' };
+        } else if (v.type === 'content_block_delta') {
+          const b = bloklar[v.index]; if (!b) continue;
+          if (v.delta?.type === 'text_delta') { b.text += v.delta.text; res.write(JSON.stringify({ d: v.delta.text }) + '\n'); }
+          else if (v.delta?.type === 'input_json_delta') b.json += v.delta.partial_json || '';
+        } else if (v.type === 'message_delta') {
+          bitis = v.delta?.stop_reason || bitis;
+        } else if (v.type === 'error') {
+          res.write(JSON.stringify({ hata: v.error?.message || 'Claude hatası' }) + '\n');
+          return res.end(), true;
+        }
+      }
+    }
+  } catch (e) {
+    res.write(JSON.stringify({ hata: e?.message || 'Bağlantı koptu' }) + '\n');
+    return res.end(), true;
+  }
+  const parts = [];
+  for (const b of bloklar.filter(Boolean)) {
+    if (b.type === 'text' && b.text) parts.push({ text: b.text });
+    else if (b.type === 'tool_use') { let args = {}; try { args = b.json ? JSON.parse(b.json) : {}; } catch { /* boş */ } parts.push({ functionCall: { id: b.id, name: b.name, args } }); }
+  }
+  const metin = bloklar.filter((b) => b?.type === 'text').map((b) => b.text).join('');
+  res.write(JSON.stringify({ son: { metin, icerik: { role: 'model', parts }, bitis, model: CLAUDE_MODEL, sure: Date.now() - baslangic } }) + '\n');
+  res.end();
+  return true;
 }
 
 // ------------------------------------------------------------ giriş
