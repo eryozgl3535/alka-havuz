@@ -150,6 +150,7 @@ async function modelSor(sistem, contents, model, parcaGeldi) {
       if (!satir.trim()) return;
       let v; try { v = JSON.parse(satir); } catch { return; }
       if (v.d) { try { parcaGeldi(v.d); } catch { /* yok */ } }
+      else if (v.arac) { try { parcaGeldi(null, v.arac); } catch { /* yok */ } }
       else if (v.son) son = v.son;
       else if (v.hata) throw Object.assign(new Error(v.hata), { kod: 'zaman' });
     };
@@ -185,9 +186,10 @@ function sesAkisiOlustur(sonunda) {
     if (caliyor) return;
     caliyor = true;
     while (kuyruk.length && !iptal && nesil === azureNesil) {
-      const p = kuyruk.shift();
-      let veri; try { veri = await p; } catch { continue; }
+      const o = kuyruk.shift();
+      let veri; try { veri = await o.p; } catch { continue; }
       if (iptal || nesil !== azureNesil) break;
+      if (o.tur !== tur) continue;
       if (azureAC.state === 'suspended') await azureAC.resume().catch(() => {});
       await new Promise((tamam) => {
         const k = azureAC.createBufferSource();
@@ -201,7 +203,8 @@ function sesAkisiOlustur(sonunda) {
     caliyor = false;
     if ((bitti && !kuyruk.length) || iptal || nesil !== azureNesil) kapat();
   };
-  const cumleAt = (c) => { const t = c.replace(/\s+/g, ' ').trim(); if (t.length > 1) { kuyruk.push(hazirla(t)); cal(); } };
+  let tur = 0; // araç çağrısı gelince artar: o turun henüz çalmaya başlamamış cümleleri atlanır
+  const cumleAt = (c) => { const t = c.replace(/\s+/g, ' ').trim(); if (t.length > 1) { kuyruk.push({ p: hazirla(t), tur }); cal(); } };
   return {
     parca(d) {
       if (iptal) return;
@@ -219,6 +222,8 @@ function sesAkisiOlustur(sonunda) {
     bitir() { if (tampon.trim()) cumleAt(tampon); tampon = ''; bitti = true; if (!caliyor && !kuyruk.length) kapat(); else cal(); },
     iptal() { iptal = true; kapat(); },
     sessizIptal() { iptal = true; bitisCagrildi = true; },
+    // Claude bir araç çağırdı: o ana kadarki metin ön açıklamaydı, çalmamış olanları at
+    aracGeldi() { tampon = ''; tur++; kuyruk.length = 0; parcaSayisi = 0; },
     get parcaVar() { return parcaSayisi > 0; },
   };
 }
@@ -685,13 +690,12 @@ export default function SesliAsistan({ ad, onDegisti }) {
     let gecmis = [...onceki, { role: 'user', parts: [{ text: soru }] }];
     let model;
     for (let tur = 0; tur < MAX_TUR; tur++) {
-      const r = await modelSor(sistem, gecmis, model, akis ? (d) => { setKonusuyor(true); akis.parca(d); } : undefined);
+      const r = await modelSor(sistem, gecmis, model, akis ? (d, arac) => { if (arac) { akis.aracGeldi(); return; } setKonusuyor(true); akis.parca(d); } : undefined);
       model = r.model; // araç turunun devamı aynı modelde kalsın
       const icerik = r.icerik && Array.isArray(r.icerik.parts) ? r.icerik : { role: 'model', parts: [{ text: r.metin || '' }] };
       gecmis = [...gecmis, icerik];
       const cagrilar = icerik.parts.filter((p) => p.functionCall);
       if (!cagrilar.length) return String(r.metin || '').trim();
-      if (akis) akis.parca('\n'); // araç öncesi söylenen kısa cümleyi hemen seslendir
       const yazar = cagrilar.some((p) => YAZAN_ARACLAR.has(p.functionCall.name));
       setDurumYazi(yazar ? 'Kaydediyorum' : 'Kayıtlara bakıyorum');
       const sonuclar = yazar

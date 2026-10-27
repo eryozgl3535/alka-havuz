@@ -157,6 +157,7 @@ async function claudeAkis(res, anahtar, govde, baslangic) {
         if (v.type === 'content_block_start') {
           const b = v.content_block || {};
           bloklar[v.index] = b.type === 'tool_use' ? { type: 'tool_use', id: b.id, name: b.name, json: '' } : { type: 'text', text: '' };
+          if (b.type === 'tool_use') res.write(JSON.stringify({ arac: b.name }) + '\n'); // tarayıcı ön açıklamayı seslendirmesin
         } else if (v.type === 'content_block_delta') {
           const b = bloklar[v.index]; if (!b) continue;
           if (v.delta?.type === 'text_delta') { b.text += v.delta.text; res.write(JSON.stringify({ d: v.delta.text }) + '\n'); }
