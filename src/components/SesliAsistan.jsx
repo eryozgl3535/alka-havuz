@@ -89,6 +89,13 @@ if (typeof window !== 'undefined' && window.speechSynthesis) {
 
 // Azure doğal ses (varsa): Web Audio ile çalınır; iPhone'da ilk dokunuşta kilidi açılır, sonra hep açık kalır
 let azureYok = false;
+// Şimdilik doğal ses Microsoft Azure: ElevenLabs canlı görüşmesi kullanılmaz (true yapılırsa önce ElevenLabs denenir)
+const ELEVENLABS_KULLAN = false;
+const AZURE_SESLER = [
+  { id: 'tr-TR-AhmetNeural', ad: 'Ahmet', cinsiyet: 'male', aciklama: 'Net, sakin erkek sesi' },
+  { id: 'tr-TR-EmelNeural', ad: 'Emel', cinsiyet: 'female', aciklama: 'Net, sıcak kadın sesi' },
+];
+const azureSesiOku = () => { try { return localStorage.getItem('alka-azure-ses') || AZURE_SESLER[0].id; } catch { return AZURE_SESLER[0].id; } };
 let azureAC = null;
 let azureKaynak = null;
 function azureKilidiAc() {
@@ -289,7 +296,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
     let bitti = false;
     const devam = () => { if (bitti) return; bitti = true; sonraDinle(); };
     try {
-      const r = await fetch('/api/ses-oku', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ metin }) });
+      const r = await fetch('/api/ses-oku', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ metin, ses: azureSesiOku() }) });
       if (!r.ok) {
         const v = await r.json().catch(() => ({}));
         if (v.kod === 'yok' || v.kod === 'anahtar') azureYok = true;
@@ -451,22 +458,31 @@ export default function SesliAsistan({ ad, onDegisti }) {
   const adKisa = (ad) => String(ad || '').replace(/^ALKA Ses - /, '').split(' - ')[0].trim();
   async function sesPaneliAc() {
     if (sesPanel) { setSesPanel(false); try { dinletici.current?.pause(); } catch { /* yok */ } return; }
-    setSesPanel(true); setSesler(null); setPanelMesaj(null);
+    setSesPanel(true); setPanelMesaj(null);
     setTimeout(() => { try { panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch { /* yok */ } }, 60);
+    if (!ELEVENLABS_KULLAN) {
+      const secili = azureSesiOku();
+      setSeciliSes(secili); setSeciliAd(AZURE_SESLER.find((x) => x.id === secili)?.ad || '');
+      setSesler(AZURE_SESLER.map((x) => ({ ...x, tur: 'turkce', secildi: x.id === secili })));
+      return;
+    }
+    setSesler(null);
     try {
       const r = await fetch('/api/ses-asistan?sesler=1&t=' + Date.now(), { cache: 'no-store' });
       const v = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(v.hata || 'Ses listesi alınamadı');
       const ad = adKisa(v.seciliAd);
       setSeciliAd(ad); setSeciliSes(v.secili || null);
-      // Türkçe sesler kütüphaneye kopyalanınca kimliği değişir; adından eşleştir
       setSesler((v.sesler || []).map((x) => ({ ...x, secildi: x.id === v.secili || (!!ad && adKisa(x.ad).slice(0, 30) === ad.slice(0, 30)) })));
     } catch (e) { setSesler([]); setPanelMesaj({ tur: 'hata', yazi: e.message }); }
   }
   function sesDinle(v) {
     try { dinletici.current?.pause(); } catch { /* yok */ }
     if (sesIslem === 'calan:' + v.id) { setSesIslem(''); return; }
-    const a = new Audio(v.ornek || `/api/ses-asistan?ornek=${encodeURIComponent(v.id)}`);
+    const url = !ELEVENLABS_KULLAN
+      ? `/api/ses-oku?ses=${encodeURIComponent(v.id)}&metin=${encodeURIComponent('Merhaba Eray, ben ALKA asistanınım. Bugün iki bakım randevun var; ilki Alaçatı\'da saat onda.')}`
+      : (v.ornek || `/api/ses-asistan?ornek=${encodeURIComponent(v.id)}`);
+    const a = new Audio(url);
     dinletici.current = a;
     setSesIslem('calan:' + v.id);
     a.onended = () => setSesIslem('');
@@ -474,6 +490,13 @@ export default function SesliAsistan({ ad, onDegisti }) {
     a.play().catch(() => { setSesIslem(''); setPanelMesaj({ tur: 'hata', yazi: 'Örnek ses çalınamadı. Telefonun yan tuşundaki sessiz modu kapatıp tekrar dene.' }); });
   }
   async function sesiSec(v) {
+    if (!ELEVENLABS_KULLAN) {
+      try { localStorage.setItem('alka-azure-ses', v.id); } catch { /* yok */ }
+      setSeciliSes(v.id); setSeciliAd(v.ad);
+      setSesler((l) => (l || []).map((x) => ({ ...x, secildi: x.id === v.id })));
+      setPanelMesaj({ tur: 'ok', yazi: `Tamam! Asistanın sesi artık "${v.ad}".` });
+      return;
+    }
     setSesIslem('sec:' + v.id); setPanelMesaj({ tur: 'bekle', yazi: `"${adKisa(v.ad)}" sesi ayarlanıyor, birkaç saniye sürebilir…` });
     try {
       const r = await fetch('/api/ses-asistan?sec=1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: v.id, sahip: v.sahip, ad: v.ad }) });
@@ -504,7 +527,7 @@ export default function SesliAsistan({ ad, onDegisti }) {
       return;
     }
     try { mik?.getTracks?.().forEach((t) => t.stop()); } catch { /* yok */ }
-    const sonuc = await canliBaslat();
+    const sonuc = ELEVENLABS_KULLAN ? await canliBaslat() : false;
     if (sonuc === true) return;
     if (sonuc === 'izin') { sohbetRef.current = false; setSohbet(false); return; }
     sesKilidiAc();
