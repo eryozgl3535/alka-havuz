@@ -32,6 +32,20 @@ function takvimLinki(v, musteri) {
   return '/api/takvim?' + q.toString();
 }
 
+// Telefonun SAAT uygulamasında gerçek alarm: iPhone Kestirmeler'deki "ALKA Alarm" kestirmesini çalıştırır.
+// Saat alarmı sadece saat tutar (tarih yok), bu yüzden yalnızca önümüzdeki 24 saat içindeki hatırlatmalar için gösterilir.
+function alarmKurulabilir(v) {
+  if (!v.tarih || !/^\d{2}:\d{2}$/.test(v.saat || '')) return false;
+  const [y, m, d] = v.tarih.split('-').map(Number);
+  const [hh, mm] = v.saat.split(':').map(Number);
+  const fark = new Date(y, m - 1, d, hh, mm).getTime() - Date.now();
+  return fark > 0 && fark <= 24 * 3600000;
+}
+function alarmLinki(v) {
+  const metin = `${v.saat} ${String(v.baslik || 'Hatırlatma').slice(0, 60)}`;
+  return 'shortcuts://run-shortcut?name=' + encodeURIComponent('ALKA Alarm') + '&input=text&text=' + encodeURIComponent(metin);
+}
+
 function tutarYaz(t) {
   if (t == null) return '';
   return t.toLocaleString('tr-TR') + ' ₺';
@@ -219,6 +233,8 @@ export default function HatirlatmalarPage({ ad }) {
     setFormAcik(false);
     setForm(bosForm());
     setDuzenlenenId(null);
+    const kv = JSON.parse(icerik);
+    if (alarmKurulabilir(kv) && window.confirm(`Telefonun saat uygulamasına ${kv.saat} için alarm da kurulsun mu?`)) window.location.href = alarmLinki(kv);
   }
 
   async function sil(x) {
@@ -383,7 +399,8 @@ export default function HatirlatmalarPage({ ad }) {
               {!x.bitti && (
                 <div style={s.islemler}>
                   <button style={s.islem} onClick={() => formAc(x)}>Düzenle</button>
-                  {x.v.tarih && <a style={{ ...s.islem, textDecoration: 'none' }} href={takvimLinki(x.v, x.customers?.name)} target="_blank" rel="noreferrer">Takvime ekle (alarm)</a>}
+                  {alarmKurulabilir(x.v) && <a style={{ ...s.islem, textDecoration: 'none', color: '#fff', background: '#dc2626', padding: '5px 10px', borderRadius: 8 }} href={alarmLinki(x.v)}>⏰ Telefonda alarm kur</a>}
+                  {x.v.tarih && <a style={{ ...s.islem, textDecoration: 'none' }} href={takvimLinki(x.v, x.customers?.name)} target="_blank" rel="noreferrer">Takvime ekle</a>}
                   <button style={{ ...s.islem, color: '#b91c1c' }} onClick={() => sil(x)}>Sil</button>
                 </div>
               )}
