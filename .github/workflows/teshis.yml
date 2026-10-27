@@ -6,11 +6,21 @@ on:
       yol:
         description: 'Adres yolu, örn. /api/ses-asistan?durum=1'
         required: true
+      veri:
+        description: 'POST gövdesi (JSON, isteğe bağlı)'
+        required: false
+        default: ''
 jobs:
   bak:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - run: |
-          out=$(curl -sS --max-time 60 "https://alka-tesisat.vercel.app${{ inputs.yol }}" 2>&1 | head -c 3500 | tr '\n' ' ' || true)
+      - env:
+          VERI: ${{ inputs.veri }}
+        run: |
+          if [ -n "$VERI" ]; then
+            out=$(curl -sS --max-time 60 -X POST -H 'Content-Type: application/json' --data "$VERI" "https://alka-tesisat.vercel.app${{ inputs.yol }}" 2>&1 | head -c 3500 | tr '\n' ' ' || true)
+          else
+            out=$(curl -sS --max-time 60 "https://alka-tesisat.vercel.app${{ inputs.yol }}" 2>&1 | head -c 3500 | tr '\n' ' ' || true)
+          fi
           echo "::notice title=Sonuc::$out"
