@@ -725,10 +725,11 @@ export default function SesliAsistan({ ad, onDegisti }) {
       if (!canliRef.current) asistanDer('Tamam, silmedim.', {}, sesle);
       return;
     }
-    const { error } = await supabase.from('mesaj_kayitlari').delete().eq('id', b.id);
+    const idler = b.idler || [b.id];
+    const { error } = await supabase.from('mesaj_kayitlari').delete().in('id', idler);
     if (error) { setHata('Silinemedi: ' + error.message); asistanDer('Silemedim, bir hata oldu.', {}, sesle); return; }
     const eylem = { yazi: `Silindi: ${b.aciklama}`, durum: '', geriAl: async () => {
-      const { error: e2 } = await supabase.from('mesaj_kayitlari').insert([b.satir]);
+      const { error: e2 } = await supabase.from('mesaj_kayitlari').insert(b.satirlar || [b.satir]);
       if (e2) throw new Error(e2.message);
     } };
     gecmisRef.current = [...gecmisRef.current, { role: 'user', parts: [{ text: 'Evet, sil.' }] }, { role: 'model', parts: [{ text: `Sildim: ${b.aciklama}.` }] }].slice(-MAX_SOHBET * 2);

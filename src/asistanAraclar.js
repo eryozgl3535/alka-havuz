@@ -163,27 +163,31 @@ const CALISTIR = {
   },
 
   // ---------------- silme onayı (silmez; uygulama kullanıcıya sorar)
-  async kayit_sil({ id }) {
-    if (!id) throw new Error('Silinecek kaydın id\'si yok.');
-    const { data: satir, error } = await supabase.from('mesaj_kayitlari').select('*, customers(name)').eq('id', id).maybeSingle();
+  async kayit_sil({ id, idler }) {
+    const liste = [...new Set([...(Array.isArray(idler) ? idler : []), ...(id ? [id] : [])].map(String).filter(Boolean))].slice(0, 50);
+    if (!liste.length) throw new Error('Silinecek kaydın id\'si yok.');
+    const { data: satirlar, error } = await supabase.from('mesaj_kayitlari').select('*, customers(name)').in('id', liste);
     hataVer(error);
-    if (!satir) return { sonuc: { hata: 'Bu id ile kayıt bulunamadı. Önce listeleme aracıyla doğru kaydı bul.' } };
-    const musteri = satir.customers?.name;
-    const tur = String(satir.tur || '');
-    let aciklama;
-    if (tur.startsWith('hatirlatma')) {
-      const v = json(satir.mesaj);
-      aciklama = `"${v.baslik || 'Hatırlatma'}" hatırlatması` + (v.tutar ? ` (${Number(v.tutar).toLocaleString('tr-TR')} TL` + (v.tarih ? `, ${trTarih(v.tarih)})` : ')') : (v.tarih ? ` (${trTarih(v.tarih)})` : ''));
-    } else if (tur.startsWith('not')) {
-      aciklama = `"${kisalt(satir.mesaj, 60)}" notu`;
-    } else {
-      aciklama = `${musteri ? musteri + ' için ' : ''}"${kisalt(satir.baslik || satir.mesaj, 50)}" mesaj kaydı`;
-    }
-    if (musteri && !aciklama.includes(musteri)) aciklama += ` — ${musteri}`;
-    const { customers, ...ham } = satir; // geri almak için kaydın kendisi saklanır
+    if (!satirlar?.length) return { sonuc: { hata: 'Bu id ile kayıt bulunamadı. Önce listeleme aracıyla doğru kaydı bul.' } };
+    const tanim = (satir) => {
+      const musteri = satir.customers?.name;
+      const tur = String(satir.tur || '');
+      let a;
+      if (tur.startsWith('hatirlatma')) {
+        const v = json(satir.mesaj);
+        a = `"${v.baslik || 'Hatırlatma'}" hatırlatması` + (v.tutar ? ` (${Number(v.tutar).toLocaleString('tr-TR')} TL` + (v.tarih ? `, ${trTarih(v.tarih)})` : ')') : (v.tarih ? ` (${trTarih(v.tarih)})` : ''));
+      } else if (tur.startsWith('not')) a = `"${kisalt(satir.mesaj, 60)}" notu`;
+      else a = `${musteri ? musteri + ' için ' : ''}"${kisalt(satir.baslik || satir.mesaj, 50)}" mesaj kaydı`;
+      if (musteri && !a.includes(musteri)) a += ` — ${musteri}`;
+      return a;
+    };
+    const hepsiHat = satirlar.every((x) => String(x.tur || '').startsWith('hatirlatma'));
+    const aciklama = satirlar.length === 1 ? tanim(satirlar[0])
+      : `${satirlar.length} ${hepsiHat ? 'hatırlatma' : 'kayıt'} (${satirlar.slice(0, 3).map((x) => tanim(x).split(' (')[0].replace(/ hatırlatması$/, '')).join(', ')}${satirlar.length > 3 ? '…' : ''})`;
+    const hamlar = satirlar.map(({ customers, ...ham }) => ham); // geri almak için kayıtların kendisi saklanır
     return {
-      sonuc: `ONAY BEKLENİYOR, HENÜZ SİLİNMEDİ: ${aciklama}. Kullanıcıya tek cümleyle "${aciklama} siliniyor, emin misin?" diye sor. Kendin "sildim" deme; kullanıcı onaylarsa uygulama siler.`,
-      silOnay: { id, aciklama, satir: ham },
+      sonuc: `ONAY BEKLENİYOR, HENÜZ SİLİNMEDİ: ${aciklama}. Kullanıcıya tek cümleyle "${aciklama} silinecek, emin misin?" diye sor. Kendin "sildim" deme; kullanıcı evet derse uygulama siler.`,
+      silOnay: { id: hamlar.map((x) => x.id).join(','), idler: hamlar.map((x) => x.id), aciklama, satirlar: hamlar },
     };
   },
 

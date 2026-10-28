@@ -25,7 +25,7 @@ export const ARACLAR = [
   { name: 'mesaj_gecmisi', description: 'Müşterilere gönderilmiş mesaj kayıtları (WhatsApp/SMS bilgilendirme, bakım hatırlatması) id ile.', parameters: S({ musteri_id: str('Sadece bu müşteri (isteğe bağlı)') }) },
 
   // --- silme (ONAYLI): bu araç silmez, sadece kullanıcıdan onay ister; onaydan sonra uygulama siler
-  { name: 'kayit_sil', description: 'Bir notu, hatırlatmayı/ödemeyi ya da mesaj kaydını silmek için KULLANICIDAN ONAY İSTER. Kaydı hemen silmez: uygulama kullanıcıya "emin misin?" diye sorar, kullanıcı evet derse uygulama siler. Önce notlar / hatirlatmalar / mesaj_gecmisi araçlarıyla doğru kaydın id\'sini bul; birden fazla aday varsa önce hangisi olduğunu sor.', parameters: S({ id: str('Silinecek kaydın id\'si') }, ['id']) },
+  { name: 'kayit_sil', description: 'Bir notu, hatırlatmayı/ödemeyi ya da mesaj kaydını silmek için KULLANICIDAN ONAY İSTER. Kaydı hemen silmez: uygulama kullanıcıya "emin misin?" diye sorar, kullanıcı evet derse uygulama siler. Önce notlar / hatirlatmalar / mesaj_gecmisi araçlarıyla doğru kaydın id\'sini bul; birden fazla aday varsa önce hangisi olduğunu sor. Birden fazla kayıt silinecekse (ör. "gecikmiş hatırlatmaları sil", "hepsini sil") hepsini TEK çağrıda idler ile ver.', parameters: S({ id: str('Tek kayıt silinecekse id\'si'), idler: { type: 'ARRAY', items: { type: 'STRING' }, description: 'Birden fazla kayıt silinecekse hepsinin id\'leri (örn. "hatırlatmaları sil", "gecikmişleri sil")' } }) },
 
   // --- yazma (hepsi geri alınabilir)
   { name: 'musteri_ekle', description: 'Yeni müşteri ekler. Önce aynı isimde müşteri var mı diye müşteri listesine bak.', parameters: S({ ad: str('Ad soyad'), telefon: str('Telefon'), adres: str('Adres / site / bölge'), not: str('Not') }, ['ad']) },
@@ -88,7 +88,7 @@ UYGULAMAYA HÂKİMSİN
 - Hatırlatmada saat söylenirse ("öğleden sonra 3'te" → 15:00) saat alanına yaz; söylenmezse 09:00. O saatte telefona bildirim gider.
 - Tarih: "20'sinde" → bu ayın 20'si, geçtiyse gelecek ayın. "yarın", "cuma", "haftaya" bugüne göre. "30 bin" = 30000.
 - Birden fazla iş istenirse hepsini yap; araçları mümkünse aynı turda birlikte çağır.
-- SİLME: Not, hatırlatma/ödeme ve mesaj kaydı silebilirsin ama SADECE kayit_sil aracıyla. Önce notlar / hatirlatmalar / mesaj_gecmisi ile doğru kaydı bul; birden fazla aday varsa hangisi olduğunu sor. kayit_sil kaydı hemen silmez, kullanıcıdan onay ister: sen de "… siliniyor, emin misin?" diye sor. Kullanıcı onaylamadan ASLA "sildim" deme. Müşteri, iş emri, cihaz gibi diğer kayıtları silemezsin; onlar için ilgili sayfayı söyle.
+- SİLME: Kullanıcı "sil" derse sil: not, hatırlatma/ödeme ve mesaj kaydı silebilirsin, SADECE kayit_sil aracıyla. "Hatırlatmaları sil", "gecikmiş/eski hatırlatmaları sil", "tamamlananları sil" gibi çoğul isteklerde hatirlatmalar ile listeyi al ve uygun olanların hepsini tek kayit_sil çağrısında idler ile ver (tek tek sorma). "Bunu silemem" deme. Önce notlar / hatirlatmalar / mesaj_gecmisi ile doğru kaydı bul; birden fazla aday varsa hangisi olduğunu sor. kayit_sil kaydı hemen silmez, kullanıcıdan onay ister: sen de "… siliniyor, emin misin?" diye sor. Kullanıcı onaylamadan ASLA "sildim" deme. Müşteri, iş emri, cihaz gibi diğer kayıtları silemezsin; onlar için ilgili sayfayı söyle.
 - "Ödemesi yapıldı / alındı" denirse bunu silme olarak değil, hatirlatma_tamamla ile tamamlandı olarak işle; kullanıcı açıkça "sil" derse kayit_sil kullan.
 
 MÜŞTERİ LİSTESİ (id|ad):
