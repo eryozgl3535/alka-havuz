@@ -68,7 +68,7 @@ async function saatliGonder(url, basliklar) {
     if (!isaret.ok) continue;
     hatirlatma++;
     const govde = [v.tutar != null ? tl(v.tutar) : '', k.customers?.name || '', v.aciklama || ''].filter(Boolean).join(' · ') || `Saat ${v.saat} hatırlatması`;
-    gonderilen += await herkeseGonder(url, basliklar, JSON.stringify({ baslik: `⏰ ${v.baslik || 'Hatırlatma'}`, govde, url: '/', etiket: `alka-hat-${k.id}`, alarm: true }));
+    gonderilen += await herkeseGonder(url, basliklar, JSON.stringify({ baslik: `⏰ ${v.baslik || 'Hatırlatma'}`, govde, url: '/?sayfa=hatirlatmalar', etiket: `alka-hat-${k.id}`, alarm: true }));
   }
   return { hatirlatma, gonderilen, saat: simdi };
 }
@@ -129,16 +129,18 @@ export default async function handler(req, res) {
     const geciken = liste.filter((v) => v.tarih < bugun);
     if (!bugunku.length && !geciken.length) return cevap(res, 200, { gonderilen: 0, neden: 'Bugün hatırlatma yok' });
 
-    const satir = (v) => `• ${v.baslik || 'Hatırlatma'}${v.tutar != null ? ' — ' + tl(v.tutar) : ''}`;
+    const satir = (v) => `• ${v.baslik || 'Hatırlatma'}${v.saat ? ' (' + v.saat + ')' : ''}${v.tutar != null ? ' — ' + tl(v.tutar) : ''}`;
     const parcalar = [];
-    if (bugunku.length) parcalar.push(...bugunku.slice(0, 5).map(satir));
-    if (bugunku.length > 5) parcalar.push(`+${bugunku.length - 5} tane daha`);
-    if (geciken.length) parcalar.push(`⚠️ ${geciken.length} gecikmiş hatırlatma var`);
+    if (bugunku.length) parcalar.push('Bugün:', ...bugunku.slice(0, 4).map(satir));
+    if (bugunku.length > 4) parcalar.push(`+${bugunku.length - 4} tane daha`);
+    if (geciken.length) {
+      parcalar.push('Tarihi geçmiş, hâlâ açık:', ...geciken.slice(0, 3).map(satir));
+      if (geciken.length > 3) parcalar.push(`+${geciken.length - 3} tane daha`);
+      parcalar.push('Yapıldıysa açıp "Tamamlandı" işaretle, bir daha hatırlatmam.');
+    }
     const sabah = saatIstanbul() < 15;
-    const baslik = bugunku.length
-      ? `${sabah ? 'Günaydın' : 'Akşam hatırlatması'} · Bugün ${bugunku.length} hatırlatma`
-      : `${geciken.length} gecikmiş hatırlatma`;
-    const yuk = JSON.stringify({ baslik, govde: parcalar.join('\n'), url: '/' });
+    const baslik = `📋 ${sabah ? 'Sabah' : 'Akşam'} hatırlatma özeti · ` + [bugunku.length ? `bugün ${bugunku.length}` : '', geciken.length ? `${geciken.length} gecikmiş` : ''].filter(Boolean).join(', ');
+    const yuk = JSON.stringify({ baslik, govde: parcalar.join('\n'), url: '/?sayfa=hatirlatmalar' });
 
     // 2) Abone cihazlar
     const gonderilen = await herkeseGonder(url, basliklar, yuk);

@@ -91,7 +91,14 @@ export default function App() {
 function AnaUygulama() {
   const [session, setSession] = useState(null);
   const [hazir, setHazir] = useState(false);
-  const [sayfa, setSayfa] = useState('anasayfa');
+  // Bildirimden gelindiyse (?sayfa=hatirlatmalar) doğrudan o sayfayı aç
+  const [sayfa, setSayfa] = useState(() => {
+    try {
+      const q = new URLSearchParams(window.location.search).get('sayfa');
+      if (q) { window.history.replaceState(null, '', window.location.pathname); return q; }
+    } catch { /* yok */ }
+    return 'anasayfa';
+  });
   const [genis, setGenis] = useState(window.innerWidth >= 900);
   const [menuAcik, setMenuAcik] = useState(false);
   const [artiAcik, setArtiAcik] = useState(false);
