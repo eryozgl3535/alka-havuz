@@ -1,5 +1,5 @@
 // Günlük hatırlatma bildirimi (telefon/bilgisayar bildirimi).
-// GET  → Vercel Cron her gün 10:00 ve 21:00'de (İstanbul) çağırır: bugünkü + gecikmiş hatırlatmaları tüm abone cihazlara yollar.
+// GET  → (KAPALI: Eray istemedi, vercel.json'daki zamanlama kaldırıldı) günlük özet: bugünkü + gecikmiş hatırlatmalar.
 // POST → { abonelik } ile sadece o cihaza deneme bildirimi yollar ("Bildirimleri aç" butonundan sonra).
 // GET ?saatli=1 → saati gelmiş hatırlatmaları TEK TEK, alarm gibi bildirir (her hatırlatma bir kez).
 //   Birkaç dakikada bir GitHub Actions zamanlayıcısı çağırır (.github/workflows/hatirlatma-saatli.yml).

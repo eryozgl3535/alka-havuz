@@ -181,13 +181,15 @@ const CALISTIR = {
       if (musteri && !a.includes(musteri)) a += ` — ${musteri}`;
       return a;
     };
-    const hepsiHat = satirlar.every((x) => String(x.tur || '').startsWith('hatirlatma'));
-    const aciklama = satirlar.length === 1 ? tanim(satirlar[0])
-      : `${satirlar.length} ${hepsiHat ? 'hatırlatma' : 'kayıt'} (${satirlar.slice(0, 3).map((x) => tanim(x).split(' (')[0].replace(/ hatırlatması$/, '')).join(', ')}${satirlar.length > 3 ? '…' : ''})`;
-    const hamlar = satirlar.map(({ customers, ...ham }) => ham); // geri almak için kayıtların kendisi saklanır
+    // Birden fazla kayıt: TOPLU silinmez, uygulama her birini sırayla tek tek sorar (sil / kalsın)
+    const hamlar = satirlar.map(({ customers, ...ham }) => ({ id: ham.id, aciklama: tanim({ ...ham, customers }), satir: ham }));
+    const [ilk, ...kalan] = hamlar;
+    const sira = hamlar.length > 1 ? ` (1/${hamlar.length})` : '';
     return {
-      sonuc: `ONAY BEKLENİYOR, HENÜZ SİLİNMEDİ: ${aciklama}. Kullanıcıya tek cümleyle "${aciklama} silinecek, emin misin?" diye sor. Kendin "sildim" deme; kullanıcı evet derse uygulama siler.`,
-      silOnay: { id: hamlar.map((x) => x.id).join(','), idler: hamlar.map((x) => x.id), aciklama, satirlar: hamlar },
+      sonuc: hamlar.length > 1
+        ? `ONAY BEKLENİYOR, HENÜZ SİLİNMEDİ. ${hamlar.length} kayıt var; uygulama bunları TEK TEK soracak. Sen sadece ilkini sor: "${ilk.aciklama} silinsin mi, yoksa kalsın mı?" Kendin "sildim" deme.`
+        : `ONAY BEKLENİYOR, HENÜZ SİLİNMEDİ: ${ilk.aciklama}. Kullanıcıya tek cümleyle "${ilk.aciklama} silinsin mi, kalsın mı?" diye sor. Kendin "sildim" deme; kullanıcı evet derse uygulama siler.`,
+      silOnay: { id: ilk.id, aciklama: ilk.aciklama + sira, satir: ilk.satir, kalan, toplam: hamlar.length, no: 1 },
     };
   },
 

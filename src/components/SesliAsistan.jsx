@@ -30,8 +30,8 @@ function veriCoz(mesaj) {
 const kucuk = (x) => String(x || '').toLocaleLowerCase('tr-TR').trim();
 const BITIR = /^(g[öo]r[üu][şs][üu]r[üu]z|kapat|bitir|sohbeti bitir|tamam bu kadar|bu kadar|ho[şs][çc]a kal|g[üu]le g[üu]le|ba[şs]ka bir [şs]ey yok)\b/;
 const SON = '(?=\\s|$)';
-const EVET = new RegExp('^(evet|eve|aynen|onayl[ıi]yorum|onayla|onay|sil|evet sil|tamam|tamam sil|olur|olur sil|emin[ıi]m|kesinlikle|do[ğg]ru)' + SON);
-const HAYIR = new RegExp('^(hay[ıi]r|yok|vazge[çc]|iptal|silme|dur|bekle|istemiyorum|olmaz)' + SON);
+const EVET = new RegExp('^(evet|eve|aynen|onayl[ıi]yorum|onayla|onay|sil|silinsin|evet sil|evet silinsin|tamam|tamam sil|olur|olur sil|emin[ıi]m|kesinlikle|do[ğg]ru)' + SON);
+const HAYIR = new RegExp('^(hay[ıi]r|yok|vazge[çc]|iptal|silme|kals[ıi]n|bu kals[ıi]n|dursun|dur|bekle|istemiyorum|olmaz)' + SON);
 const MAX_TUR = 5;          // bir mesajda en fazla kaç araç turu
 const MAX_SOHBET = 10;      // modele hatırlatılan en fazla önceki soru-cevap sayısı
 
@@ -713,30 +713,38 @@ export default function SesliAsistan({ ad, onDegisti }) {
     return '';
   }
 
-  // Onaylanan silme: kaydı siler, "Geri al" ile aynı kaydı geri koyar
+  // Silme onayı: "evet" → siler ("Geri al" ile geri gelir), "hayır/kalsın" → bırakır.
+  // Birden fazla kayıt varsa her biri sırayla tek tek sorulur.
   async function silmeyiUygula(onay, sesle) {
     const b = bekleyenSil.current;
-    try { canliRef.current?.sendContextualUpdate?.(b ? `Kullanıcı "${b.aciklama}" silme isteğini ${onay ? 'onayladı, kayıt silindi' : 'iptal etti, silinmedi'}.` : ''); } catch { /* yok */ }
+    try { canliRef.current?.sendContextualUpdate?.(b ? `Kullanıcı "${b.aciklama}" için ${onay ? 'silmeyi onayladı, silindi' : 'kalsın dedi, silinmedi'}.` : ''); } catch { /* yok */ }
     bekleyenSil.current = null;
     setMesajlar((l) => l.map((m) => (m.silOnay && m.silOnay.id === b?.id ? { ...m, silOnay: { ...m.silOnay, durum: onay ? 'silindi' : 'iptal' } } : m)));
     if (!b) return;
-    if (!onay) {
-      gecmisRef.current = [...gecmisRef.current, { role: 'user', parts: [{ text: 'Hayır, silme.' }] }, { role: 'model', parts: [{ text: `Tamam, ${b.aciklama} silinmedi.` }] }].slice(-MAX_SOHBET * 2);
-      if (!canliRef.current) asistanDer('Tamam, silmedim.', {}, sesle);
-      return;
-    }
-    const idler = b.idler || [b.id];
-    const { error } = await supabase.from('mesaj_kayitlari').delete().in('id', idler);
-    if (error) { setHata('Silinemedi: ' + error.message); asistanDer('Silemedim, bir hata oldu.', {}, sesle); return; }
-    const eylem = { yazi: `Silindi: ${b.aciklama}`, durum: '', geriAl: async () => {
-      const { error: e2 } = await supabase.from('mesaj_kayitlari').insert(b.satirlar || [b.satir]);
-      if (e2) throw new Error(e2.message);
-    } };
-    gecmisRef.current = [...gecmisRef.current, { role: 'user', parts: [{ text: 'Evet, sil.' }] }, { role: 'model', parts: [{ text: `Sildim: ${b.aciklama}.` }] }].slice(-MAX_SOHBET * 2);
-    if (canliRef.current) ekle('asistan', null, { eylemler: [eylem] }); // canlıda sözlü cevabı sesli ajan veriyor
-    else asistanDer('Sildim.', { eylemler: [eylem] }, sesle);
-    await veriYukle();
-    onDegisti && onDegisti();
+    let ilkSoz, eylemler = [];
+    if (onay) {
+      const { error } = await supabase.from('mesaj_kayitlari').delete().eq('id', b.id);
+      if (error) { setHata('Silinemedi: ' + error.message); asistanDer('Silemedim, bir hata oldu.', {}, sesle); return; }
+      eylemler = [{ yazi: `Silindi: ${b.aciklama}`, durum: '', geriAl: async () => {
+        const { error: e2 } = await supabase.from('mesaj_kayitlari').insert([b.satir]);
+        if (e2) throw new Error(e2.message);
+      } }];
+      ilkSoz = 'Sildim.';
+    } else ilkSoz = 'Tamam, kalsın.';
+    gecmisRef.current = [...gecmisRef.current,
+      { role: 'user', parts: [{ text: onay ? 'Evet, sil.' : 'Hayır, kalsın.' }] },
+      { role: 'model', parts: [{ text: onay ? `Sildim: ${b.aciklama}.` : `${b.aciklama} silinmedi, kaldı.` }] }].slice(-MAX_SOHBET * 2);
+    // Sırada başka kayıt varsa onu sor
+    const [sonraki, ...kalan] = b.kalan || [];
+    if (sonraki) {
+      const no = (b.no || 1) + 1;
+      const yeni = { id: sonraki.id, aciklama: `${sonraki.aciklama} (${no}/${b.toplam})`, satir: sonraki.satir, kalan, toplam: b.toplam, no };
+      bekleyenSil.current = yeni;
+      if (canliRef.current) ekle('asistan', null, { eylemler, silOnay: { ...yeni } });
+      else asistanDer(`${ilkSoz} Sıradaki: ${sonraki.aciklama}. Silinsin mi, kalsın mı?`, { ...(eylemler.length ? { eylemler } : {}), silOnay: { ...yeni } }, sesle);
+    } else if (canliRef.current) { if (eylemler.length) ekle('asistan', null, { eylemler }); }
+    else asistanDer(b.toplam > 1 ? `${ilkSoz} Hepsine baktık.` : ilkSoz, eylemler.length ? { eylemler } : {}, sesle);
+    if (onay) { await veriYukle(); onDegisti && onDegisti(); }
   }
 
   async function gonder(metin, sesle = false) {
@@ -987,11 +995,11 @@ export default function SesliAsistan({ ad, onDegisti }) {
                 <div style={{ ...s.silKart, ...(m.silOnay.durum ? { opacity: 0.6 } : {}) }}>
                   <div style={s.silBaslik}><Ikon ad="kapat" boyut={14} renk="#b91c1c" kalin={2.4} /> {m.silOnay.aciklama}</div>
                   {m.silOnay.durum ? (
-                    <div style={s.silDurum}>{m.silOnay.durum === 'silindi' ? 'Silindi' : 'Silinmedi'}</div>
+                    <div style={s.silDurum}>{m.silOnay.durum === 'silindi' ? 'Silindi' : 'Kaldı'}</div>
                   ) : (
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button style={s.silEvet} onClick={() => silmeyiUygula(true, false)}>Evet, sil</button>
-                      <button style={s.silHayir} onClick={() => silmeyiUygula(false, false)}>Vazgeç</button>
+                      <button style={s.silHayir} onClick={() => silmeyiUygula(false, false)}>Kalsın</button>
                     </div>
                   )}
                 </div>
